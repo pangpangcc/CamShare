@@ -1,0 +1,8 @@
+编译说明
+1. 执行 compile.sh 脚本
+  # ./compile.sh
+
+打包说明
+1. 执行 package.sh 脚本
+  # ./package.sh
+2. tar.gz包生成路径为 ./package

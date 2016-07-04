@@ -336,21 +336,35 @@ int Client::ParseCurrentPackage(Message* m) {
 }
 
 void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
-	// 进入会议室
-	if( pDataHttpParser->GetPath() == "/GETUSERBYSESSION" ) {
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"Client::ParseCommand( "
+			"tid : %d, "
+			"[解析命令], "
+			"pDataHttpParser->GetPath() : %s "
+			")",
+			(int)syscall(SYS_gettid),
+			pDataHttpParser->GetPath().c_str()
+			);
+	if( pDataHttpParser->GetPath() == "/GETDIALPLAN" ) {
+		// 进入会议室
 		if( mpClientCallback != NULL ) {
-			const string session = pDataHttpParser->GetParam("session");
+			const string rtmpSession = pDataHttpParser->GetParam("rtmpSession");
+			const string channelId = pDataHttpParser->GetParam("channelId");
+			const string conference = pDataHttpParser->GetParam("conference");
+			const string serverId = pDataHttpParser->GetParam("serverId");
+			const string siteId = pDataHttpParser->GetParam("siteId");
 
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseCommand( "
 					"tid : %d, "
-					"[解析命令:获取用户名] "
+					"[解析命令:获取拨号计划] "
 					")",
 					(int)syscall(SYS_gettid)
 					);
 
-			mpClientCallback->OnClientGetUserBySession(this, session);
+			mpClientCallback->OnClientGetDialplan(this, rtmpSession, channelId, conference, serverId, siteId);
 		}
 	} else {
 		if( mpClientCallback != NULL ) {

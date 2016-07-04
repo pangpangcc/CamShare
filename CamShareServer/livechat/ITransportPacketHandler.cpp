@@ -9,7 +9,6 @@
 #include "ITransportPacketHandler.h"
 #include "TransportPacketHandler.h"
 #include <common/CommonFunc.h>
-#include <common/CheckMomoryLeak.h>
 
 ITransportPacketHandler* ITransportPacketHandler::Create()
 {

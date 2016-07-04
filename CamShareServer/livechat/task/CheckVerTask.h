@@ -1,8 +1,7 @@
 /*
- * author: Samson.Fan
- *   date: 2015-03-30
- *   file: CheckVerTaskTask.h
- *   desc: 检测版本Task实现类
+ * CheckVerTask.h
+ *  Created on: 2016年3月11日
+ *      Author: max
  */
 
 #pragma once
@@ -24,8 +23,7 @@ public:
 	virtual bool Handle(const TransportProtocol* tp);
 	// 获取待发送的数据，可先获取data长度，如：GetSendData(NULL, 0, dataLen);
 	virtual bool GetSendData(void* data, unsigned int dataSize, unsigned int& dataLen);
-	// 获取待发送数据的类型
-	virtual TASK_PROTOCOL_TYPE GetSendDataProtocolType();
+	TASK_PROTOCOL_TYPE GetSendDataProtocolType();
 	// 获取命令号
 	virtual int GetCmdCode();
 	// 获取处理结果

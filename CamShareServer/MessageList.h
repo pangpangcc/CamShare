@@ -28,9 +28,11 @@ typedef struct Message {
 	int 	len;
 	int		index;
 	int		seq;
+	int		type;
+
 	unsigned int 	starttime;
 	unsigned int	totaltime;
-	int		type;
+
 	char	buffer[MAX_LOG_BUFFER_LEN];
 //	char    bitBuffer[128];
 	ev_io *wr;
@@ -39,8 +41,6 @@ typedef struct Message {
 	void Reset() {
 		len = 0;
 		seq = 0;
-		starttime = 0;
-		totaltime = 0;
 		memset(buffer, '\0', sizeof(buffer));
 //		memset(bitBuffer, '\0', sizeof(bitBuffer));
 		wr = NULL;

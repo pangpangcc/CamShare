@@ -7,7 +7,6 @@
 
 #include "TaskMapManager.h"
 #include <common/IAutoLock.h>
-#include <common/CheckMomoryLeak.h>
 
 TaskMapManager::TaskMapManager(void)
 {

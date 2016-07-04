@@ -6,18 +6,19 @@
  */
 
 #include "ITask.h"
-#include "RecvDisconnectUserVideo.h"
-
-// 服务器主动请求的task
-#include <common/CheckMomoryLeak.h>
+#include "RecvEnterConferenceTask.h"
+#include "RecvKickUserFromConferenceTask.h"
 
 // 根据 cmd 创建 task
 ITask* ITask::CreateTaskWithCmd(int cmd)
 {
 	ITask* task = NULL;
 	switch (cmd) {
-	case TCMD_RECVDISCONNECTUSERVIDEO:
-		task = new RecvDisconnectUserVideo();
+	case TCMD_RECVENTERCONFERENCE:
+		task = new RecvEnterConferenceTask();
+		break;
+	case TCMD_RECVKICKUSERFROMCONFERENCE:
+		task = new RecvKickUserFromConferenceTask();
 		break;
 //	case TCMD_RECVEMOTION:
 //		task = new RecvEmotionTask();

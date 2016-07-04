@@ -7,7 +7,6 @@
 
 #include "ISocketHandler.h"
 #include <common/KLog.h>
-#include <common/CheckMomoryLeak.h>
 
 
 #ifdef WIN32

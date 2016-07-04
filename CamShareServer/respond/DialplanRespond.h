@@ -5,8 +5,8 @@
  *      Author: Max.Chiu
  */
 
-#ifndef DialplanRespond_H_
-#define DialplanRespond_H_
+#ifndef DIALPLANRESPOND_H_
+#define DIALPLANRESPOND_H_
 
 #include "BaseRespond.h"
 

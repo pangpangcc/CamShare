@@ -84,11 +84,13 @@ LogManager *LogManager::GetLogManager() {
 LogManager::LogManager() {
 	// TODO Auto-generated constructor stub
 	mIsRunning = false;
+	mpLogThread = NULL;
 }
 
 LogManager::~LogManager() {
 	// TODO Auto-generated destructor stub
 	mIsRunning = false;
+	Stop();
 }
 
 bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
@@ -116,7 +118,7 @@ bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
                 delete g_pFileCtrl;
             }
             g_pFileCtrl = NULL;
-            g_pFileCtrl = new CFileCtrl(mLogDir.c_str(), "Log", 128);
+            g_pFileCtrl = new CFileCtrl(mLogDir.c_str(), "Log", 30);
             if (!g_pFileCtrl) {
                 return -1;
             }

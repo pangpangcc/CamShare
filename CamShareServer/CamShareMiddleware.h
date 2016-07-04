@@ -14,6 +14,7 @@
 #include "MessageList.h"
 #include "TcpServer.h"
 #include "FreeswitchClient.h"
+#include "SessionManager.h"
 
 #include <common/ConfFile.hpp>
 #include <common/KSafeMap.h>
@@ -28,6 +29,8 @@
 #include <map>
 #include <list>
 using namespace std;
+
+#define VERSION_STRING "1.0.1"
 
 // socket -> client
 typedef KSafeMap<int, Client*> ClientMap;
@@ -44,7 +47,10 @@ typedef KSafeMap<ILiveChatClient*, Session*> LiveChat2SessionMap;
 class StateRunnable;
 class ConnectLiveChatRunnable;
 class ConnectFreeswitchRunnable;
-class CamShareMiddleware : public TcpServerObserver, ClientCallback, ILiveChatClientListener, FreeswitchClientListener {
+class CamShareMiddleware : public TcpServerObserver,
+								ClientCallback,
+								ILiveChatClientListener,
+								FreeswitchClientListener {
 public:
 	CamShareMiddleware();
 	virtual ~CamShareMiddleware();
@@ -82,13 +88,31 @@ public:
 	/**
 	 * 内部服务(HTTP), 命令回调
 	 */
-	void OnClientGetUserBySession(Client* client, const string& session);
+	void OnClientGetDialplan(
+			Client* client,
+			const string& rtmpSession,
+			const string& channelId,
+			const string& conference,
+			const string& serverId,
+			const string& siteId
+			);
 	void OnClientUndefinedCommand(Client* client);
 
 	/**
 	 * 内部服务(Freeswitch), 命令回调
 	 */
-	 void OnFreeswitchEventConferenceAddMember(FreeswitchClient* freeswitch, const string& user, const string& conference, MemberType type);
+	void OnFreeswitchEventConferenceAuthorizationMember(
+			FreeswitchClient* freeswitch,
+			const Channel* channel
+			);
+	 void OnFreeswitchEventConferenceAddMember(
+			 FreeswitchClient* freeswitch,
+			 const Channel* channel
+			 );
+	void OnFreeswitchEventConferenceDelMember(
+			FreeswitchClient* freeswitch,
+			const Channel* channel
+			);
 
 	/**
 	 * 外部服务(LiveChat), 任务回调
@@ -96,7 +120,8 @@ public:
 	void OnConnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnDisconnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
-	void OnRecvDisconnectUserVideo(ILiveChatClient* livechat, int seq, const string& userId1, const string& userId2, LCC_ERR_TYPE err, const string& errmsg);
+	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
+	void OnRecvKickUserFromConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
 
 private:
 	/*
@@ -111,62 +136,47 @@ private:
 	 */
 	void FreeswitchEventHandle(esl_event_t *event);
 
-	/***************************** 会话管理 **************************************/
-	/**
-	 * 会话交互(Session), 客户端发起会话
-	 * @param client		客户端
-	 * @param livechat		LiveChat client
-	 * @param request		请求实例
-	 * @param seq			LiveChat client seq
-	 * @return true:需要Finish / false:不需要Finish
-	 */
-	bool StartSession(
-			Client* client,
-			ILiveChatClient* livechat,
-			IRequest* request,
-			int seq
-			);
-
-	/**
-	 * 会话交互(Session), LiveChat返回会话
-	 * @param livechat		LiveChat client
-	 * @param seq			LiveChat client seq
-	 * @param client		客户端(出参)
-	 * @return 请求实例
-	 */
-	IRequest* FinishSession(
-			ILiveChatClient* livechat,
-			int seq,
-			Client** client
-			);
-
-	/**
-	 * 内部服务(HTTP), 关闭会话
-	 * @param client	客户端
-	 * @return true:发送成功/false:发送失败
-	 */
-	bool CloseSessionByClient(Client* client);
-
-	/**
-	 * 外部服务(LiveChat), 关闭会话
-	 * @param livechat		LiveChat client
-	 */
-	bool CloseSessionByLiveChat(ILiveChatClient* livechat);
-	/***************************** 会话管理 end **************************************/
-
 	/***************************** 外部服务接口 **************************************/
 	/**
 	 * 外部服务(LiveChat), 发送进入聊天室命令
+	 * @param	livechat
 	 * @param 	fromId		用户Id
 	 * @param 	toId		对方Id
 	 * @param	type		会员类型
+	 * @param   serverId	服务器Id
 	 */
 	bool SendEnterConference2LiveChat(
+			ILiveChatClient* livechat,
 			const string& fromId,
 			const string& toId,
 			MemberType type,
-			Client* client = NULL
+			const string& serverId
 			);
+
+	/**
+	 * 外部服务(LiveChat), 发送通知客户端进入聊天室命令
+	 * @param	livechat
+	 * @param 	fromId		用户Id
+	 * @param 	toId		对方Id
+	 */
+	bool SendMsgEnterConference2LiveChat(
+			ILiveChatClient* livechat,
+			const string& fromId,
+			const string& toId
+			);
+
+	/**
+	 * 外部服务(LiveChat), 发送通知客户端退出聊天室命令
+	 * @param	livechat
+	 * @param 	fromId		用户Id
+	 * @param 	toId		对方Id
+	 */
+	bool SendMsgExitConference2LiveChat(
+			ILiveChatClient* livechat,
+			const string& fromId,
+			const string& toId
+			);
+
 	/***************************** 外部服务接口 end **************************************/
 
 	/***************************** 内部服务接口 **************************************/
@@ -181,6 +191,13 @@ private:
 			IRespond* respond
 			);
 	/***************************** 内部服务接口 end **************************************/
+
+	/**
+	 * 判断是否测试账号
+	 */
+	bool CheckTestAccount(
+			const string& user
+			);
 
 	/***************************** 基本参数 **************************************/
 	/**
@@ -207,6 +224,11 @@ private:
 	 * 请求超时(秒)
 	 */
 	unsigned int miTimeout;
+
+	/**
+	 * flash请求超时(秒)
+	 */
+	unsigned int miFlashTimeout;
 	/***************************** 基本参数 end **************************************/
 
 	/***************************** 日志参数 **************************************/
@@ -225,6 +247,62 @@ private:
 	 */
 	int miDebugMode;
 	/***************************** 日志参数 end **************************************/
+
+	/***************************** Livechat参数 **************************************/
+	/**
+	 * Livechat服务器端口
+	 */
+	short miLivechatPort;
+
+	/**
+	 * Livechat服务器Ip
+	 */
+	string mLivechatIp;
+
+	/**
+	 * Livechat服务器对本应用唯一标识
+	 */
+	string mLivechatName;
+
+	/**
+	 * Livechat连接成功是否重新验所有证会议室用户
+	 */
+	bool mAuthorization;
+
+	/***************************** Livechat参数 end **************************************/
+
+	/***************************** Freeswitch参数 **************************************/
+	/**
+	 * Freeswitch服务器端口
+	 */
+	short miFreeswitchPort;
+
+	/**
+	 * Freeswitch服务器Ip
+	 */
+	string mFreeswitchIp;
+
+	/**
+	 * Freeswitch服务器用户名
+	 */
+	string mFreeswitchUser;
+
+	/**
+	 * Freeswitch服务器密码
+	 */
+	string mFreeswitchPassword;
+
+	/**
+	 * Freeswitch服务器是否录制视频
+	 */
+	bool mbFreeswitchIsRecording;
+
+	/**
+	 * Freeswitch服务器用录制视频目录
+	 */
+	string mFreeswitchRecordingPath;
+
+	/***************************** Freeswitch参数 end **************************************/
 
 	/***************************** 处理线程 **************************************/
 	/**
@@ -253,11 +331,18 @@ private:
 	KMutex mCountMutex;
 
 	/**
+	 * 发送进入会议室请求数目
+	 */
+	unsigned int miSendEnterConference;
+
+	/**
 	 * 监听线程输出间隔
 	 */
 	unsigned int miStateTime;
+
 	/***************************** 统计参数 end **************************************/
 
+	/***************************** 运行参数 **************************************/
 	/**
 	 * 是否运行
 	 */
@@ -288,14 +373,9 @@ private:
 	LiveChatClientMap mLiveChatClientMap;
 
 	/**
-	 * 内部服务(HTTP), 对应会话
+	 * 会话管理器
 	 */
-	Client2SessionMap mClient2SessionMap;
-
-	/**
-	 * 外部服务(LiveChat), 对应会话
-	 */
-	LiveChat2SessionMap mLiveChat2SessionMap;
+	SessionManager mSessionManager;
 
 	/**
 	 * 客户端缓存数据包buffer
@@ -306,6 +386,8 @@ private:
 	 * Freeswitch实例
 	 */
 	FreeswitchClient mFreeswitch;
+
+	/***************************** 运行参数 end **************************************/
 };
 
 #endif /* CAMSHAREMIDDLEWARE_H_ */

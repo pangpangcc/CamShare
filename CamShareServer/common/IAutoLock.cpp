@@ -86,7 +86,10 @@ public:
 public:
 	bool Init() {
 		if (!m_bInit) {
-			m_bInit = pthread_mutex_init(&m_lock, NULL) == 0;
+			pthread_mutexattr_t attr;
+			pthread_mutexattr_init(&attr);
+			pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
+			m_bInit = pthread_mutex_init(&m_lock, &attr) == 0;
 		}
 		return m_bInit;
 	}

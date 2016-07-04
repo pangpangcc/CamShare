@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include "Counter.h"
 #include <common/IAutoLock.h>
-#include <common/CheckMomoryLeak.h>
 
 Counter::Counter(void)
 {

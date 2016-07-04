@@ -16,6 +16,7 @@ BaseTask::BaseTask() {
 	m_errType = LCC_ERR_FAIL;
 	m_errMsg = "";
 
+	m_serverId = "";
 }
 
 BaseTask::~BaseTask() {
@@ -35,6 +36,12 @@ bool BaseTask::Init(ILiveChatClient* client, ILiveChatClientListener* listener)
 	return result;
 }
 
+// 获取待发送数据的类型
+TASK_PROTOCOL_TYPE BaseTask::GetSendDataProtocolType()
+{
+	return JSON_PROTOCOL;
+}
+
 // 设置seq
 void BaseTask::SetSeq(unsigned int seq)
 {
@@ -45,6 +52,16 @@ void BaseTask::SetSeq(unsigned int seq)
 unsigned int BaseTask::GetSeq()
 {
 	return m_seq;
+}
+
+// 获取服务器Id
+string BaseTask::GetServerId() {
+	return m_serverId;
+}
+
+// 设置服务器Id
+void BaseTask::SetServerId(const string& serverId) {
+	m_serverId = serverId;
 }
 
 // 是否需要等待回复。若false则发送后释放(delete掉)，否则发送后会被添加至待回复列表，收到回复后释放

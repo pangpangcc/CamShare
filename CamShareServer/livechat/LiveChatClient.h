@@ -28,12 +28,16 @@ public:
 	bool IsInvalidSeq(int seq);
 	// 获取计数器
 	int GetSeq();
+	// 是否已经连接服务器
+	bool IsConnected();
 	// 连接服务器
-	bool ConnectServer(SITE_TYPE type);
+	bool ConnectServer(SITE_TYPE type, string name);
 	// 断开连接
 	bool Disconnect();
 	// 进入聊天室
-	bool SendEnterConference(int seq, const string& fromId, const string& toId);
+	bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key);
+	// 发送消息到客户端
+	bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg);
 	// 获取站点类型
 	SITE_TYPE GetType();
 
@@ -44,7 +48,7 @@ private:
 // ITaskManagerListener接口函数
 private:
 	// 连接成功回调
-	virtual void OnConnect(bool success, const TaskList& listUnsentTask);
+	virtual void OnConnect(bool success);
 	// 连接失败回调(listUnsentTask：未发送/未回复的task列表)
 	virtual void OnDisconnect(const TaskList& list);
 	// 已完成交互的task
@@ -75,5 +79,7 @@ private:
 	IThreadHandler*		m_hearbeatThread;	// 心跳线程
 
 	IAutoLock*		m_pConnectLock;		// 锁
-	bool 			m_bConnected;
+	bool 			m_bConnectForbidden;
+
+	string 			m_svrName;	// 服务器名
 };

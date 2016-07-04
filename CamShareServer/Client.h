@@ -26,7 +26,15 @@ class Client;
 class ClientCallback {
 public:
 	virtual ~ClientCallback(){};
-	virtual void OnClientGetUserBySession(Client* client, const string& session) = 0;
+	virtual void OnClientGetDialplan(
+			Client* client,
+			const string& rtmpSession,
+			const string& channelId,
+			const string& conference,
+			const string& serverId,
+			const string& siteId
+			) = 0;
+
 	virtual void OnClientUndefinedCommand(Client* client) = 0;
 };
 

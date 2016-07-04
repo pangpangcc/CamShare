@@ -9,12 +9,12 @@
 #include "TaskManager.h"
 #include <common/KLog.h>
 #include <common/CommonFunc.h>
-#include <common/CheckMomoryLeak.h>
 #include <common/IAutoLock.h>
 
 // task include
 #include "task/CheckVerTask.h"
 #include "task/SendEnterConferenceTask.h"
+#include "task/SendMsgTask.h"
 
 CLiveChatClient::CLiveChatClient()
 {
@@ -27,11 +27,11 @@ CLiveChatClient::CLiveChatClient()
 	m_site_type = SITE_TYPE_UNKNOW;
 	m_svrPort = -1;
 
-	m_bConnected = false;
+	m_bConnectForbidden = false;
 	m_pConnectLock = NULL;
 	m_pConnectLock = IAutoLock::CreateAutoLock();
 	if (NULL != m_pConnectLock) {
-		m_bInit = m_pConnectLock->Init();
+		m_pConnectLock->Init();
 	}
 }
 
@@ -87,27 +87,35 @@ int CLiveChatClient::GetSeq() {
 	return m_seqCounter.GetAndIncrement();
 }
 
+// 是否已经连接服务器
+bool CLiveChatClient::IsConnected() {
+	return m_taskManager->IsConnected();
+}
+
 // 连接服站点
-bool CLiveChatClient::ConnectServer(SITE_TYPE type) {
+bool CLiveChatClient::ConnectServer(SITE_TYPE type, string name) {
 	bool result = false;
 
-	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d ) begin", type);
+//	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d, name : %s ) begin", type, name.c_str());
 
 	m_pConnectLock->Lock();
-	if( !m_bConnected ) {
-		m_bConnected = true;
-		m_pConnectLock->Unlock();
+	if( !m_bConnectForbidden ) {
+		FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d, name : %s )", type, name.c_str());
 		if ( ConnectServer() )
 		{
-			m_bConnected = true;
+			m_bConnectForbidden = true;
 			m_site_type = type;
+
+//			char siteId[64];
+//			sprintf(siteId, "C%d", (int)m_site_type);
+			m_svrName = name;
+
 			result = true;
 		}
-	} else {
-		m_pConnectLock->Unlock();
 	}
+	m_pConnectLock->Unlock();
 
-	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d ) end", type);
+//	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d, name : %s ) end", type, name.c_str());
 
 	return result;
 }
@@ -156,7 +164,7 @@ bool CLiveChatClient::Disconnect()
 }
 
 // 进入聊天室
-bool CLiveChatClient::SendEnterConference(int seq, const string& fromId, const string& toId) {
+bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key) {
 	bool result = false;
 	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() begin");
 	if (NULL != m_taskManager
@@ -166,10 +174,11 @@ bool CLiveChatClient::SendEnterConference(int seq, const string& fromId, const s
 		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p", task);
 		if (NULL != task) {
 			result = task->Init(this, m_listener);
-			result = result && task->InitParam(fromId, toId);
+			result = result && task->InitParam(m_svrName, fromId, toId, key);
 
 			if (result) {
 //				int seq = m_seqCounter.GetCount();
+				task->SetServerId(serverId);
 				task->SetSeq(seq);
 				result = m_taskManager->HandleRequestTask(task);
 			}
@@ -180,13 +189,38 @@ bool CLiveChatClient::SendEnterConference(int seq, const string& fromId, const s
 	return result;
 }
 
+// 发送消息到客户端
+bool CLiveChatClient::SendMsg(int seq, const string& fromId, const string& toId, const string& msg) {
+	bool result = false;
+	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() begin");
+	if (NULL != m_taskManager
+		&& m_taskManager->IsStart())
+	{
+		SendMsgTask* task = new SendMsgTask();
+		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() task:%p", task);
+		if (NULL != task) {
+			result = task->Init(this, m_listener);
+			result = result && task->InitParam(fromId, toId, msg);
+
+			if (result) {
+//				int seq = m_seqCounter.GetCount();
+				task->SetSeq(seq);
+				result = m_taskManager->HandleRequestTask(task);
+			}
+		}
+		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() task:%p end", task);
+	}
+	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end");
+	return result;
+}
+
 SITE_TYPE CLiveChatClient::GetType() {
 	return m_site_type;
 }
 
 // ------------------------ ITaskManagerListener接口函数 -------------------------
 // 连接成功回调
-void CLiveChatClient::OnConnect(bool success, const TaskList& listUnsentTask)
+void CLiveChatClient::OnConnect(bool success)
 {
 	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() success: %d", success);
 
@@ -198,20 +232,12 @@ void CLiveChatClient::OnConnect(bool success, const TaskList& listUnsentTask)
 //		HearbeatThreadStart();
 	}
 	else {
-		TaskList::const_iterator iter;
-		for (iter = listUnsentTask.begin();
-			iter != listUnsentTask.end();
-			iter++)
-		{
-			(*iter)->OnDisconnect();
-		}
-
 		FileLog("LiveChatClient", "CLiveChatClient::OnConnect() LCC_ERR_CONNECTFAIL, m_listener:%p", m_listener);
 		m_listener->OnConnect(this, LCC_ERR_CONNECTFAIL, "");
 	}
 
 	m_pConnectLock->Lock();
-	m_bConnected = success;
+	m_bConnectForbidden = success;
 	m_pConnectLock->Unlock();
 
 	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() end");
@@ -239,7 +265,7 @@ void CLiveChatClient::OnDisconnect(const TaskList& listUnsentTask)
 	m_listener->OnDisconnect(this, LCC_ERR_CONNECTFAIL, "");
 
 	m_pConnectLock->Lock();
-	m_bConnected = false;
+	m_bConnectForbidden = false;
 	m_pConnectLock->Unlock();
 }
 
@@ -282,7 +308,7 @@ bool CLiveChatClient::CheckVersionProc()
 		checkVerTask->Init(this, m_listener);
 
 		char siteId[64];
-		sprintf(siteId, "1.1.0.0XC%dX%dXCAMSX6", (int)m_site_type);
+		sprintf(siteId, "1.1.0.0X%sX%dXCAMSX7", m_svrName.c_str(), m_site_type);
 		checkVerTask->InitParam(siteId);
 
 		int seq = m_seqCounter.GetAndIncrement();

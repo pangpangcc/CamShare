@@ -12,8 +12,8 @@
 #include "ITransportDataHandler.h"
 #include "TaskDef.h"
 #include <common/CommonFunc.h>
-#include <common/CheckMomoryLeak.h>
 #include <common/KLog.h>
+#include <common/IAutoLock.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -28,6 +28,13 @@ CTaskManager::CTaskManager(void)
 	m_dataHandler = NULL;
 	m_bStart = false;
 	m_bInit = false;
+
+	m_bConnected = false;
+	m_pConnectLock = NULL;
+	m_pConnectLock = IAutoLock::CreateAutoLock();
+	if (NULL != m_pConnectLock) {
+		m_pConnectLock->Init();
+	}
 }
 
 CTaskManager::~CTaskManager(void)
@@ -37,6 +44,8 @@ CTaskManager::~CTaskManager(void)
 	FileLog("LiveChatClient", "CTaskManager::~CTaskManager() stop ok");
 	ITransportDataHandler::Release(m_dataHandler);
 	m_dataHandler = NULL;
+	IAutoLock::ReleaseAutoLock(m_pConnectLock);
+	m_pConnectLock = NULL;
 	FileLog("LiveChatClient", "CTaskManager::~CTaskManager() end");
 }
 
@@ -105,6 +114,16 @@ bool CTaskManager::IsStart()
 	return m_bStart;
 }
 	
+// 是否已经连接服务器
+bool CTaskManager::IsConnected() {
+	bool bFlag = false;
+	m_pConnectLock->Lock();
+	bFlag = m_bConnected;
+	m_pConnectLock->Unlock();
+//	FileLog("LiveChatClient", "CTaskManager::IsConnected() m_bConnected:%d", bFlag);
+	return bFlag;
+}
+
 // 处理请求的task
 bool CTaskManager::HandleRequestTask(ITask* task)
 {
@@ -112,7 +131,18 @@ bool CTaskManager::HandleRequestTask(ITask* task)
 
 	bool result = false;
 	if (m_bInit && NULL != task) {
-		result = m_dataHandler->SendTaskData(task);
+		m_pConnectLock->Lock();
+		if( m_bConnected ) {
+			result = m_dataHandler->SendTaskData(task);
+		}
+		m_pConnectLock->Unlock();
+	}
+
+	if( !result ) {
+		if( NULL != task ) {
+			task->OnDisconnect();
+			delete task;
+		}
 	}
 
 	FileLog("LiveChatClient", "CTaskManager::HandleRequestTask() result:%d", result);
@@ -122,28 +152,16 @@ bool CTaskManager::HandleRequestTask(ITask* task)
 
 // ------------- ILiveChatClientListener接口函数 -------------
 // 连接callback
-void CTaskManager::OnConnect(bool success, const TaskList& listUnsentTask)
+void CTaskManager::OnConnect(bool success)
 {
 	FileLog("LiveChatClient", "CTaskManager::OnConnect() success:%d", success);
+	m_pConnectLock->Lock();
+	m_bConnected = success;
 	if (NULL != m_mgrListener) {
-		TaskList list;
-
-		// 回调 发送不成功 或 发送成功但没有回应 的task
-		m_requestTaskMap.InsertTaskList(listUnsentTask);
-		m_requestTaskMap.Clear(list);
-
-		m_mgrListener->OnConnect(success, list);
-
-		// 释放task
-		TaskList::iterator iter;
-		for (iter = list.begin();
-			iter != list.end();
-			iter++)
-		{
-			ITask* task = *iter;
-			delete task;
-		}
+		m_mgrListener->OnConnect(success);
 	}
+	m_pConnectLock->Unlock();
+
 	FileLog("LiveChatClient", "CTaskManager::OnConnect() end");
 }
 	
@@ -151,6 +169,10 @@ void CTaskManager::OnConnect(bool success, const TaskList& listUnsentTask)
 void CTaskManager::OnDisconnect(const TaskList& listUnsentTask)
 {
 	FileLog("LiveChatClient", "CTaskManager::OnDisconnect() listUnsentTask.size:%d", listUnsentTask.size());
+
+	m_pConnectLock->Lock();
+	m_bConnected = false;
+
 	if (NULL != m_mgrListener) {
 		// 回调 发送不成功 或 发送成功但没有回应 的task
 		m_requestTaskMap.InsertTaskList(listUnsentTask);
@@ -169,6 +191,9 @@ void CTaskManager::OnDisconnect(const TaskList& listUnsentTask)
 			delete task;
 		}
 	}
+
+	m_pConnectLock->Unlock();
+
 	FileLog("LiveChatClient", "CTaskManager::OnDisconnect() end");
 }
 	

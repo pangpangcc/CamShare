@@ -1,21 +1,20 @@
 /*
- * author: Samson.Fan
- *   date: 2015-03-30
- *   file: SendEnterConferenceTask.h
- *   desc: 检测版本Task实现类
+ * SendEnterConferenceTask.cpp
+ *  Created on: 2016年3月11日
+ *      Author: max
  */
-
 
 #include "SendEnterConferenceTask.h"
 #include <amf/AmfParser.h>
 #include <json/json/json.h>
 #include <common/KLog.h>
-#include <common/CheckMomoryLeak.h>
 
 SendEnterConferenceTask::SendEnterConferenceTask(void)
 {
+	mServer = "";
 	mFromId = "";
 	mToId = "";
+	mKey = "";
 }
 
 SendEnterConferenceTask::~SendEnterConferenceTask(void)
@@ -26,35 +25,6 @@ SendEnterConferenceTask::~SendEnterConferenceTask(void)
 bool SendEnterConferenceTask::Handle(const TransportProtocol* tp)
 {
 	bool result = false;
-
-	Json::Value root;
-	Json::Reader reader;
-	if( reader.parse((char*)tp->data, root, false) ) {
-		if( root.isObject() ) {
-			if( root["ret"].isInt() ) {
-				result = true;
-
-				if( root["ret"].asInt() == 0 ) {
-					m_errType = LCC_ERR_SUCCESS;
-				}
-			}
-		}
-	}
-
-	// 协议解析失败
-	if (!result) {
-		m_errType = LCC_ERR_PROTOCOLFAIL;
-		m_errMsg = "";
-	}
-
-	// 打log
-	FileLog("LiveChatClient", "SendEnterConferenceTask::Handle() errType:%d, errMsg:%s"
-			, m_errType, m_errMsg.c_str());
-
-	// 通知listener
-	if (NULL != m_listener) {
-		m_listener->OnSendEnterConference(m_client, GetSeq(), mFromId, mToId, m_errType, m_errMsg);
-	}
 
 	return result;
 }
@@ -68,12 +38,18 @@ bool SendEnterConferenceTask::GetSendData(void* data, unsigned int dataSize, uns
 	Json::Value root;
 	root["fromId"] = mFromId;
 	root["toId"] = mToId;
+	root["server"] = mServer;
+	root["key"] = mKey;
 	Json::FastWriter writer;
 	string json = writer.write(root);
 
 	// 填入buffer
 	if (json.length() < dataSize) {
-		memcpy(data, json.c_str(), json.length());
+		// 打log
+		FileLog("LiveChatClient", "SendEnterConferenceTask::GetSendData() len:%d, json:%s", json.length(), json.c_str());
+		if( json.length() > 0 ) {
+			memcpy(data, json.c_str(), json.length());
+		}
 		dataLen = json.length();
 
 		result  = true;
@@ -85,12 +61,6 @@ bool SendEnterConferenceTask::GetSendData(void* data, unsigned int dataSize, uns
 	return result;
 }
 
-// 获取待发送数据的类型
-TASK_PROTOCOL_TYPE SendEnterConferenceTask::GetSendDataProtocolType()
-{
-	return JSON_PROTOCOL;
-}
-	
 // 获取命令号
 int SendEnterConferenceTask::GetCmdCode()
 {
@@ -106,18 +76,27 @@ void SendEnterConferenceTask::GetHandleResult(LCC_ERR_TYPE& errType, string& err
 
 // 初始化参数
 bool SendEnterConferenceTask::InitParam(
+		const string& server,
 		const string& fromId,
-		const string& toId
+		const string& toId,
+		const string& key
 		)
 {
 	bool bFlag = false;
-	if ( !fromId.empty() && !toId.empty() ) {
+	if ( !server.empty() && !fromId.empty() && !toId.empty() ) {
+		mServer = server;
 		mFromId = fromId;
 		mToId = toId;
+		mKey = key;
 		bFlag = true;
 	}
 
 	return bFlag;
+}
+
+bool SendEnterConferenceTask::IsWaitToRespond()
+{
+	return false;
 }
 
 // 未完成任务的断线通知

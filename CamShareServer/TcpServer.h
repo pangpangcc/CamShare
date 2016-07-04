@@ -117,8 +117,8 @@ private:
 
 	MessageList mSendImmediatelyMessageList;
 
-	MessageList mHandleSendMessageList;
-	MessageList* mpSendMessageList;
+//	MessageList mHandleSendMessageList;
+//	MessageList* mpSendMessageList;
 
 	/* Thread safe watcher list */
 	WatcherList mWatcherList;

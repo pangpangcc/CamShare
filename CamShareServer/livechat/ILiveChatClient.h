@@ -24,7 +24,8 @@ public:
 	virtual void OnDisconnect(ILiveChatClient* client, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnSendEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	// 服务器主动请求
-	virtual void OnRecvDisconnectUserVideo(ILiveChatClient* client, int seq, const string& userId1, const string& userId2, LCC_ERR_TYPE err, const string& errmsg) = 0;
+	virtual void OnRecvEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, bool bAuth, LCC_ERR_TYPE err, const string& errmsg) = 0;
+	virtual void OnRecvKickUserFromConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
 };
 
 // LiveChat客户端接口类
@@ -45,12 +46,16 @@ public:
 	virtual bool IsInvalidSeq(int seq) = 0;
 	// 获取计数器
 	virtual int GetSeq() = 0;
+	// 是否已经连接服务器
+	virtual bool IsConnected() = 0;
 	// 连接服务器
-	virtual bool ConnectServer(SITE_TYPE type) = 0;
+	virtual bool ConnectServer(SITE_TYPE type, string name) = 0;
 	// 断开服务器连接
 	virtual bool Disconnect() = 0;
 	// 进入聊天室
-	virtual bool SendEnterConference(int seq, const string& fromId, const string& toId) = 0;
+	virtual bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key) = 0;
+	// 发送消息到客户端
+	virtual bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg) = 0;
 
 public:
 	// 获取站点类型

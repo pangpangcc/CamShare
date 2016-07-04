@@ -33,24 +33,17 @@ public:
 	}
 
 	/**
-	 * 返回已经删除的当前节点
+	 * 经删节点, 调用前需要先记录
+	 * Example:
+	 * 	KSafeMap<string> map;
+	 * 	RequestkMap::iterator itr = map.Find(identify);
+	 *	map.Erase(itr++);
+	 *
 	 */
-	iterator Erase(Key key) {
-		typename SafeMap::iterator itr = mMap.find(key);
+	void Erase(iterator itr) {
 		if( itr != mMap.end() ) {
 			mMap.erase(itr);
 		}
-		return itr;
-	}
-
-	/**
-	 * 返回已经删除的下一个节点
-	 */
-	iterator Erase(iterator itr) {
-		if( itr != mMap.end() ) {
-			mMap.erase(itr++);
-		}
-		return itr;
 	}
 
 	int Size() {

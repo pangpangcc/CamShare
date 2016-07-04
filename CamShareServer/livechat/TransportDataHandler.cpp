@@ -11,7 +11,6 @@
 #include "ISocketHandler.h"
 #include <common/IAutoLock.h>
 #include <common/CommonFunc.h>
-#include <common/CheckMomoryLeak.h>
 #include <common/KLog.h>
 
 #include <string.h>
@@ -272,11 +271,8 @@ void CTransportDataHandler::RecvThreadProc(void)
 	// 连接服务器
 	bool bConnect = ConnectProc();
 	FileLog("LiveChatClient", "CTransportDataHandler::RecvThreadProc() ConnectProc(), m_listener:%p, bConnect:%d", m_listener, bConnect);
-//	m_sendTaskListLock->Lock();
-	m_listener->OnConnect(bConnect, m_sendTaskList);
-//	m_sendTaskListLock->Unlock();
-//	m_listener->OnConnect(bConnect);
-	FileLog("LiveChatClient", "CTransportDataHandler::RecvThreadProc() m_listener->OnConnect(bConnect) ok");
+	m_listener->OnConnect(bConnect);
+	FileLog("LiveChatClient", "CTransportDataHandler::RecvThreadProc() m_listener->OnConnect() ok");
 
 	if (bConnect && m_bStart) {
 		// 启动发送线程

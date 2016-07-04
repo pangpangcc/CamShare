@@ -19,9 +19,11 @@ typedef enum {
 	TCMD_UNKNOW			    		= 0,	// 未知命令
 	// 客户端主动请求命令
 	TCMD_CHECKVER		    		= -1,	// 版本检测
-	TCMD_SENDENTERCONFERENCE		= 1,	// 进入会议室认证
+	TCMD_SENDENTERCONFERENCE		= 244,	// 进入会议室认证
+	TCMD_SENDMSG					= 246,	// 发送消息到客户端
 	// 服务器主动请求命令
-	TCMD_RECVDISCONNECTUSERVIDEO	= 2,	// 断开指定用户视频
+	TCMD_RECVENTERCONFERENCE		= 243,	// 进入会议室认证结果
+	TCMD_RECVKICKUSERFROMCONFERENCE	= 254,	// 从会议室踢出用户
 } TASK_CMD_TYPE;
 
 // 判断是否客户端主动请求的命令
@@ -31,6 +33,9 @@ inline bool IsRequestCmd(int cmd)
 	switch (cmd) {
 	case TCMD_CHECKVER:				// 版本检测
 	case TCMD_SENDENTERCONFERENCE:	// 进入会议室认证
+		result = true;				// 主动请求的命令
+		break;
+	case TCMD_SENDMSG:				// 发送消息到客户端
 		result = true;				// 主动请求的命令
 		break;
 	default:

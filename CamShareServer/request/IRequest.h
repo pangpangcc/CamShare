@@ -20,6 +20,17 @@ public:
 	virtual ~IRequest(){};
 
 	/**
+	 * 开始请求
+	 */
+	virtual bool StartRequest() = 0;
+
+	/**
+	 * 完成请求
+	 * 可能超时, 或者完成
+	 */
+	virtual void FinisRequest(bool bSuccess) = 0;
+
+	/**
 	 * 是否需要等待返回
 	 */
 	virtual bool IsNeedReturn() = 0;

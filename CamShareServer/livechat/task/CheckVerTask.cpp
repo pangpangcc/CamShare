@@ -1,16 +1,13 @@
 /*
- * author: Samson.Fan
- *   date: 2015-03-30
- *   file: CheckVerTask.h
- *   desc: 检测版本Task实现类
+ * CheckVerTask.cpp
+ *  Created on: 2016年3月11日
+ *      Author: max
  */
-
 
 #include "CheckVerTask.h"
 #include <amf/AmfParser.h>
 #include <json/json/json.h>
 #include <common/KLog.h>
-#include <common/CheckMomoryLeak.h>
 
 CheckVerTask::CheckVerTask(void)
 {
@@ -26,28 +23,26 @@ bool CheckVerTask::Handle(const TransportProtocol* tp)
 {
 	bool result = false;
 
-//	AmfParser parser;
-//	amf_object_handle root = parser.Decode((char*)tp->data, tp->GetDataLength());
-//	if (!root.isnull()
-//		&& (root->type == DT_FALSE || root->type == DT_TRUE))
-//	{
-//		m_errType = root->boolValue ? LCC_ERR_SUCCESS : LCC_ERR_CHECKVERFAIL;
-//		m_errMsg = "";
-//
-//		result = true;
-//	}
+	AmfParser parser;
+	amf_object_handle root = parser.Decode((char*)tp->data, tp->GetDataLength());
+	if ( !root.isnull() && (root->type == DT_FALSE || root->type == DT_TRUE) ) {
+		m_errType = root->boolValue ? LCC_ERR_SUCCESS : LCC_ERR_CHECKVERFAIL;
+		m_errMsg = "";
 
-	Json::Value root;
-	Json::Reader reader;
-	if( reader.parse((char*)tp->data, root, false) ) {
-		if( root.isObject() ) {
-			if( root["ret"].isInt() && (root["ret"].asInt() == 0) ) {
-				result = true;
-
-				m_errType = LCC_ERR_SUCCESS;
-			}
-		}
+		result = true;
 	}
+
+//	Json::Value root;
+//	Json::Reader reader;
+//	if( reader.parse((char*)tp->data, root, false) ) {
+//		if( root.isObject() ) {
+//			if( root["ret"].isInt() && (root["ret"].asInt() == 0) ) {
+//				result = true;
+//
+//				m_errType = LCC_ERR_SUCCESS;
+//			}
+//		}
+//	}
 
 	// 协议解析失败
 	if (!result) {
@@ -68,14 +63,21 @@ bool CheckVerTask::GetSendData(void* data, unsigned int dataSize, unsigned int& 
 	bool result = false;
 
 	// 构造json协议
-	Json::Value root(m_version);
+	Json::Value root;
 	Json::FastWriter writer;
+	root["cmd"] = GetCmdCode();
+	root["data"] = m_version;
 	string json = writer.write(root);
 
 	// 填入buffer
-	if (json.length() < dataSize) {
-		memcpy(data, json.c_str(), json.length());
-		dataLen = json.length();
+	if (json.length() + 1 < dataSize) {
+		// 打log
+		FileLog("LiveChatClient", "CheckVerTask::GetSendData() len:%d, json:%s", json.length(), json.c_str());
+		if( json.length() > 0 ) {
+			memcpy(data, json.c_str(), json.length());
+		}
+		((char*)data)[json.length()] = 0;
+		dataLen = json.length() + 1;
 
 		result  = true;
 	}
@@ -86,12 +88,11 @@ bool CheckVerTask::GetSendData(void* data, unsigned int dataSize, unsigned int& 
 	return result;
 }
 
-// 获取待发送数据的类型
 TASK_PROTOCOL_TYPE CheckVerTask::GetSendDataProtocolType()
 {
-	return JSON_PROTOCOL;
+	return NOHEAD_PROTOCOL;
 }
-	
+
 // 获取命令号
 int CheckVerTask::GetCmdCode()
 {

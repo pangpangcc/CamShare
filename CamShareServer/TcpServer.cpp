@@ -365,11 +365,19 @@ TcpServer::TcpServer() {
 	mIsRunning = false;
 	mpTcpServerObserver = NULL;
 	mServer = 0;
-
+	miMaxConnection = 0;
 	mHandleSize = 0;
 
+	mpMainThread = NULL;
+
+	miMaxThreadHandle = 0;
+	mpHandleRunnable = NULL;
+	mpHandleThread = NULL;
+
 	mpMainRunnable = new MainRunnable(this);
+
 	mpSendRunnable = new SendRunnable(this);
+	mpSendThread = NULL;
 
 	mpHandlingMessageCount = NULL;
 	mpCloseRecv = NULL;
@@ -789,7 +797,6 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			/* push this message into handle queue */
 			m->len = ret;
 			m->type = 0;
-			m->starttime = GetTickCount();
 
 			if ( GetHandleSize() > 0 &&
 					GetHandleMessageList()->Size() > GetHandleSize() ) {

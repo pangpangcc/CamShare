@@ -22,7 +22,7 @@ public:
 
 public:
 	// 连接成功回调
-	virtual void OnConnect(bool success, const TaskList& list) = 0;
+	virtual void OnConnect(bool success) = 0;
 	// 连接失败回调(listUnsentTask：未发送/未回复的task列表)
 	virtual void OnDisconnect(const TaskList& list) = 0;
 	// 已完成交互的task
@@ -47,6 +47,8 @@ public:
 	virtual bool Stop() = 0;
 	// 是否已经开始
 	virtual bool IsStart() = 0;
+	// 是否已经连接服务器
+	virtual bool IsConnected() = 0;
 	// 处理请求的task
 	virtual bool HandleRequestTask(ITask* task) = 0;
 };

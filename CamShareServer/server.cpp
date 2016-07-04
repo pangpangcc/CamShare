@@ -14,11 +14,9 @@
 
 #include <string>
 #include <map>
-
-#include "CamShareMiddleware.h"
 using namespace std;
 
-#define VERSION_STRING "1.0.0"
+#include "CamShareMiddleware.h"
 
 string sConf = "";  // 配置文件
 

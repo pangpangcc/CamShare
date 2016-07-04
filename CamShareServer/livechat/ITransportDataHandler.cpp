@@ -8,7 +8,6 @@
 
 #include "ITransportDataHandler.h"
 #include "TransportDataHandler.h"
-#include <common/CheckMomoryLeak.h>
 
 ITransportDataHandler* ITransportDataHandler::Create()
 {

@@ -8,7 +8,6 @@
 #include "TransportPacketHandler.h"
 #include "task/ITask.h"
 #include "zlib.h"
-#include <common/CheckMomoryLeak.h>
 #include <common/KLog.h>
 
 // 使用 ntohl 需要include跨平台socket头文件
@@ -31,72 +30,101 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 	//printf("CTransportPacketHandler::Packet() task:%p, data:%p, dataLen:%d\n", task, data, dataLen);
 
 	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() begin");
-
+	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, data:%p", task, data);
 	bool result = false;
 
 	if (task->GetSendDataProtocolType() == NOHEAD_PROTOCOL) {
-		if (dataSize > sizeof(NoHeadTransportProtocol)) {
-			NoHeadTransportProtocol* protocol = (NoHeadTransportProtocol*)data;
-
-			// 获取数据
-			unsigned int bodyLen = 0;
-			result = task->GetSendData((void*)&(protocol->data), dataSize, bodyLen);
-			if  (result)
-			{
-				dataLen = protocol->GetAllDataLength();
-			}
+		// 获取数据
+		unsigned int bodyLen = 0;
+		result = task->GetSendData(data, dataSize, bodyLen);
+		if  (result)
+		{
+			dataLen = bodyLen;
 		}
-	}
-	else {
-//		if (dataSize > sizeof(TransportHeader)) {
-//			TransportProtocol* protocol = (TransportProtocol*)data;
-//			protocol->header.shiftKey = 0;
-//			protocol->header.remote = 0;
-//			protocol->header.request = 0;
-//			protocol->header.cmd = ntohl(task->GetCmdCode());
-//			protocol->header.seq = ntohl(task->GetSeq());
-//			protocol->header.zip = 0;	// 不压缩
-//			protocol->header.protocolType = (unsigned char)task->GetSendDataProtocolType();
+
+//		if (dataSize > sizeof(NoHeadTransportProtocol)) {
+//			NoHeadTransportProtocol* protocol = (NoHeadTransportProtocol*)data;
 //
+//			// 获取数据
 //			unsigned int bodyLen = 0;
-//			result = task->GetSendData(protocol->data, dataSize - sizeof(TransportHeader), bodyLen);
-//			if (result)
+//			result = task->GetSendData((void*)&(protocol->data), dataSize, bodyLen);
+//			if  (result)
 //			{
-//				dataLen = sizeof(TransportHeader) + bodyLen;
-//
-//				protocol->header.length = dataLen - sizeof(protocol->header.length);
-//				protocol->header.length = ntohl(protocol->header.length);
-//
-//				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, seq:%d, dataLen:%d"
-//						, task->GetCmdCode(), task->GetSeq(), dataLen);
+//				dataLen = bodyLen;
 //			}
 //		}
-		int headerLen = sizeof(TransportSendHeader) + sizeof(TransportHeader);
-		if (dataSize > headerLen) {
-			TransportSendProtocol* protocol = (TransportSendProtocol*)data;
-//			protocol->header.shiftKey = 0;
+	}
+	else {
+		TransportSendHeader* sendHeader = (TransportSendHeader *)data;
+		string serverId = task->GetServerId();
+		int serverIdLength = serverId.length();
+//		int headerLen = sizeof(TransportSendHeader) - sizeof(sendHeader->requesttype) + serverIdLength + sizeof(TransportHeader);
+		if (true) {
+			sendHeader->shiftKey = 0;
+			sendHeader->requestremote = 1;
+			// 没有服务器Id长度, 没有就为0
+			sendHeader->serverNamelength = serverIdLength;
+			if( serverIdLength > 0 ) {
+				// 复制服务器Id
+				memcpy(sendHeader->serverName, serverId.c_str(), serverId.length());
+			} else {
+				// 没有服务器Id默认填0, 长度改为1
+				sendHeader->serverName[0] = (unsigned char)0;
+				serverIdLength = 1;
+			}
+
+			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() "
+					"sendHeader->serverNamelength : %d, "
+					"sendHeader->serverName : %s",
+					sendHeader->serverNamelength,
+					serverId.c_str()
+					);
+
+//		int headerLen = sizeof(TransportSendHeader) + sizeof(TransportHeader);
+//		if (dataSize > headerLen) {
+
+			int sendHeaderLen = sendHeader->GetHeaderLength();
+			int headerLen = sendHeaderLen + sizeof(TransportHeader);
+			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() sendHeaderLen:%d, headerLen:%d", sendHeaderLen, headerLen);
+
+			TransportProtocol* protocol = (TransportProtocol*)(sendHeader->serverName + serverIdLength);
+			protocol->header.shiftKey = 0;
 			protocol->header.remote = 0;
 			protocol->header.request = 0;
-			protocol->header.cmd = ntohl(task->GetCmdCode());
-			protocol->header.seq = ntohl(task->GetSeq());
+			protocol->header.cmd = htonl(task->GetCmdCode());
+			protocol->header.seq = htonl(task->GetSeq());
 			protocol->header.zip = 0;	// 不压缩
 			protocol->header.protocolType = (unsigned char)task->GetSendDataProtocolType();
 
 			unsigned int bodyLen = 0;
 			result = task->GetSendData(protocol->data, dataSize - headerLen, bodyLen);
+			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, result:%d", task, result);
 			if (result)
 			{
 				dataLen = headerLen + bodyLen;
 
+				sendHeader->SetDataLength(sizeof(TransportHeader) + bodyLen);
+				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() sendHeader->length:%d, bodyLen:%d", sendHeader->length, bodyLen);
+				sendHeader->length = htonl(sendHeader->length);
+
 				protocol->SetDataLength(bodyLen);
-//				protocol->header.length = dataLen - sizeof(protocol->header.length);
-				protocol->sendHeader.length = ntohl(protocol->sendHeader.length);
 				protocol->header.length = ntohl(protocol->header.length);
 
 				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, seq:%d, dataLen:%d"
 						, task->GetCmdCode(), task->GetSeq(), dataLen);
 			}
 		}
+	}
+
+	if (result) {
+		string hex = "";
+		char temp[4];
+		for(int i = 0; i < dataLen; i++) {
+			sprintf(temp, "%02x", ((unsigned char *)data)[i]);
+			hex += temp;
+			hex += " ";
+		}
+		FileLog("LiveChatClient", "CTransportPacketHandler::Packet() hex:%s", hex.c_str());
 	}
 
 	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() end, result:%d", result);
@@ -131,7 +159,7 @@ UNPACKET_RESULT_TYPE CTransportPacketHandler::Unpacket(void* data, unsigned int 
 			{
 				tp->header.length = length;
 				useLen = tp->header.length + sizeof(tp->header.length);
-//				ShiftRight((unsigned char*)data + sizeof(tp->header.length) + sizeof(tp->header.shiftKey), tp->header.length - sizeof(tp->header.shiftKey), tp->header.shiftKey);
+				ShiftRight((unsigned char*)data + sizeof(tp->header.length) + sizeof(tp->header.shiftKey), tp->header.length - sizeof(tp->header.shiftKey), tp->header.shiftKey);
 				tp->header.cmd = ntohl(tp->header.cmd);
 				tp->header.seq = ntohl(tp->header.seq);
 

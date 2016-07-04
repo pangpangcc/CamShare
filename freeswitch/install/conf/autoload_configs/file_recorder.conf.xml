@@ -1,0 +1,32 @@
+<configuration name="file_recorder.conf" description="Record Setting">
+  <settings>
+    <!-- ===== video recod setting ===== -->
+    
+    <!-- video transcode to mp4 in directory -->
+    <!-- mp4文件生成目录 -->
+    <param name="mp4-dir" value="/usr/local/freeswitch/recordings/video_mp4"/>
+    
+    <!-- Close record shell -->
+    <!-- 视频录制结束执行的脚本路径 -->
+    <param name="close-shell" value="/usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh"/>
+    
+    <!-- ===== cut picture setting ===== -->
+    <!-- picture source directory -->
+    <!--  生成i帧h264文件的路径 -->
+    <param name="pic-h264-dir" value="/usr/local/freeswitch/recordings/pic_h264"/>
+    
+    <!-- picture transcode to jpeg directory -->
+    <!-- 生成i帧jpeg文件的路径 -->
+    <param name="pic-dir" value="/usr/local/freeswitch/recordings/pic_jpg"/>
+    
+    <!-- picture shell -->
+    <!-- i帧h264转换为jpeg的脚本路径 -->
+    <param name="pic-shell" value="/usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh"/>
+    
+    <!-- cut picture interval(millisecond) -->
+    <!-- 生成i帧jpeg文件的时间间隔(毫秒) -->
+    <param name="pic-interval" value="1000"/>
+    
+  </settings>
+</configuration>
+

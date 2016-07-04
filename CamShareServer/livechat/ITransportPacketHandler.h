@@ -11,9 +11,13 @@
 
 #include "TaskDef.h"
 
+/**
+ * 公共协议包头
+ * 17 byte
+ */
 typedef struct _tagTransportHeader {
 	unsigned int length;		// 报文长度（不包括本身长度），4 byte（高位先存）
-//	unsigned char shiftKey;		// 移位加密key，1 byte
+	unsigned char shiftKey;		// 移位加密key，1 byte
 	unsigned char remote;		// 客户端无用（直接传0），1 byte
 	unsigned char request;		// 客户端无用（直接传0），1 byte
 	int cmd;					// 命令号，区分不同请求及推送，4 byte（高位先存）
@@ -23,7 +27,7 @@ typedef struct _tagTransportHeader {
 
 	_tagTransportHeader() {
 		length = 0;
-//		shiftKey = 0;
+		shiftKey = 0;
 		remote = 0;
 		request = 0;
 		cmd = TCMD_UNKNOW;
@@ -55,36 +59,32 @@ typedef struct _tagNoHeadTransportProtocol {
 
 /**
  * 发送请求的协议包头
+ * 8 byte at least
  */
 typedef struct _tagTransportSendHeader {
-	unsigned int length;		// 报文长度（不包括本身长度），4 byte（高位先存）
-	unsigned char remote;		// 客户端无用（直接传1），1 byte
-	unsigned char request;		// 服务器类型（直接传0），1 byte
+	unsigned int length;				// 报文长度（不包括本身长度），4 byte（高位先存）
+	unsigned char shiftKey;				// 移位加密key，(直接传0）, 1 byte
+	unsigned char requestremote;		// 客户端无用（直接传1），1 byte
+	unsigned char serverNamelength;		// 服务器名字长度，1 byte
+	unsigned char serverName[1];		// 服务器名字 （如果没有就传0），1 byte
 
 	_tagTransportSendHeader() {
 		length = 0;
-		remote = 1;
-		request = 0;
+		shiftKey = 0;
+		requestremote = 1;
+		serverNamelength = 0;
+		serverName[0] = 0;
+	}
+
+	unsigned int GetHeaderLength() {
+		return sizeof(_tagTransportSendHeader) - sizeof(serverName) + ((serverNamelength == 0)?1:serverNamelength);
+	}
+
+	void SetDataLength(unsigned int dataLength) {
+		length = GetHeaderLength() - sizeof(length) + dataLength;
 	}
 
 } TransportSendHeader;
-
-/**
- * 发送请求的协议包头
- */
-typedef struct _tagTransportSendProtocol {
-	TransportSendHeader sendHeader;	// 发送包头
-	TransportHeader header;		// 协议头
-	unsigned char data[1];		// 数据，长度为 header.length + sizeof(header.length) - sizeof(header)
-
-//	unsigned int GetDataLength() const {
-//		return sizeof(sendHeader) - sizeof(sendHeader.length) + sizeof(header) + dataLength;
-//	}
-	void SetDataLength(unsigned int dataLength) {
-		sendHeader.length = sizeof(sendHeader) - sizeof(sendHeader.length) + sizeof(header) + dataLength;
-		header.length = sizeof(header) - sizeof(header.length) + dataLength;
-	}
-} TransportSendProtocol;
 
 typedef enum {
 	UNPACKET_ERROR = -2,	// 严重错误，需要重新连接

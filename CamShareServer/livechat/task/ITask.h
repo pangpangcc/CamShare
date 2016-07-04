@@ -37,6 +37,10 @@ public:
 	virtual int GetCmdCode() = 0;
 	// 设置seq
 	virtual void SetSeq(unsigned int seq) = 0;
+	// 获取服务器Id
+	virtual string GetServerId() = 0;
+	// 设置服务器Id
+	virtual void SetServerId(const string& serverId) = 0;
 	// 获取seq
 	virtual unsigned int GetSeq() = 0;
 	// 是否需要等待回复

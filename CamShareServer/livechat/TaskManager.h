@@ -27,13 +27,15 @@ public:
 	virtual bool Stop();
 	// 是否已经开始
 	virtual bool IsStart();
+	// 是否已经连接服务器
+	virtual bool IsConnected();
 	// 处理请求的task
 	virtual bool HandleRequestTask(ITask* task);
 
 // ITransportDataHandlerListener 接口函数
 public:
 	// 连接callback
-	virtual void OnConnect(bool success, const TaskList& listUnsentTask);
+	virtual void OnConnect(bool success);
 	// 断开连接callback（连接不成功不会调用，断开后需要手动调用ITransportDataHandler::Stop才能停止）
 	virtual void OnDisconnect(const TaskList& listUnsentTask);
 	// 发送callback
@@ -54,4 +56,7 @@ private:
 	unsigned int		m_svrPort;		// 端口
 
 	TaskMapManager		m_requestTaskMap;	// 请求的task map
+
+	IAutoLock*		m_pConnectLock;		// 锁
+	bool 			m_bConnected;
 };

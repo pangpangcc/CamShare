@@ -8,44 +8,80 @@
 #ifndef SESSION_H_
 #define SESSION_H_
 
-#include "Client.h"
+#include <common/TimeProc.hpp>
+#include <common/KThread.h>
+#include <common/KSafeList.h>
+#include <common/KSafeMap.h>
 
 #include <livechat/ILiveChatClient.h>
 #include <request/IRequest.h>
 
-typedef KSafeMap<int, IRequest*> RequestkMap;
+class CheckTimeoutRunnable;
+typedef struct RequestItem {
+	RequestItem(
+			string identify,
+			IRequest* request
+			) {
+		this->identify = identify;
+		this->request = request;
+		timestamp = GetTickCount();
+	}
+	string identify;
+	IRequest* request;
+	unsigned int timestamp;
+} RequestItem;
+
+typedef KSafeList<RequestItem*> RequestItemList;
+typedef KSafeMap<string, IRequest*> RequestkMap;
 class Session {
 public:
-	Session(Client* client, ILiveChatClient* livechat);
+	Session(ILiveChatClient* livechat);
 	virtual ~Session();
 
 	/**
 	 * 记录已经发送的请求
-	 * @param seq livechat client 请求序列号
+	 * @param identify 唯一标识
 	 * @param request 请求实例
 	 */
-	void AddRequest(int seq, IRequest* request);
+	bool AddRequest(const string& identify, IRequest* request);
 
 	/**
 	 * 获得并删除已经返回的请求
-	 * @param seq livechat client 请求序列号
+	 * @param identify 唯一标识
 	 * @return 请求实例
 	 */
-	IRequest* EraseRequest(int seq);
+	IRequest* EraseRequest(const string& identify);
 
 	/**
-	 * 客户端句柄
+	 * livechat句柄
 	 */
-	Client* client;
-
 	ILiveChatClient* livechat;
 
-private:
+	void CheckTimeoutRunnableHandle();
 
 	/**
-	 * 请求列表
+	 * 任务请求超时(毫秒)
+	 */
+	unsigned int timeout;
+
+private:
+	/**
+	 * 任务列表
 	 */
 	RequestkMap mRequestMap;
+
+	/**
+	 * 任务检测列表
+	 */
+	RequestItemList mRequestItemList;
+
+	/**
+	 * 检测超时线程
+	 */
+	CheckTimeoutRunnable* mpCheckTimeoutRunnable;
+	KThread* mpCheckTimeoutThread;
+
+	bool mIsRunning;
 };
 
 #endif /* SESSION_H_ */
