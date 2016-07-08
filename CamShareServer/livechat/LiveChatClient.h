@@ -81,5 +81,7 @@ private:
 	IAutoLock*		m_pConnectLock;		// 锁
 	bool 			m_bConnectForbidden;
 
-	string 			m_svrName;	// 服务器名
+	string 			m_svrName;		// 应用名
+	string 			m_connectName;	// 服务器连接名
+	string 			m_groupName;	// 服务器组名
 };

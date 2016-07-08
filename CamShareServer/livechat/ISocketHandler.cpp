@@ -423,6 +423,31 @@ public:
 		return result;
 	}
 
+	// 设置是否tcp keep alive
+	bool SetKeepAlive(bool isKeepAlive, int idle, int interval, int count)
+	{
+		bool result = true;
+
+		int iKeepAlive = isKeepAlive ? 1 : 0;
+	    if (setsockopt(m_socket, SOL_SOCKET, SO_KEEPALIVE, (void*)&iKeepAlive, sizeof(iKeepAlive)) < 0) {
+	        result = false;
+	    }
+
+	    if (setsockopt(m_socket, SOL_TCP, TCP_KEEPIDLE, (void*)&idle, sizeof(idle)) < 0) {
+	    	result = false;
+	    }
+
+	    if (setsockopt(m_socket, SOL_TCP, TCP_KEEPINTVL, (void *)&interval, sizeof(interval)) < 0) {
+	    	result = false;
+	    }
+
+	    if (setsockopt(m_socket, SOL_TCP, TCP_KEEPCNT, (void *)&count, sizeof(count)) < 0) {
+	    	result = false;
+	    }
+
+	    return result;
+	}
+
 private:
 	SOCKET	m_socket;
 	bool	m_block;

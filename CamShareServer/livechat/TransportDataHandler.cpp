@@ -407,6 +407,7 @@ bool CTransportDataHandler::ConnectProc()
 
 		if (result) {
 			m_socketHandler->SetBlock(true);
+			m_socketHandler->SetKeepAlive();
 			break;
 		}
 		else {

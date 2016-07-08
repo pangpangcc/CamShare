@@ -402,10 +402,15 @@ TcpServer::~TcpServer() {
 }
 
 bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
+	if( mIsRunning ) {
+		return false;
+	}
+
+	printf("# TcpServer starting... \n");
+
 	miMaxThreadHandle = maxThreadHandle;
 	miMaxConnection = maxConnection;
 
-	printf("# TcpServer start... \n");
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"TcpServer::Start( "
@@ -420,7 +425,7 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 	struct sockaddr_in ac_addr;
 	if ((mServer = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "TcpServer::Start( Create socket error )");
-		printf("# Create socket error \n");
+		printf("# Create socket error! \n");
 		return -1;
 	}
 
@@ -434,13 +439,13 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 
 	if ( bind(mServer, (struct sockaddr *) &ac_addr, sizeof(struct sockaddr))== -1 ) {
 		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "TcpServer::Start( Bind socket error )");
-		printf("# Bind socket error \n");
+		printf("# Bind socket error! \n");
 		return false;
 	}
 
 	if ( listen(mServer, 1024) == -1 ) {
 		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "TcpServer::Start( Listen socket error )");
-		printf("# Listen socket error \n");
+		printf("# Listen socket error! \n");
 		return false;
 	}
 
@@ -465,11 +470,6 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 	}
 	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( Create idle buffers ok )");
 
-//	/* init send message list */
-//	mpSendMessageList = new MessageList[2 * maxConnection];
-//	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( Init send message list ok )");
-//	printf("# Init send message list ok \n");
-
 	mIsRunning = true;
 
 	mLoop = ev_loop_new(EVFLAG_AUTO);//EV_DEFAULT;
@@ -478,7 +478,6 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 	mpMainThread = new KThread(mpMainRunnable);
 	if( mpMainThread->start() != 0 ) {
 		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( Create main thread ok )");
-//		printf("# Create main thread ok \n");
 	}
 
 	/* start handle thread */
@@ -489,7 +488,6 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 		mpHandleThread[i] = new KThread(mpHandleRunnable[i]);
 		if( mpHandleThread[i]->start() != 0 ) {
 			LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( Create handle thread[%d] ok )", i);
-//			printf("# Create handle thread[%d] ok \n", i);
 		}
 	}
 
@@ -497,15 +495,20 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 	mpSendThread = new KThread(mpSendRunnable);
 	if( mpSendThread->start() != 0 ) {
 		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( Create send thread ok )");
-//		printf("# Create send thread ok \n");
 	}
+	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::Start( start ok )");
 	printf("# TcpServer start OK. \n");
 	return true;
 }
 
 bool TcpServer::Stop() {
-	/* stop log thread */
-	mIsRunning = false;
+	if( mIsRunning ) {
+		mIsRunning = false;
+	} else {
+		return false;
+	}
+
+	printf("# TcpServer stopping... \n");
 
 	/* release main thread */
 	if( mpMainThread ) {
@@ -514,13 +517,19 @@ bool TcpServer::Stop() {
 	}
 
 	/* release handle thread */
-	for( int i = 0; i < miMaxThreadHandle; i++ ) {
-		mpHandleThread[i]->stop();
-		delete mpHandleRunnable[i];
-		delete mpHandleThread[i];
+	if( mpHandleThread != NULL && mpHandleThread != NULL ) {
+		for( int i = 0; i < miMaxThreadHandle; i++ ) {
+			if( mpHandleThread[i] != NULL ) {
+				mpHandleThread[i]->stop();
+				delete mpHandleThread[i];
+			}
+			if( mpHandleRunnable[i] != NULL ) {
+				delete mpHandleRunnable[i];
+			}
+		}
+		delete mpHandleThread;
+		delete mpHandleRunnable;
 	}
-	delete mpHandleThread;
-	delete mpHandleRunnable;
 
 	close(mServer);
 
@@ -555,6 +564,8 @@ bool TcpServer::Stop() {
 	if( mLoop ) {
 		ev_loop_destroy(mLoop);
 	}
+
+	printf("# TcpServer stop OK. \n");
 
 	return true;
 }

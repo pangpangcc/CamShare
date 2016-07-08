@@ -27,6 +27,10 @@ CLiveChatClient::CLiveChatClient()
 	m_site_type = SITE_TYPE_UNKNOW;
 	m_svrPort = -1;
 
+	m_svrName = "";
+	m_connectName = "";
+	m_groupName = "";
+
 	m_bConnectForbidden = false;
 	m_pConnectLock = NULL;
 	m_pConnectLock = IAutoLock::CreateAutoLock();
@@ -105,10 +109,15 @@ bool CLiveChatClient::ConnectServer(SITE_TYPE type, string name) {
 		{
 			m_bConnectForbidden = true;
 			m_site_type = type;
-
-//			char siteId[64];
-//			sprintf(siteId, "C%d", (int)m_site_type);
 			m_svrName = name;
+
+			char tmp[64];
+			// 服务器连接名[应用名_站点]
+			sprintf(tmp, "%s_%d", m_svrName.c_str(), m_site_type);
+			m_connectName = tmp;
+
+			// 服务器组名[应用名]
+			m_groupName = m_svrName;
 
 			result = true;
 		}
@@ -125,7 +134,7 @@ bool CLiveChatClient::ConnectServer()
 {
 	bool result = false;
 
-	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer() begin");
+	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer() begin, siteId : %d ", m_site_type);
 
 	if (m_bInit) {
 		if (NULL != m_taskManager) {
@@ -133,7 +142,7 @@ bool CLiveChatClient::ConnectServer()
 				m_taskManager->Stop();
 			}
 			result = m_taskManager->Start();
-			FileLog("LiveChatClient", "CLiveChatClient::ConnectServer() result: %d", result);
+			FileLog("LiveChatClient", "CLiveChatClient::ConnectServer(), result: %d, siteId : %d", result, m_site_type);
 		}
 	}
 
@@ -147,10 +156,10 @@ bool CLiveChatClient::Disconnect()
 {
 	bool result = false;
 
-	FileLog("LiveChatClient", "CLiveChatClient::Disconnect() begin, m_taskManager:%p", m_taskManager);
+	FileLog("LiveChatClient", "CLiveChatClient::Disconnect() begin, m_taskManager:%p, siteId : %d", m_taskManager, m_site_type);
 
 	if (NULL != m_taskManager) {
-		FileLog("LiveChatClient", "CLiveChatClient::Disconnect() m_taskManager->Stop(), m_taskManager:%p", m_taskManager);
+		FileLog("LiveChatClient", "CLiveChatClient::Disconnect() m_taskManager->Stop(), m_taskManager:%p, siteId : %d", m_taskManager, m_site_type);
 		result = m_taskManager->Stop();
 
 		if (result) {
@@ -158,7 +167,7 @@ bool CLiveChatClient::Disconnect()
 		}
 	}
 
-	FileLog("LiveChatClient", "CLiveChatClient::Disconnect() end");
+	FileLog("LiveChatClient", "CLiveChatClient::Disconnect() end, siteId : %d", m_site_type);
 
 	return result;
 }
@@ -171,10 +180,10 @@ bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const
 		&& m_taskManager->IsStart())
 	{
 		SendEnterConferenceTask* task = new SendEnterConferenceTask();
-		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p", task);
+		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p, siteId : %d", task, m_site_type);
 		if (NULL != task) {
 			result = task->Init(this, m_listener);
-			result = result && task->InitParam(m_svrName, fromId, toId, key);
+			result = result && task->InitParam(m_connectName, fromId, toId, key);
 
 			if (result) {
 //				int seq = m_seqCounter.GetCount();
@@ -183,9 +192,9 @@ bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const
 				result = m_taskManager->HandleRequestTask(task);
 			}
 		}
-		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p end", task);
+		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p end, siteId : %d", task, m_site_type);
 	}
-	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() end");
+	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() end, siteId : %d", m_site_type);
 	return result;
 }
 
@@ -197,7 +206,7 @@ bool CLiveChatClient::SendMsg(int seq, const string& fromId, const string& toId,
 		&& m_taskManager->IsStart())
 	{
 		SendMsgTask* task = new SendMsgTask();
-		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() task:%p", task);
+		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() task:%p, siteId : %d", task, m_site_type);
 		if (NULL != task) {
 			result = task->Init(this, m_listener);
 			result = result && task->InitParam(fromId, toId, msg);
@@ -208,9 +217,9 @@ bool CLiveChatClient::SendMsg(int seq, const string& fromId, const string& toId,
 				result = m_taskManager->HandleRequestTask(task);
 			}
 		}
-		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() task:%p end", task);
+		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, task:%p, siteId : %d", task, m_site_type);
 	}
-	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end");
+	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, siteId : %d", m_site_type);
 	return result;
 }
 
@@ -222,17 +231,17 @@ SITE_TYPE CLiveChatClient::GetType() {
 // 连接成功回调
 void CLiveChatClient::OnConnect(bool success)
 {
-	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() success: %d", success);
+	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() success: %d, siteId : %d", success, m_site_type);
 
 	if (success) {
-		FileLog("LiveChatClient", "CLiveChatClient::OnConnect() CheckVersionProc()");
+		FileLog("LiveChatClient", "CLiveChatClient::OnConnect) CheckVersionProc(), siteId : %d", m_site_type);
 		// 连接服务器成功，检测版本号
 		CheckVersionProc();
 //		// 启动发送心跳包线程
 //		HearbeatThreadStart();
 	}
 	else {
-		FileLog("LiveChatClient", "CLiveChatClient::OnConnect() LCC_ERR_CONNECTFAIL, m_listener:%p", m_listener);
+		FileLog("LiveChatClient", "CLiveChatClient::OnConnect() LCC_ERR_CONNECTFAIL, m_listener:%p, siteId : %d", m_listener, m_site_type);
 		m_listener->OnConnect(this, LCC_ERR_CONNECTFAIL, "");
 	}
 
@@ -240,7 +249,7 @@ void CLiveChatClient::OnConnect(bool success)
 	m_bConnectForbidden = success;
 	m_pConnectLock->Unlock();
 
-	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() end");
+	FileLog("LiveChatClient", "CLiveChatClient::OnConnect() end, siteId : %d", m_site_type);
 }
 
 // 连接失败回调(listUnsentTask：未发送的task列表)
@@ -308,7 +317,8 @@ bool CLiveChatClient::CheckVersionProc()
 		checkVerTask->Init(this, m_listener);
 
 		char siteId[64];
-		sprintf(siteId, "1.1.0.0X%sX%dXCAMSX7", m_svrName.c_str(), m_site_type);
+		// 服务器连接名[应用名_站点]/站点/服务器组名[应用名]
+		sprintf(siteId, "1.1.0.0X%sX%dX%sX7", m_connectName.c_str(), m_site_type, m_groupName.c_str());
 		checkVerTask->InitParam(siteId);
 
 		int seq = m_seqCounter.GetAndIncrement();

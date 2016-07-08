@@ -1104,7 +1104,7 @@ public:
 				);
 //		client->Close();
 		char temp[1024];
-		sprintf(temp, "WW%d@192.168.88.152", client->mIndex);
+		sprintf(temp, "WW%d@192.168.88.143", client->mIndex);
 		client->Login(temp, "", "1", "sid=SESSION123456&userType=1");
 	}
 

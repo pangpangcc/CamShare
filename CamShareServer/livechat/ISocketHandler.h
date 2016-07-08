@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <strings.h>
@@ -70,6 +71,8 @@ public:
 	virtual bool Bind(const string& ip, unsigned int port) = 0;
 	// 设置blocking
 	virtual bool SetBlock(bool block) = 0;
+	// 设置是否tcp keep alive
+	virtual bool SetKeepAlive(bool isKeepAlive = true, int idle = 180, int interval = 30, int count = 3) = 0;
 	// 连接（msTimeout：超时时间(毫秒)，不大于0表示使用默认超时）
 	virtual SOCKET_RESULT_CODE Connect(const string& ip, unsigned int port, int msTimeout) = 0;
 	// 发送

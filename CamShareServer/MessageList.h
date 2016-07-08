@@ -29,10 +29,6 @@ typedef struct Message {
 	int		index;
 	int		seq;
 	int		type;
-
-	unsigned int 	starttime;
-	unsigned int	totaltime;
-
 	char	buffer[MAX_LOG_BUFFER_LEN];
 //	char    bitBuffer[128];
 	ev_io *wr;

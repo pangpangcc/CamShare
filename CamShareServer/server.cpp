@@ -36,12 +36,18 @@ int main(int argc, char *argv[]) {
 
 	Parse(argc, argv);
 
+	bool bFlag = false;
 	CamShareMiddleware server;
 	if( sConf.length() > 0 ) {
-		server.Run(sConf);
+		bFlag = server.Run(sConf);
 	} else {
 		printf("# Usage : ./camshare-middleware [ -f <config file> ] \n");
-		server.Run("/etc/camshare-middleware.config");
+		bFlag = server.Run("/etc/camshare-middleware.config");
+	}
+
+	while( bFlag && server.IsRunning() ) {
+		/* do nothing here */
+		sleep(5);
 	}
 
 	return EXIT_SUCCESS;

@@ -138,7 +138,7 @@ CamShareMiddleware::~CamShareMiddleware() {
 	}
 }
 
-void CamShareMiddleware::Run(const string& config) {
+bool CamShareMiddleware::Run(const string& config) {
 	if( config.length() > 0 ) {
 		mConfigFile = config;
 
@@ -150,7 +150,8 @@ void CamShareMiddleware::Run(const string& config) {
 				LogManager::LogSetFlushBuffer(5 * BUFFER_SIZE_1K * BUFFER_SIZE_1K);
 			}
 
-			Run();
+			return Run();
+
 		} else {
 			printf("# CamShareMiddleware can not load config file exit. \n");
 		}
@@ -158,9 +159,11 @@ void CamShareMiddleware::Run(const string& config) {
 	} else {
 		printf("# No config file can be use exit. \n");
 	}
+
+	return false;
 }
 
-void CamShareMiddleware::Run() {
+bool CamShareMiddleware::Run() {
 	/* log system */
 	LogManager::GetLogManager()->Start(1000, miLogLevel, mLogDir);
 	LogManager::GetLogManager()->Log(
@@ -272,7 +275,7 @@ void CamShareMiddleware::Run() {
 	bFlag = mClientTcpServer.Start(miMaxClient, miPort, miMaxHandleThread);
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( TcpServer Init Fail )");
-		return;
+		return false;
 	}
 	LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( TcpServer Init OK )");
 
@@ -286,15 +289,47 @@ void CamShareMiddleware::Run() {
 	ILiveChatClient* cl = ILiveChatClient::CreateClient();
 	cl->Init(ips, miLivechatPort, this);
 	mLiveChatClientMap.Insert(SITE_TYPE_CL, cl);
+	LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( "
+			"[创建外部服务(LiveChat)], "
+			"cl : %p, "
+			"siteId : %d "
+			")",
+			cl,
+			SITE_TYPE_CL
+			);
 	ILiveChatClient* ida = ILiveChatClient::CreateClient();
 	ida->Init(ips, miLivechatPort, this);
 	mLiveChatClientMap.Insert(SITE_TYPE_IDA, ida);
+	LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( "
+			"[创建外部服务(LiveChat)], "
+			"ida : %p "
+			"siteId : %d "
+			")",
+			ida,
+			SITE_TYPE_IDA
+			);
 	ILiveChatClient* cd = ILiveChatClient::CreateClient();
 	cd->Init(ips, miLivechatPort, this);
 	mLiveChatClientMap.Insert(SITE_TYPE_CD, cd);
+	LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( "
+			"[创建外部服务(LiveChat)], "
+			"cd : %p "
+			"siteId : %d "
+			")",
+			cd,
+			SITE_TYPE_CD
+			);
 	ILiveChatClient* ld = ILiveChatClient::CreateClient();
 	ld->Init(ips, miLivechatPort, this);
 	mLiveChatClientMap.Insert(SITE_TYPE_LD, ld);
+	LogManager::GetLogManager()->Log(LOG_STAT, "CamShareMiddleware::Run( "
+			"[创建外部服务(LiveChat)], "
+			"ld : %p "
+			"siteId : %d "
+			")",
+			ld,
+			SITE_TYPE_LD
+			);
 	mLiveChatClientMap.Unlock();
 
 	/**
@@ -320,13 +355,10 @@ void CamShareMiddleware::Run() {
 	}
 
 	// 服务启动成功
-	printf("# CamShareMiddleware start OK \n");
+	printf("# CamShareMiddleware start OK. \n");
 	LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( Init OK )");
 
-	while( true ) {
-		/* do nothing here */
-		sleep(5);
-	}
+	return true;
 }
 
 bool CamShareMiddleware::Reload() {
@@ -1203,10 +1235,12 @@ void CamShareMiddleware::OnConnect(
 				"CamShareMiddleware::OnConnect( "
 				"tid : %d, "
 				"[外部服务(LiveChat), 连接服务器成功], "
-				"livechat : %p "
+				"livechat : %p, "
+				"siteId : %d "
 				")",
 				(int)syscall(SYS_gettid),
-				livechat
+				livechat,
+				livechat->GetType()
 				);
 
 		if( mAuthorization ) {
@@ -1221,11 +1255,13 @@ void CamShareMiddleware::OnConnect(
 				"tid : %d, "
 				"[外部服务(LiveChat), 连接服务器失败], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"err : %d, "
 				"errmsg : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				err,
 				errmsg.c_str()
 				);
@@ -1244,11 +1280,13 @@ void CamShareMiddleware::OnDisconnect(
 			"tid : %d, "
 			"[外部服务(LiveChat), 断开服务器], "
 			"livechat : %p, "
+			"siteId : %d "
 			"err : %d, "
 			"errmsg : %s "
 			")",
 			(int)syscall(SYS_gettid),
 			livechat,
+			livechat->GetType(),
 			err,
 			errmsg.c_str()
 			);
@@ -1265,12 +1303,14 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				"tid : %d, "
 				"[外部服务(LiveChat), 发送命令:进入会议室认证, 成功], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str()
@@ -1283,6 +1323,7 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				"tid : %d, "
 				"[外部服务(LiveChat), 发送命令:进入会议室认证, 失败], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s "
@@ -1291,6 +1332,7 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str(),
@@ -1331,12 +1373,14 @@ void CamShareMiddleware::OnRecvEnterConference(
 				"tid : %d, "
 				"[外部服务(LiveChat), 收到命令:进入会议室认证结果, 成功], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str()
@@ -1352,6 +1396,7 @@ void CamShareMiddleware::OnRecvEnterConference(
 				"tid : %d, "
 				"[外部服务(LiveChat), 收到命令:进入会议室认证结果, 失败], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s, "
@@ -1361,6 +1406,7 @@ void CamShareMiddleware::OnRecvEnterConference(
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str(),
@@ -1394,12 +1440,14 @@ void CamShareMiddleware::OnRecvKickUserFromConference(
 				"tid : %d, "
 				"[外部服务(LiveChat), 收到命令:从会议室踢出用户, 成功], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str()
@@ -1423,6 +1471,7 @@ void CamShareMiddleware::OnRecvKickUserFromConference(
 				"tid : %d, "
 				"[外部服务(LiveChat), 收到命令:从会议室踢出用户, 失败], "
 				"livechat : %p, "
+				"siteId : %d, "
 				"seq : %d, "
 				"fromId : %s, "
 				"toId : %s, "
@@ -1431,6 +1480,7 @@ void CamShareMiddleware::OnRecvKickUserFromConference(
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
+				livechat->GetType(),
 				seq,
 				fromId.c_str(),
 				toId.c_str(),
@@ -1451,30 +1501,35 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 		) {
 	bool bFlag = true;
 
+	SITE_TYPE siteId = SITE_TYPE_UNKNOW;
+	// LiveChat client生成请求序列号
+	int seq = -1;
+	if( livechat != NULL ) {
+		seq = livechat->GetSeq();
+		siteId = livechat->GetType();
+
+	} else {
+		bFlag = false;
+	}
+
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"CamShareMiddleware::SendEnterConference2LiveChat( "
 			"tid : %d, "
 			"[外部服务(LiveChat), 发送命令:进入会议室], "
+			"siteId : %d, "
 			"fromId : %s, "
 			"toId : %s, "
 			"type : %u, "
 			"serverId : %s "
 			")",
 			(int)syscall(SYS_gettid),
+			siteId,
 			fromId.c_str(),
 			toId.c_str(),
 			type,
 			serverId.c_str()
 			);
-	// LiveChat client生成请求序列号
-	int seq = -1;
-	if( livechat != NULL ) {
-		seq = livechat->GetSeq();
-
-	} else {
-		bFlag = false;
-	}
 
 	if( bFlag ) {
 		bFlag = false;
@@ -1493,6 +1548,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 					"CamShareMiddleware::SendEnterConference2LiveChat( "
 					"tid : %d, "
 					"[外部服务(LiveChat), 发送命令:进入会议室, 生成会话成功], "
+					"siteId : %d, "
 					"fromId : %s, "
 					"toId : %s, "
 					"type : %u, "
@@ -1500,6 +1556,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 					"key : %s "
 					")",
 					(int)syscall(SYS_gettid),
+					siteId,
 					fromId.c_str(),
 					toId.c_str(),
 					type,
@@ -1517,12 +1574,14 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 				"CamShareMiddleware::SendEnterConference2LiveChat( "
 				"tid : %d, "
 				"[外部服务(LiveChat), 发送命令:进入会议室, 失败], "
+				"siteId : %d, "
 				"fromId : %s, "
 				"toId : %s, "
 				"type : %u, "
 				"serverId : %s "
 				")",
 				(int)syscall(SYS_gettid),
+				siteId,
 				fromId.c_str(),
 				toId.c_str(),
 				type,
@@ -1540,26 +1599,30 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 		) {
 	bool bFlag = true;
 
+	SITE_TYPE siteId = SITE_TYPE_UNKNOW;
+	// LiveChat client生成请求序列号
+	int seq = -1;
+	if( livechat != NULL ) {
+		seq = livechat->GetSeq();
+		siteId = livechat->GetType();
+	} else {
+		bFlag = false;
+	}
+
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
 			"tid : %d, "
 			"[外部服务(LiveChat), 发送命令:通知客户端进入聊天室], "
+			"siteId : %d, "
 			"fromId : %s, "
 			"toId : %s "
 			")",
 			(int)syscall(SYS_gettid),
+			siteId,
 			fromId.c_str(),
 			toId.c_str()
 			);
-	// LiveChat client生成请求序列号
-	int seq = -1;
-	if( livechat != NULL ) {
-		seq = livechat->GetSeq();
-
-	} else {
-		bFlag = false;
-	}
 
 	if( bFlag ) {
 		bFlag = false;
@@ -1575,10 +1638,12 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 					"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
 					"tid : %d, "
 					"[外部服务(LiveChat), 发送命令:通知客户端进入聊天室, 成功], "
+					"siteId : %d, "
 					"fromId : %s, "
 					"toId : %s "
 					")",
 					(int)syscall(SYS_gettid),
+					siteId,
 					fromId.c_str(),
 					toId.c_str()
 					);
@@ -1591,10 +1656,12 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 				"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
 				"tid : %d, "
 				"[外部服务(LiveChat), 发送命令:通知客户端进入聊天室, 失败], "
+				"siteId : %d, "
 				"fromId : %s, "
 				"toId : %s "
 				")",
 				(int)syscall(SYS_gettid),
+				siteId,
 				fromId.c_str(),
 				toId.c_str()
 				);
@@ -1610,26 +1677,29 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 		) {
 	bool bFlag = true;
 
+	SITE_TYPE siteId = SITE_TYPE_UNKNOW;
+	// LiveChat client生成请求序列号
+	int seq = -1;
+	if( livechat != NULL ) {
+		seq = livechat->GetSeq();
+		siteId = livechat->GetType();
+	} else {
+		bFlag = false;
+	}
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"CamShareMiddleware::SendMsgExitConference2LiveChat( "
 			"tid : %d, "
 			"[外部服务(LiveChat), 发送命令:通知客户端退出聊天室], "
+			"siteId : %d, "
 			"fromId : %s, "
 			"toId : %s "
 			")",
 			(int)syscall(SYS_gettid),
+			siteId,
 			fromId.c_str(),
 			toId.c_str()
 			);
-	// LiveChat client生成请求序列号
-	int seq = -1;
-	if( livechat != NULL ) {
-		seq = livechat->GetSeq();
-
-	} else {
-		bFlag = false;
-	}
 
 	if( bFlag ) {
 		bFlag = false;
@@ -1645,10 +1715,12 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 					"CamShareMiddleware::SendMsgExitConference2LiveChat( "
 					"tid : %d, "
 					"[外部服务(LiveChat), 发送命令:通知客户端退出聊天室, 成功], "
+					"siteId : %d, "
 					"fromId : %s, "
 					"toId : %s "
 					")",
 					(int)syscall(SYS_gettid),
+					siteId,
 					fromId.c_str(),
 					toId.c_str()
 					);
@@ -1661,10 +1733,12 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 				"CamShareMiddleware::SendMsgExitConference2LiveChat( "
 				"tid : %d, "
 				"[外部服务(LiveChat), 发送命令:通知客户端退出聊天室, 失败], "
+				"siteId : %d, "
 				"fromId : %s, "
 				"toId : %s "
 				")",
 				(int)syscall(SYS_gettid),
+				siteId,
 				fromId.c_str(),
 				toId.c_str()
 				);

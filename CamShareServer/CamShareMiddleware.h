@@ -30,7 +30,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.1"
+#define VERSION_STRING "1.0.2"
 
 // socket -> client
 typedef KSafeMap<int, Client*> ClientMap;
@@ -55,8 +55,8 @@ public:
 	CamShareMiddleware();
 	virtual ~CamShareMiddleware();
 
-	void Run(const string& config);
-	void Run();
+	bool Run(const string& config);
+	bool Run();
 	bool Reload();
 	bool IsRunning();
 
