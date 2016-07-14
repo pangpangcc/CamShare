@@ -49,7 +49,7 @@ public:
 	// 是否已经连接服务器
 	virtual bool IsConnected() = 0;
 	// 连接服务器
-	virtual bool ConnectServer(SITE_TYPE type, string name) = 0;
+	virtual bool ConnectServer(string siteId, string name) = 0;
 	// 断开服务器连接
 	virtual bool Disconnect() = 0;
 	// 进入聊天室
@@ -59,5 +59,5 @@ public:
 
 public:
 	// 获取站点类型
-	virtual SITE_TYPE GetType() = 0;
+	virtual const string& GetSiteId() = 0;
 };

@@ -13,6 +13,8 @@ class BaseRespond : public IRespond {
 public:
 	BaseRespond();
 	virtual ~BaseRespond();
+
+	int GetData(char* buffer, int len, bool &more);
 };
 
 #endif /* REQUEST_BASERESPOND_H_ */

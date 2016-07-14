@@ -34,7 +34,16 @@ public:
 			const string& serverId,
 			const string& siteId
 			) = 0;
+	virtual void OnClientRecordFinish(
+			Client* client,
+			const string& conference,
+			const string& siteId,
+			const string& filePath,
+			const string& startTime,
+			const string& endTime
+			) = 0;
 
+	virtual void OnClientReloadLogConfig(Client* client) = 0;
 	virtual void OnClientUndefinedCommand(Client* client) = 0;
 };
 

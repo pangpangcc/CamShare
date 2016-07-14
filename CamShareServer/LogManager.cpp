@@ -275,3 +275,7 @@ int LogManager::MkDir(const char* pDir) {
     }
     return 1;
 }
+
+void LogManager::SetLogLevel(LOG_LEVEL nLevel) {
+	g_iLogLevel = nLevel;
+}

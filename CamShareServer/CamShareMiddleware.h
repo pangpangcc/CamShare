@@ -15,6 +15,7 @@
 #include "TcpServer.h"
 #include "FreeswitchClient.h"
 #include "SessionManager.h"
+#include "DBHandler.h"
 
 #include <common/ConfFile.hpp>
 #include <common/KSafeMap.h>
@@ -30,23 +31,44 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.2"
+#define VERSION_STRING "1.0.3"
+
+typedef struct SiteConfig {
+	SiteConfig() {
+		siteId = "";
+		recordFinishUrl ="";
+	}
+	SiteConfig(
+			const string& siteId,
+			const string& recordFinishUrl
+			) {
+		this->siteId = siteId;
+		this->recordFinishUrl = recordFinishUrl;
+	}
+	~SiteConfig() {
+
+	}
+	string siteId;
+	string recordFinishUrl;
+}SiteConfig;
 
 // socket -> client
 typedef KSafeMap<int, Client*> ClientMap;
-
-// type -> livechat client
-typedef KSafeMap<SITE_TYPE, ILiveChatClient*> LiveChatClientMap;
-
+// siteId -> livechat client
+typedef KSafeMap<string, ILiveChatClient*> LiveChatClientMap;
+// siteId -> site config
+typedef KSafeMap<string, SiteConfig*> SiteConfigMap;
 // client -> session
 typedef KSafeMap<Client*, Session*> Client2SessionMap;
-
 // livechat client -> session
 typedef KSafeMap<ILiveChatClient*, Session*> LiveChat2SessionMap;
 
 class StateRunnable;
 class ConnectLiveChatRunnable;
 class ConnectFreeswitchRunnable;
+class UploadRecordsRunnable;
+class HttpClient;
+
 class CamShareMiddleware : public TcpServerObserver,
 								ClientCallback,
 								ILiveChatClientListener,
@@ -57,19 +79,19 @@ public:
 
 	bool Run(const string& config);
 	bool Run();
-	bool Reload();
 	bool IsRunning();
+	bool Stop();
 
-	/**
-	 * TcpServer回调
-	 */
+	/***************************** TcpServer回调 **************************************/
 	bool OnAccept(TcpServer *ts, int fd, char* ip);
 	void OnRecvMessage(TcpServer *ts, Message *m);
 	void OnSendMessage(TcpServer *ts, Message *m);
 	void OnDisconnect(TcpServer *ts, int fd);
 	void OnClose(TcpServer *ts, int fd);
 	void OnTimeoutMessage(TcpServer *ts, Message *m);
+	/***************************** TcpServer回调 end **************************************/
 
+	/***************************** 线程处理函数 **************************************/
 	/**
 	 * 检测状态线程处理
 	 */
@@ -86,8 +108,12 @@ public:
 	void ConnectFreeswitchHandle();
 
 	/**
-	 * 内部服务(HTTP), 命令回调
+	 * 同步本地录制完成记录
 	 */
+	void UploadRecordsHandle();
+	/***************************** 线程处理函数 end **************************************/
+
+	/***************************** 内部服务(HTTP), 命令回调 **************************************/
 	void OnClientGetDialplan(
 			Client* client,
 			const string& rtmpSession,
@@ -96,11 +122,20 @@ public:
 			const string& serverId,
 			const string& siteId
 			);
+	void OnClientRecordFinish(
+			Client* client,
+			const string& conference,
+			const string& siteId,
+			const string& filePath,
+			const string& startTime,
+			const string& endTime
+			);
+	void OnClientReloadLogConfig(Client* client);
 	void OnClientUndefinedCommand(Client* client);
+	/***************************** 内部服务(HTTP), 命令回调 end **************************************/
 
-	/**
-	 * 内部服务(Freeswitch), 命令回调
-	 */
+	/***************************** 内部服务(Freeswitch), 命令回调 **************************************/
+	void OnFreeswitchConnect(FreeswitchClient* freeswitch);
 	void OnFreeswitchEventConferenceAuthorizationMember(
 			FreeswitchClient* freeswitch,
 			const Channel* channel
@@ -113,23 +148,31 @@ public:
 			FreeswitchClient* freeswitch,
 			const Channel* channel
 			);
+	/***************************** 内部服务(Freeswitch), 命令回调 end **************************************/
 
-	/**
-	 * 外部服务(LiveChat), 任务回调
-	 */
+	/***************************** 外部服务(LiveChat), 任务回调 **************************************/
 	void OnConnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnDisconnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvKickUserFromConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
+	/***************************** 外部服务(LiveChat), 任务回调 end **************************************/
 
 private:
-	/*
-	 *	请求解析函数
-	 *	return : -1:Send fail respond / 0:Continue recv, send no respond / 1:Send OK respond
+	/**
+	 * 加载配置
 	 */
-	int TcpServerRecvMessageHandle(TcpServer *ts, Message *m);
-	int TcpServerTimeoutMessageHandle(TcpServer *ts, Message *m);
+	bool LoadConfig();
+	/**
+	 * 重新读取日志等级
+	 */
+	bool ReloadLogConfig();
+
+	/**
+	 * HTTP server处理
+	 */
+	void TcpServerRecvMessageHandle(TcpServer *ts, Message *m);
+	void TcpServerTimeoutMessageHandle(TcpServer *ts, Message *m);
 
 	/**
 	 * Freeswitch事件处理
@@ -175,6 +218,14 @@ private:
 			ILiveChatClient* livechat,
 			const string& fromId,
 			const string& toId
+			);
+
+	/**
+	 * 发送录制文件完成记录到HTTP服务器
+	 */
+	bool SendRecordFinish(
+			HttpClient* client,
+			const Record& record
 			);
 
 	/***************************** 外部服务接口 end **************************************/
@@ -304,22 +355,45 @@ private:
 
 	/***************************** Freeswitch参数 end **************************************/
 
+	/***************************** 站点参数 **************************************/
+	/**
+	 * 站点数量
+	 */
+	unsigned int miSiteCount;
+
+	/**
+	 * 上传视频录制记录时间间隔(秒)
+	 */
+	unsigned int miUploadTime;
+
+	/**
+	 * 站点配置
+	 */
+	SiteConfig* mpSiteConfig;
+
+	/***************************** 站点参数 end **************************************/
+
 	/***************************** 处理线程 **************************************/
 	/**
 	 * 状态监视线程
 	 */
 	StateRunnable* mpStateRunnable;
-	KThread* mpStateThread;
+	KThread mStateThread;
 	/**
 	 * 连接Livechat线程
 	 */
 	ConnectLiveChatRunnable* mpConnectLiveChatRunnable;
-	KThread* mpLiveChatConnectThread;
+	KThread mLiveChatConnectThread;
 	/**
 	 * 连接Freeswitch线程
 	 */
 	ConnectFreeswitchRunnable* mpConnectFreeswitchRunnable;
-	KThread* mpConnectFreeswitchThread;
+	KThread mConnectFreeswitchThread;
+	/**
+	 * 同步本地录制完成记录线程
+	 */
+	UploadRecordsRunnable* mpUploadRecordsRunnable;
+	KThread mUploadRecordsThread;
 	/***************************** 处理线程 end **************************************/
 
 	/***************************** 统计参数 **************************************/
@@ -358,6 +432,11 @@ private:
 	string mConfigFile;
 
 	/**
+	 * 站点查找配置
+	 */
+	SiteConfigMap mSiteConfigMap;
+
+	/**
 	 * 内部服务(HTTP)
 	 */
 	TcpServer mClientTcpServer;
@@ -386,6 +465,11 @@ private:
 	 * Freeswitch实例
 	 */
 	FreeswitchClient mFreeswitch;
+
+	/**
+	 * 请求缓存数据持久化实例
+	 */
+	DBHandler mDBHandler;
 
 	/***************************** 运行参数 end **************************************/
 };

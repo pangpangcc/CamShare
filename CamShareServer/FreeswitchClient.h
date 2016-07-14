@@ -117,6 +117,9 @@ class FreeswitchClient;
 class FreeswitchClientListener {
 public:
 	virtual ~FreeswitchClientListener() {};
+
+	virtual void OnFreeswitchConnect(FreeswitchClient* freeswitch) = 0;
+
 	virtual void OnFreeswitchEventConferenceAuthorizationMember(
 			FreeswitchClient* freeswitch,
 			const Channel* channel
@@ -271,8 +274,9 @@ private:
 	/**
 	 * 开始录制会议视频
 	 * @param	conference	会议名字
+	 * @param	siteId		站点Id
 	 */
-	bool StartRecordConference(const string& conference);
+	bool StartRecordConference(const string& conference, const string& siteId);
 
 	/**
 	 * 开始录制频道视频

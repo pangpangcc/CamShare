@@ -1075,7 +1075,7 @@ public:
 protected:
 	void onRun() {
 		while( true ) {
-			if( mContainer->Connect() ) {
+			if( mContainer->Connect("192.168.88.143") ) {
 				RtmpPacket recvPacket;
 				while( mContainer->RecvRtmpPacket(&recvPacket) ) {
 					RTMP_PACKET_TYPE type = mContainer->ParseRtmpPacket(&recvPacket);
@@ -1104,7 +1104,8 @@ public:
 				);
 //		client->Close();
 		char temp[1024];
-		sprintf(temp, "WW%d@192.168.88.143", client->mIndex);
+//		sprintf(temp, "WW%d@192.168.88.143", client->mIndex);
+		sprintf(temp, "MAX%d@192.168.88.143", client->mIndex);
 		client->Login(temp, "", "1", "sid=SESSION123456&userType=1");
 	}
 
@@ -1114,7 +1115,8 @@ public:
 	void OnLogin(RtmpClient* client, bool bSuccess) {
 		if( bSuccess ) {
 			char temp[1024];
-			sprintf(temp, "MM%d_PC0_1", client->mIndex);
+//			sprintf(temp, "MM%d|||PC0|||1", client->mIndex);
+			sprintf(temp, "SAMSON%d|||PC0|||1", client->mIndex);
 			client->MakeCall(temp);
 //			client->CreatePublishStream();
 		}

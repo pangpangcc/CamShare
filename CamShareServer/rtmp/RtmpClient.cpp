@@ -28,7 +28,7 @@ RtmpClient::RtmpClient() {
 
 	mSession = "";
 	port = 1935;
-	hostname = "192.168.88.143";
+	hostname = "";
     app = "phone";
 
     mbConnected = false;
@@ -65,7 +65,7 @@ void RtmpClient::SetRtmpClientListener(RtmpClientListener *listener) {
 	mpRtmpClientListener = listener;
 }
 
-bool RtmpClient::Connect() {
+bool RtmpClient::Connect(const string& hostName) {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::Connect( "
@@ -73,6 +73,8 @@ bool RtmpClient::Connect() {
 			")",
 			mIndex
 			);
+
+	hostname = hostName;
 
 	bool bFlag = false;
 

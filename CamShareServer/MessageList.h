@@ -23,12 +23,21 @@
 #include <list>
 using namespace std;
 
+typedef enum MessageType {
+	MessageTypeRecv,
+	MessageTypeSend
+};
+
 typedef struct Message {
 	int		fd;
 	int 	len;
 	int		index;
 	int		seq;
-	int		type;
+
+	MessageType		type;
+
+	unsigned int 	starttime;
+
 	char	buffer[MAX_LOG_BUFFER_LEN];
 //	char    bitBuffer[128];
 	ev_io *wr;
@@ -37,6 +46,8 @@ typedef struct Message {
 	void Reset() {
 		len = 0;
 		seq = 0;
+		type = MessageTypeRecv;
+		starttime = 0;
 		memset(buffer, '\0', sizeof(buffer));
 //		memset(bitBuffer, '\0', sizeof(bitBuffer));
 		wr = NULL;

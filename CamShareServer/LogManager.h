@@ -43,6 +43,7 @@ public:
 	bool IsRunning();
 	bool Log(LOG_LEVEL nLevel, const char *format, ...);
 	int MkDir(const char* pDir);
+	void SetLogLevel(LOG_LEVEL nLevel = LOG_STAT);
 
 //	MessageList *GetIdleMessageList();
 //	MessageList *GetLogMessageList();

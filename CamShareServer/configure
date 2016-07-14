@@ -12,3 +12,15 @@ cd libev
 chmod +x configure &&
 ./configure &&
 cd ..
+
+cd sqlite &&
+autoreconf -ivf &&
+chmod +x configure &&
+./configure &&
+cd ..
+
+cd curl &&
+autoreconf -ivf &&
+chmod +x configure &&
+./configure --disable-shared --enable-static --without-ssl &&
+cd ..

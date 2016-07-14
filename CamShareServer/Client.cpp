@@ -366,6 +366,42 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 
 			mpClientCallback->OnClientGetDialplan(this, rtmpSession, channelId, conference, serverId, siteId);
 		}
+	} else if( pDataHttpParser->GetPath() == "/RECORDFINISH" ) {
+		// 录制文件成功
+		if( mpClientCallback != NULL ) {
+			const string conference = pDataHttpParser->GetParam("userId");
+			const string siteId = pDataHttpParser->GetParam("siteId");
+			const string filePath = pDataHttpParser->GetParam("fileName");
+			const string startTime = pDataHttpParser->GetParam("startTime");
+			const string endTime = pDataHttpParser->GetParam("endTime");
+
+//			long long iStartTime = atoll(startTime.c_str());
+//			long long iEndTime = atoll(iEndTime.c_str());
+
+			LogManager::GetLogManager()->Log(
+					LOG_STAT,
+					"Client::ParseCommand( "
+					"tid : %d, "
+					"[解析命令:录制文件成功] "
+					")",
+					(int)syscall(SYS_gettid)
+					);
+
+			mpClientCallback->OnClientRecordFinish(this, conference, siteId, filePath, startTime, endTime);
+		}
+	} else if( pDataHttpParser->GetPath() == "/RELOADLOGCONFIG" ) {
+		if( mpClientCallback != NULL ) {
+			LogManager::GetLogManager()->Log(
+					LOG_STAT,
+					"Client::ParseCommand( "
+					"tid : %d, "
+					"[解析命令:重新加载日志配置] "
+					")",
+					(int)syscall(SYS_gettid)
+					);
+
+			mpClientCallback->OnClientReloadLogConfig(this);
+		}
 	} else {
 		if( mpClientCallback != NULL ) {
 			LogManager::GetLogManager()->Log(

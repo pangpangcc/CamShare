@@ -31,7 +31,7 @@ public:
 	// 是否已经连接服务器
 	bool IsConnected();
 	// 连接服务器
-	bool ConnectServer(SITE_TYPE type, string name);
+	bool ConnectServer(string siteId, string name);
 	// 断开连接
 	bool Disconnect();
 	// 进入聊天室
@@ -39,7 +39,7 @@ public:
 	// 发送消息到客户端
 	bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg);
 	// 获取站点类型
-	SITE_TYPE GetType();
+	const string& GetSiteId();
 
 private:
 	// 连接服务器
@@ -68,7 +68,7 @@ private:
 	string			m_svrIp;	// 当前连接的服务器IP
 	unsigned int	m_svrPort;	// 服务器端口
 
-	SITE_TYPE		m_site_type;	// 站点类型
+	string		m_siteId;	// 站点Id
 
 	Counter			m_seqCounter;	// seq计数器
 

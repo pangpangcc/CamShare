@@ -56,15 +56,6 @@ typedef enum {
 	LCC_ERR_SETOFFLINE		= -10006,	// 不能把在线状态设为"离线"，"离线"请使用Logout()
 } LCC_ERR_TYPE;
 
-// 站点类型
-typedef enum {
-	SITE_TYPE_UNKNOW = -1,	// UNKNOW
-	SITE_TYPE_CL = 0,		// CL
-	SITE_TYPE_IDA = 1,		// IDA
-	SITE_TYPE_CD = 4,		// CD
-	SITE_TYPE_LD = 5		// LD
-} SITE_TYPE;
-
 //// 试聊事件
 //typedef enum {
 //	TTE_NORMAL		= 0,	// 正常使用

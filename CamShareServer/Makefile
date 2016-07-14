@@ -16,12 +16,14 @@ CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable
-CXXFLAGS +=	-I. -Iinclude -Ilibev -Iesl/include
+CXXFLAGS +=	-I. -Iinclude -Ilibev -Iesl/include -Isqlite -Icurl/include
 
 LIBS =		-L. \
 			-Wl,-Bstatic -Llibev/.libs -lev \
 			-Wl,-Bstatic -Lesl/libs -lesl \
-			-Wl,-Bdynamic -ldl -lz -lpthread 
+			-Wl,-Bstatic -Lsqlite/.libs -lsqlite3 \
+			-Wl,-Bstatic -Lcurl/lib/.libs -lcurl \
+			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 
 COMMON  	=	common/LogFile.o common/md5.o common/KThread.o common/ConfFile.o common/Arithmetic.o\
 				common/IAutoLock.o common/CommonFunc.o
@@ -32,10 +34,12 @@ AMF	    	=	amf/AMF3.o amf/AmfParser.o
 
 XML			=   xml/tinystr.o xml/tinyxml.o xml/tinyxmlerror.o xml/tinyxmlparser.o
 
+HTTPCLIENT	=	httpclient/HttpClient.o httpclient/HttpEntiy.o
+
 REQUEST 	=	request/BaseRequest.o request/EnterConferenceRequest.o request/SendMsgExitConferenceRequest.o \
 				request/SendMsgEnterConferenceRequest.o
 
-RESPOND		=   respond/BaseRespond.o respond/DialplanRespond.o
+RESPOND		=   respond/BaseRespond.o respond/DialplanRespond.o respond/RecordFinishRespond.o
 
 LIVECHAT	=	livechat/Counter.o livechat/ILiveChatClient.o livechat/ISocketHandler.o \
 				livechat/IThreadHandler.o livechat/ITransportDataHandler.o livechat/ITransportPacketHandler.o \
@@ -47,18 +51,20 @@ LIVECHAT	=	livechat/Counter.o livechat/ILiveChatClient.o livechat/ISocketHandler
 				livechat/task/SendEnterConferenceTask.o livechat/task/SendMsgTask.o
 				
 OBJS 		=	server.o CamShareMiddleware.o TcpServer.o MessageList.o LogManager.o Client.o\
-				DataHttpParser.o DataParser.o Session.o FreeswitchClient.o SessionManager.o
+				DataHttpParser.o DataParser.o Session.o FreeswitchClient.o SessionManager.o \
+				SqliteManager.o DBHandler.o
 		
 OBJS +=		$(COMMON)
 OBJS +=		$(JSON)
 OBJS +=		$(AMF)
 OBJS +=		$(XML)
+OBJS +=		$(HTTPCLIENT)
 OBJS +=		$(REQUEST)
 OBJS +=     $(RESPOND)
 OBJS +=		$(LIVECHAT)
 TARGET =	camshare-middleware
 
-DEPDIRS	:= libev #rtmp
+DEPDIRS	:= libev sqlite #rtmp
 CLEAN_DEPS := $(addprefix _clean_, $(DEPDIRS))
 
 .PHONY: all deps test clean cleanall install $(DEPDIRS) $(TARGET)

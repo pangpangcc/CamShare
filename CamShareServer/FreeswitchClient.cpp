@@ -116,6 +116,9 @@ bool FreeswitchClient::Proceed(
 				")",
 				(int)syscall(SYS_gettid)
 				);
+		if( mpFreeswitchClientListener ) {
+			mpFreeswitchClientListener->OnFreeswitchConnect(this);
+		}
 
 		status = esl_events(&mFreeswitch, ESL_EVENT_TYPE_JSON,
 				"CHANNEL_CREATE CHANNEL_DESTROY "
@@ -156,7 +159,7 @@ bool FreeswitchClient::Proceed(
 			}
 
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"CamShareiddleware::Proceed( "
 					"tid : %d, "
 					"[Freeswitch, 连接断开] "
@@ -179,7 +182,7 @@ bool FreeswitchClient::Proceed(
 
 		} else {
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"CamShareiddleware::Proceed( "
 					"tid : %d, "
 					"[Freeswitch, 事件监听失败] "
@@ -192,7 +195,7 @@ bool FreeswitchClient::Proceed(
 
 	} else {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::Proceed( "
 				"tid : %d, "
 				"[Freeswitch, 连接失败] "
@@ -378,7 +381,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::StartUserRecvVideo( "
 				"tid : %d, "
 				"[Freeswitch, 允许用户开始观看聊天室视频, 失败], "
@@ -612,7 +615,7 @@ bool FreeswitchClient::SendCommandGetResult(const string& command, string& resul
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::SendCommandGetResult( "
 				"tid : %d, "
 				"[Freeswitch, 发送命令, 失败], "
@@ -757,7 +760,7 @@ bool FreeswitchClient::SyncRtmpSessionList() {
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::SyncRtmpSessionList( "
 				"tid : %d, "
 				"[Freeswitch, 同步所有用户rtmp_session, 失败] "
@@ -860,6 +863,7 @@ bool FreeswitchClient::ParseSessionInfo(
 
 bool FreeswitchClient::AuthorizationAllConference() {
 	bool bFlag = false;
+
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"FreeswitchClient::AuthorizationAllConference( "
@@ -868,6 +872,19 @@ bool FreeswitchClient::AuthorizationAllConference() {
 			")",
 			(int)syscall(SYS_gettid)
 			);
+
+	if( mFreeswitch.connected != 1 ) {
+		// 未连接
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"FreeswitchClient::AuthorizationAllConference( "
+				"tid : %d, "
+				"[Freeswitch, 重新验证当前所有会议室用户, 未连接成功, 不处理返回] "
+				")",
+				(int)syscall(SYS_gettid)
+				);
+		return false;
+	}
 
 	char temp[1024] = {'\0'};
 	string result = "";
@@ -990,7 +1007,7 @@ bool FreeswitchClient::AuthorizationAllConference() {
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::AuthorizationAllConference( "
 				"tid : %d, "
 				"[Freeswitch, 重新验证当前所有会议室用户, 失败] "
@@ -1145,7 +1162,7 @@ string FreeswitchClient::GetChannelParam(
 				);
 	} else {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::GetChannelParam( "
 				"tid : %d, "
 				"[Freeswitch, 获取会话变量, 失败], "
@@ -1192,7 +1209,7 @@ string FreeswitchClient::GetSessionIdByUUID(const string& uuid) {
 				);
 	} else {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::GetSessionIdByUUID( "
 				"tid : %d, "
 				"[Freeswitch, 获取用户rtmp_session, 失败], "
@@ -1335,17 +1352,22 @@ list<string> FreeswitchClient::GetMemberIdByUserFromConference(
 //	return memberId;
 }
 
-bool FreeswitchClient::StartRecordConference(const string& conference) {
+bool FreeswitchClient::StartRecordConference(
+		const string& conference,
+		const string& siteId
+		) {
 	bool bFlag = false;
 	LogManager::GetLogManager()->Log(
-			LOG_STAT,
+			LOG_MSG,
 			"FreeswitchClient::StartRecordConference( "
 			"tid : %d, "
 			"[Freeswitch, 开始录制会议视频], "
-			"conference : %s "
+			"conference : %s, "
+			"siteId : %s "
 			")",
 			(int)syscall(SYS_gettid),
-			conference.c_str()
+			conference.c_str(),
+			siteId.c_str()
 			);
 
 	char temp[1024] = {'\0'};
@@ -1356,12 +1378,13 @@ bool FreeswitchClient::StartRecordConference(const string& conference) {
 	time_t stm = time(NULL);
 	struct tm tTime;
 	localtime_r(&stm, &tTime);
-	snprintf(timeBuffer, 64, "%d-%02d-%02d-%02d-%02d-%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
+	snprintf(timeBuffer, 64, "%d%02d%02d%02d%02d%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-	snprintf(temp, sizeof(temp), "api conference %s record %s/%s-%s.h264",
+	snprintf(temp, sizeof(temp), "api conference %s record %s/%s_%s_%s.h264",
 			conference.c_str(),
 			mRecordingPath.c_str(),
 			conference.c_str(),
+			siteId.c_str(),
 			timeBuffer
 			);
 
@@ -1371,24 +1394,28 @@ bool FreeswitchClient::StartRecordConference(const string& conference) {
 				"FreeswitchClient::StartRecordConference( "
 				"tid : %d, "
 				"[Freeswitch, 开始录制会议视频, 成功], "
-				"conference : %s "
+				"conference : %s, "
+				"siteId : %s "
 				")",
 				(int)syscall(SYS_gettid),
-				conference.c_str()
+				conference.c_str(),
+				siteId.c_str()
 				);
 		bFlag = true;
 	}
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::StartRecordConference( "
 				"tid : %d, "
 				"[Freeswitch, 开始录制会议视频, 失败], "
-				"conference : %s "
+				"conference : %s, "
+				"siteId : %s "
 				")",
 				(int)syscall(SYS_gettid),
-				conference.c_str()
+				conference.c_str(),
+				siteId.c_str()
 				);
 	}
 
@@ -1462,7 +1489,7 @@ bool FreeswitchClient::StartRecordChannel(const string& uuid) {
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::StartRecordChannel( "
 				"tid : %d, "
 				"[Freeswitch, 开始录制频道视频, 失败], "
@@ -1699,16 +1726,8 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
     	memberType = root["Member-Type"].asString();
     	if( memberType == "moderator" ) {
     		type = Moderator;
-
-    		if( mbIsRecording && conference.length() > 0 ) {
-        		// 开始录制视频
-//        		StartRecordChannel(channel_uuid);
-//        		StartRecordConference(conference_name);
-    		}
     	}
     }
-
-	bool bFlag = false;
 
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
@@ -1742,15 +1761,24 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 			if( channel ) {
 				channel->type = type;
 				channel->memberId = memberId;
-				bFlag = true;
-
-				// 回调用户进入聊天室
-				if( mpFreeswitchClientListener ) {
-					mpFreeswitchClientListener->OnFreeswitchEventConferenceAddMember(this, channel);
-				}
 			}
 		}
 		mRtmpChannel2UserMap.Unlock();
+
+		// Freeswitch只在一条线程处理消息, channel不会销毁
+		if( channel != NULL ) {
+	    	if( type == Moderator ) {
+	    		if( mbIsRecording && conference.length() > 0 && channel->siteId.length() > 0 ) {
+	        		// 开始录制视频
+	        		StartRecordConference(conference, channel->siteId);
+	    		}
+	    	}
+
+			// 回调用户进入聊天室
+			if( mpFreeswitchClientListener ) {
+				mpFreeswitchClientListener->OnFreeswitchEventConferenceAddMember(this, channel);
+			}
+		}
 
 	} else {
 		// 踢出用户
@@ -1759,7 +1787,7 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 		snprintf(temp, sizeof(temp), "api conference %s kick %s", conference.c_str(), memberId.c_str());
 		if( SendCommandGetResult(temp, result) ) {
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"FreeswitchClient::FreeswitchEventConferenceAddMember( "
 					"tid : %d, "
 					"[Freeswitch, 事件处理, 增加会议成员, 踢出未登陆用户] "
@@ -1801,19 +1829,15 @@ void FreeswitchClient::FreeswitchEventConferenceDelMember(const Json::Value& roo
 		if( itr != mRtmpChannel2UserMap.End() ) {
 			// 清除<user,conference> -> channel关系
 			channel = itr->second;
-
-			if( channel->user.length() > 0
-					&& channel->conference.length() > 0
-					&& channel->siteId.length() > 0
-					) {
-				// 回调用户进入聊天室
-				if( mpFreeswitchClientListener ) {
-					mpFreeswitchClientListener->OnFreeswitchEventConferenceDelMember(this, channel);
-				}
-			}
-
 		}
 		mRtmpChannel2UserMap.Unlock();
+
+		if( channel ) {
+			// 回调用户进入聊天室
+			if( mpFreeswitchClientListener ) {
+				mpFreeswitchClientListener->OnFreeswitchEventConferenceDelMember(this, channel);
+			}
+		}
 	}
 
 	LogManager::GetLogManager()->Log(

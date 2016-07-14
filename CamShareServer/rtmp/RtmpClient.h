@@ -59,7 +59,7 @@ public:
 	void SetIndex(int i);
 
 	void SetRtmpClientListener(RtmpClientListener *listener);
-	bool Connect();
+	bool Connect(const string& hostName);
 	void Close();
 	bool Login(const string& user, const string& password, const string& site, const string& custom);
 	bool MakeCall(const string& dest);
