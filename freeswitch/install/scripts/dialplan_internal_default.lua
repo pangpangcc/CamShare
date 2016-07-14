@@ -13,23 +13,23 @@ api = freeswitch.API();
 -- 字符串分隔
 function string_split(str, sep)
     local tables = {};
-    local i = 0;
+    local i = 1;
     local j = 0;
     local value;
-    
+       
     while true do
-        j = string.find(str, sep, i + 1);
+        j = string.find(str, sep, i);
         if j == nil then
-            value = string.sub(str, i + 1, string.len(str));
+            value = string.sub(str, i, string.len(str));
             table.insert(tables, value);
             break;
         else
-            print("i : " .. i .. ", j : " ..  j)
-            value = string.sub(str, i + 1, j - 1);
+            value = string.sub(str, i, j - 1);
             table.insert(tables, value);
+            
+            i = j + string.len(sep);
         end;
-        
-        i = j;
+
     end
     return tables;
 end
@@ -63,7 +63,7 @@ local serverId = "";
 local siteId = "";
 
 -- 分隔[用户Id]/[Livechat服务器Id]/[站点Id]
-tables = string_split(destination_number, "_");
+tables = string_split(destination_number, "|||");
 if( #tables >= 3 ) then
   conference = tables[1];
   serverId = tables[2];

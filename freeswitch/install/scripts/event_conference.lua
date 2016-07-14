@@ -32,7 +32,7 @@ if fun == "conference_member_add" then
     freeswitch.consoleLog("CONSOLE", "# 会议事件监听脚本->事件:增加主持人[member_id:" .. member_id .. "]到会议室[" .. conference_name .. "]\n");   
     api:execute("conference", conference_name .. " vid-floor " .. member_id .. " force");
 --    api:execute("uuid_setvar", channel_id .. " enable_file_write_buffering false");
-    api:execute("conference", conference_name .. " record /usr/local/freeswitch/recordings/video_h264/" .. conference_name .. os.date("_%Y%m%d%H%M%S", os.time()) .. ".h264");
+--    api:execute("conference", conference_name .. " record /usr/local/freeswitch/recordings/video_h264/" .. conference_name .. os.date("_%Y%m%d%H%M%S", os.time()) .. ".h264");
   else
     freeswitch.consoleLog("CONSOLE", "# 会议事件监听脚本->事件:增加成员[member_id:" .. member_id .. "]到会议室[" .. conference_name .. "]\n");
   end

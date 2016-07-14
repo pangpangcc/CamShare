@@ -784,10 +784,24 @@ void VideoRecorder::RunCloseShell()
 		char mp4Path[MAX_PATH_LENGTH] = {0};
 		GetMp4FilePath(mp4Path, mcH264Path, mcMp4Dir);
 
+		// get userId
+		char userId[MAX_PATH_LENGTH] = {0};
+		GetUserIdWithFilePath(userId, mcH264Path);
+
+		// get siteId
+		char siteId[MAX_PATH_LENGTH] = {0};
+		GetSiteIdWithFilePath(siteId, mcH264Path);
+
+		// get startTime
+		char startTime[MAX_PATH_LENGTH] = {0};
+		GetStartTimeWithFilePath(userId, mcH264Path);
+
 		// build shell处理文件
+		// shell h264Path mp4Path jpgPath userId siteId startTime
 		char cmd[MAX_PATH_LENGTH] = {0};
-		snprintf(cmd, sizeof(cmd), "%s %s %s"
-				, mcCloseShell, mcH264Path, mp4Path);
+		snprintf(cmd, sizeof(cmd), "%s %s %s %s %s %s %s"
+				, mcCloseShell, mcH264Path, mp4Path, mcPicPath
+				, userId, siteId, startTime);
 
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -816,26 +830,74 @@ void VideoRecorder::RunCloseShell()
 //					, "mod_file_recorder: RunCloseShell() end\n");
 }
 
-// 获取源文件名称
-bool VideoRecorder::GetSrcPathFileName(char* buffer, const char* srcPath)
+// 根据源文件路径获取SiteID
+bool VideoRecorder::GetSiteIdWithFilePath(char* buffer, const char* srcPath)
 {
 	bool result = false;
-	if (NULL != srcPath && srcPath[0] != '\0')
+	const int siteIdIndex = 1;
+
+	char fileName[MAX_PATH_LENGTH] = {0};
+	if (GetFileNameWithoutExt(fileName, srcPath)
+		&& GetParamWithFileName(buffer, fileName, siteIdIndex))
 	{
-		// copy file name
-		const char* name = strrchr(srcPath, '/');
+		result = true;
+	}
+	return result;
+}
+
+// 根据源文件路径获取起始时间
+bool VideoRecorder::GetStartTimeWithFilePath(char* buffer, const char* srcPath)
+{
+	bool result = false;
+	const int startTimeIndex = 2;
+
+	char fileName[MAX_PATH_LENGTH] = {0};
+	if (GetFileNameWithoutExt(fileName, srcPath)
+		&& GetParamWithFileName(buffer, fileName, startTimeIndex))
+	{
+		result = true;
+	}
+	return result;
+}
+
+// 获取用户ID
+bool VideoRecorder::GetUserIdWithFilePath(char* buffer, const char* srcPath)
+{
+	bool result = false;
+	const int userIdIndex = 0;
+
+	char fileName[MAX_PATH_LENGTH] = {0};
+	if (GetFileNameWithoutExt(fileName, srcPath)
+		&& GetParamWithFileName(buffer, fileName, userIdIndex))
+	{
+		result = true;
+	}
+	return result;
+}
+
+// 获取没有后缀的文件名
+bool VideoRecorder::GetFileNameWithoutExt(char* buffer, const char* filePath)
+{
+	bool result = false;
+
+	if (NULL != filePath && filePath[0] != '\0')
+	{
+		// get file name
+		const char* name = strrchr(filePath, '/');
 		if (NULL == name) {
-			name = strrchr(srcPath, '\\');
+			name = strrchr(filePath, '\\');
 		}
 		// offset '/' or '\\'
 		if (NULL != name) {
 			name++;
 		}
-		// filter ext
-		const char* ext = strrchr(name, '.');
+		else {
+			name = filePath;
+		}
 
-		// copy file name
+		// get extension
 		if (NULL != name) {
+			const char* ext = strrchr(name, '.');
 			if (NULL != ext) {
 				strncpy(buffer, name, ext - name);
 			}
@@ -848,35 +910,47 @@ bool VideoRecorder::GetSrcPathFileName(char* buffer, const char* srcPath)
 	return result;
 }
 
-// 获取用户名
-bool VideoRecorder::GetUserNameWithFileName(char* buffer, const char* srcPath)
+// 获取文件名中的第index个参数(从0开始)
+bool VideoRecorder::GetParamWithFileName(char* buffer, const char* fileName, int index)
 {
 	bool result = false;
-	if (NULL != srcPath && srcPath[0] != '\0')
-	{
-		// copy file name
-		const char* name = strrchr(srcPath, '/');
-		if (NULL == name) {
-			name = strrchr(srcPath, '\\');
-		}
-		// offset '/' or '\\'
-		if (NULL != name) {
-			name++;
-		}
-		// filter separator
-		const char* separator = strrchr(name, '_');
 
-		// copy file name
-		if (NULL != name) {
-			if (NULL != separator) {
-				strncpy(buffer, name, separator - name);
+	// define separator
+	static const char separator = '_';
+
+	if (NULL != fileName && fileName[0] != '\0')
+	{
+		// get param
+		int i = 0;
+		const char* begin = fileName;
+		while (NULL != begin) {
+			const char* end = strchr(begin, separator);
+			if (i == index) {
+				if (NULL != end) {
+					// found
+					strncpy(buffer, begin, end - begin);
+				}
+				else {
+					// end of param
+					strcpy(buffer, begin);
+				}
+				result = true;
+				break;
 			}
 			else {
-				strcpy(buffer, name);
+				if (NULL != end) {
+					// go to next param
+					begin = end + 1;
+				}
+				else {
+					// not found
+					break;
+				}
 			}
-			result = true;
+			i++;
 		}
 	}
+
 	return result;
 }
 
@@ -910,12 +984,15 @@ bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* srcPath, const cha
 				strcat(mp4Path, "/");
 			}
 
-			// copy file name
-			char name[1024] = {0};
-			if (GetSrcPathFileName(name, srcPath))
+			// copy userId and startTime
+			char userId[MAX_PATH_LENGTH] = {0};
+			char startTime[MAX_PATH_LENGTH] = {0};
+			if (GetUserIdWithFilePath(userId, srcPath)
+				&& GetStartTimeWithFilePath(startTime, srcPath))
 			{
-				strcat(mp4Path, name);
-
+				strcat(mp4Path, userId);
+				strcat(mp4Path, "_");
+				strcat(mp4Path, startTime);
 				result = true;
 			}
 		}
@@ -968,11 +1045,11 @@ bool VideoRecorder::BuildPicH264FilePath(const char* srcPath, const char* dir)
 				strcat(mcPicH264Path, "/");
 			}
 
-			// copy file name
-			char name[1024] = {0};
-			if (GetUserNameWithFileName(name, srcPath))
+			// copy file user id
+			char userId[MAX_PATH_LENGTH] = {0};
+			if (GetUserIdWithFilePath(userId, srcPath))
 			{
-				strcat(mcPicH264Path, name);
+				strcat(mcPicH264Path, userId);
 				strcat(mcPicH264Path, ".h264");
 
 				result = true;
@@ -1000,11 +1077,11 @@ bool VideoRecorder::BuildPicFilePath(const char* srcPath, const char* dir)
 				strcat(mcPicPath, "/");
 			}
 
-			// copy file name
-			char name[1024] = {0};
-			if (GetUserNameWithFileName(name, srcPath))
+			// copy file user id
+			char userId[MAX_PATH_LENGTH] = {0};
+			if (GetUserIdWithFilePath(userId, srcPath))
 			{
-				strcat(mcPicPath, name);
+				strcat(mcPicPath, userId);
 				strcat(mcPicPath, ".jpg");
 
 				result = true;

@@ -1,0 +1,18 @@
+--- CamShareServer log ---
+1. 查找以下右方的log可列出左方事件
+踢出会议室：			, exceptMemberId :  )
+LiveChat验证返回失败：		, mbAuth:false
+LiveChat验证超时失败：		检测任务超时, 发现有任务超时, 任务未完成, 标记执行失败
+LiveChat验证成功：		任务已经完成
+LiveChat主动踢出：		RecvKickUserFromConferenceTask::Handle() errType:
+连接LiveChat中心服务器：	CLiveChatClient::ConnectServer( type : 
+断开LiveChat中心服务器：	外部服务(LiveChat), 断开服务器
+客户端MakeCall：		, siteId : 
+
+--- freeswitch log ---
+1. 登录不成功
+  1) 查找以下log得到登录请求URL（把url和data用"&"拼接，即可用浏览器打开）
+		post, url: 
+		Post data: 
+  2) 查找以下log得到登录请求返回的结果
+		用户登陆脚本->获取http返回:

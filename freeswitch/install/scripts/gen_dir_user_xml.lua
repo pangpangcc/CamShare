@@ -13,23 +13,23 @@ api = freeswitch.API();
 -- 字符串分隔
 function string_split(str, sep)
     local tables = {};
-    local i = 0;
+    local i = 1;
     local j = 0;
     local value;
-    
+       
     while true do
-        j = string.find(str, sep, i + 1);
+        j = string.find(str, sep, i);
         if j == nil then
-            value = string.sub(str, i + 1, string.len(str));
+            value = string.sub(str, i, string.len(str));
             table.insert(tables, value);
             break;
         else
-            print("i : " .. i .. ", j : " ..  j)
-            value = string.sub(str, i + 1, j - 1);
+            value = string.sub(str, i, j - 1);
             table.insert(tables, value);
+            
+            i = j + string.len(sep);
         end;
-        
-        i = j;
+
     end
     return tables;
 end
@@ -64,54 +64,68 @@ XML_STRING = "";
 loginPaths = {
   ["0"] = "http://test:5179@demo.chnlove.com/livechat/setstatus.php?action=getuserloginstatus",
   ["1"] = "http://test:5179@demo.idateasia.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["4"] = "http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["4"] = "http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
   ["5"] = "http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
 };
 
 XML_STRING = ""
+
+local support_test = 0
+local result = 0
+
+-- 判断是否测试帐号
+if support_test == 1 then
+  if string.find(req_user, "^MM%d$") or string.find(req_user, "^WW%d$") then
+    result = 1
+  end
+end
   
 -- 从接口验证用户
-loginPath = loginPaths["0"];
-if loginPaths[siteId] ~= nil then
-  loginPath = loginPaths[siteId]
+if result == 0 then 
+  loginPath = loginPaths["0"];
+  if loginPaths[siteId] ~= nil then
+    loginPath = loginPaths[siteId]
+  end
+
+  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. loginPath .. "\n");
+  response = api:execute("curl", loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom);
+  if response ~= nil then
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
+    json = cjson.decode(response);
+    body = json["body"];
+    if body ~= nil then
+      json = cjson.decode(body);
+      
+      result = json["result"];
+      errno = json["errno"];
+      errmsg = json["errmsg"];
+    end
+  else
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回失败");
+  end
 end
 
-freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. loginPath .. "\n");
-response = api:execute("curl", loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom);
-if response ~= nil then
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
-  json = cjson.decode(response);
-  body = json["body"];
-  if body ~= nil then
-    json = cjson.decode(body);
-    
-    result = json["result"];
-    errno = json["errno"];
-    errmsg = json["errmsg"];
-    
-    if result == 1 then
---    登陆成功
-      XML_STRING = 
-      [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-      <document type="freeswitch/xml">
-        <section name="directory">
-          <domain name="]] .. req_domain .. [[">
-            <user id="]] .. req_user .. [[" effective_caller_id_number="]] .. req_user .. [[">
-              <params>
-                <param name="password" value="]] .. "" .. [["/>
-                <param name="allow-empty-password" value="true"/>
-                <param name="site-id" value="]] .. siteId .. [["/>
-              </params>
-              <variables>
-              </variables>
-            </user>
-          </domain>
-        </section>
-      </document>]]
-    end
-  end
-else
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回失败");
+-- 登陆成功
+if result == 1 then
+  freeswitch.consoleLog("CONSOLE", "# 用户登陆成功:\n" .. req_user .. "\n");
+	
+  XML_STRING = 
+  [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+  <document type="freeswitch/xml">
+    <section name="directory">
+      <domain name="]] .. req_domain .. [[">
+        <user id="]] .. req_user .. [[" effective_caller_id_number="]] .. req_user .. [[">
+          <params>
+            <param name="password" value="]] .. "" .. [["/>
+            <param name="allow-empty-password" value="true"/>
+            <param name="site-id" value="]] .. siteId .. [["/>
+          </params>
+          <variables>
+          </variables>
+        </user>
+      </domain>
+    </section>
+  </document>]]
 end
 
 freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")

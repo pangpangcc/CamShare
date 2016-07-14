@@ -57,10 +57,16 @@ private:
 	bool RenewNaluBuffer();
 	// 执行关闭shell
 	void RunCloseShell();
-	// 获取源文件名称
-	bool GetSrcPathFileName(char* buffer, const char* srcPath);
-	// 获取用户名
-	bool GetUserNameWithFileName(char* buffer, const char* srcPath);
+	// 根据源文件路径获取SiteID
+	bool GetSiteIdWithFilePath(char* buffer, const char* srcPath);
+	// 根据源文件路径获取起始时间
+	bool GetStartTimeWithFilePath(char* buffer, const char* srcPath);
+	// 根据源文件路径获取用户名
+	bool GetUserIdWithFilePath(char* buffer, const char* srcPath);
+	// 获取文件名中的第index个参数(从0开始)
+	bool GetParamWithFileName(char* buffer, const char* fileName, int index);
+	// 获取没有后缀的文件名
+	bool GetFileNameWithoutExt(char* buffer, const char* filePath);
 	// 生成录制h264文件路径
 	bool BuildH264FilePath(const char* srcPath);
 	// 获取mp4文件路径
