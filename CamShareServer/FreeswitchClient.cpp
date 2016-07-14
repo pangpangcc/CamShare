@@ -290,7 +290,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 	bool bFlag = false;
 
 	LogManager::GetLogManager()->Log(
-			LOG_STAT,
+			LOG_MSG,
 			"FreeswitchClient::StartUserRecvVideo( "
 			"tid : %d, "
 			"[Freeswitch, 允许用户开始观看聊天室视频], "
@@ -315,7 +315,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 			snprintf(temp, sizeof(temp), "api conference %s relate %s %s clear", conference.c_str(), memberId.c_str(), memberId.c_str());
 			if( SendCommandGetResult(temp, result) ) {
 				LogManager::GetLogManager()->Log(
-						LOG_STAT,
+						LOG_MSG,
 						"FreeswitchClient::StartUserRecvVideo( "
 						"tid : %d, "
 						"[Freeswitch, 允许用户开始观看聊天室视频, 还原权限], "
@@ -336,7 +336,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 				switch(type) {
 				case Member:{
 					LogManager::GetLogManager()->Log(
-							LOG_STAT,
+							LOG_MSG,
 							"FreeswitchClient::StartUserRecvVideo( "
 							"tid : %d, "
 							"[Freeswitch, 允许用户开始观看聊天室视频, 开放普通成员权限, 成功], "
@@ -355,7 +355,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 					snprintf(temp, sizeof(temp), "api conference %s unvmute %s ", conference.c_str(), memberId.c_str());
 					if( SendCommandGetResult(temp, result) ) {
 						LogManager::GetLogManager()->Log(
-								LOG_STAT,
+								LOG_MSG,
 								"FreeswitchClient::StartUserRecvVideo( "
 								"tid : %d, "
 								"[Freeswitch, 允许用户开始观看聊天室视频, 开放主持人权限, 成功], "
@@ -543,7 +543,7 @@ bool FreeswitchClient::SendCommandGetResult(const string& command, string& resul
 	bool bFlag = false;
 
 	LogManager::GetLogManager()->Log(
-			LOG_STAT,
+			LOG_MSG,
 			"FreeswitchClient::SendCommandGetResult( "
 			"tid : %d, "
 			"[Freeswitch, 发送命令], "

@@ -737,6 +737,17 @@ void CamShareMiddleware::TcpServerRecvMessageHandle(TcpServer *ts, Message *m) {
 	}
 
 	if( ret == -1 ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"CamShareMiddleware::TcpServerRecvMessageHandle( "
+				"tid : %d, "
+				"[内部服务(HTTP), 客户端发起请求, 请求解析失败, 断开连接], "
+				"fd : [%d] "
+				")",
+				(int)syscall(SYS_gettid),
+				m->fd
+				);
+
 		ts->Disconnect(m->fd);
 	}
 
@@ -935,12 +946,12 @@ void CamShareMiddleware::UploadRecordsHandle() {
 			mDBHandler.RemoveRecords(records, getSize);
 
 		} else {
-			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
-					"CamShareMiddleware::UploadRecordsHandle( "
-					"[上传录制文件完成记录, 没有更多记录] "
-					")"
-					);
+//			LogManager::GetLogManager()->Log(
+//					LOG_WARNING,
+//					"CamShareMiddleware::UploadRecordsHandle( "
+//					"[上传录制文件完成记录, 完成] "
+//					")"
+//					);
 			sleep(miUploadTime);
 		}
 

@@ -64,7 +64,7 @@ OBJS +=     $(RESPOND)
 OBJS +=		$(LIVECHAT)
 TARGET =	camshare-middleware
 
-DEPDIRS	:= libev sqlite #rtmp
+DEPDIRS	:= libev sqlite curl#rtmp
 CLEAN_DEPS := $(addprefix _clean_, $(DEPDIRS))
 
 .PHONY: all deps test clean cleanall install $(DEPDIRS) $(TARGET)

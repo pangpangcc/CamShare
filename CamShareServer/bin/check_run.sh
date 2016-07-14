@@ -8,20 +8,21 @@
 # Email: Kingsleyyau@gmail.com
 #
 
-PROCESS_CMD="./run.sh"
-
 # Check Camshare middle ware
 APP="camshare-middleware"
-PID=`ps -ef | grep ${APP} | grep -v grep`
+PID=`ps -ef | grep ${APP} | grep -v grep | awk -F" " '{ print $2 }'`
 if [ -z "$PID" ];then
-  ${PROCESS_CMD}
+  # 运行camshare-middlewarecd
+	`cd /usr/local/CamShareServer/ && nohup ./camshare-middleware -f ./camshare-middleware.config 2>&1>/dev/null &`
   exit
 fi
 
 # Check freeswitch
 APP="freeswitch"
-PID=`ps -ef | grep ${APP} | grep -v grep`
+PID=`ps -ef | grep ${APP} | grep -v grep | awk -F" " '{ print $2 }'`
 if [ -z "$PID" ];then
-  ${PROCESS_CMD}
+  # 运行freeswitch
+  sleep 5;
+	`cd /usr/local/freeswitch/bin && ./freeswitch -nc`
   exit
 fi

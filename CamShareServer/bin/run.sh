@@ -14,8 +14,10 @@
 # 运行camshare-middlewarecd
 cd /usr/local/CamShareServer/ && nohup ./camshare-middleware -f ./camshare-middleware.config 2>&1>/dev/null &
 
+sleep 5;
+
 # 运行freeswitch
 cd /usr/local/freeswitch/bin && ./freeswitch -nc
 
-ps -ef | grep camshare-middleware | grep -v "grep"
-ps -ef | grep freeswitch | grep -v "grep"
+echo "camshare-middlewarecd pid : `ps -ef | grep camshare-middleware | grep -v "grep" | awk -F" " '{ print $2 }'`"
+echo "freeswitch pid : `ps -ef | grep freeswitch | grep -v "grep" | awk -F" " '{ print $2 }'`"
