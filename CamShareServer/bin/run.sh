@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # 增加权限
-#chmod +x /root/CamShareServer/camshare-middleware
+#chmod +x /usr/local/CamShareServer/camshare-middleware
 #chmod +x /usr/local/freeswitch/bin/freeswitch
 #chmod +x /usr/local/freeswitch/bin/fs_cli
 
