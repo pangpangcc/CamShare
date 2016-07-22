@@ -81,6 +81,10 @@ public:
 	/**
 	 * 删除录制完成记录
 	 */
+	bool RemoveRecord(const Record& record);
+	/**
+	 * 删除录制完成记录(批量)
+	 */
 	bool RemoveRecords(Record* records, int size);
 	/**
 	 * 获取录制完成记录剩余数量

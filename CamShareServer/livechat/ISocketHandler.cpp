@@ -276,6 +276,18 @@ public:
 
 			// 回复block状态
 			SetBlock(block);
+
+		    /*deal with the tcp keepalive
+		      iKeepAlive = 1 (check keepalive)
+		      iKeepIdle = 600 (active keepalive after socket has idled for 10 minutes)
+		      KeepInt = 60 (send keepalive every 1 minute after keepalive was actived)
+		      iKeepCount = 3 (send keepalive 3 times before disconnect from peer)
+		     */
+		    int iKeepAlive = 1, iKeepIdle = 60, KeepInt = 30, iKeepCount = 3;
+		    setsockopt(m_socket, SOL_SOCKET, SO_KEEPALIVE, (void*)&iKeepAlive, sizeof(iKeepAlive));
+		    setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPIDLE, (void*)&iKeepIdle, sizeof(iKeepIdle));
+		    setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPINTVL, (void *)&KeepInt, sizeof(KeepInt));
+		    setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPCNT, (void *)&iKeepCount, sizeof(iKeepCount));
 		}
 		return result;
 	}

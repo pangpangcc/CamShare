@@ -14,6 +14,8 @@
 #include <json/json/json.h>
 #include <xml/tinyxml.h>
 
+#include <CommonHeader.h>
+
 #include <esl.h>
 
 #include <map>
@@ -34,6 +36,7 @@ typedef struct Channel {
 		identify = "";
 		serverId = "";
 		siteId = "";
+		recordFilePath = "";
 	}
 	Channel(
 			const string& user,
@@ -48,6 +51,7 @@ typedef struct Channel {
 		this->serverId = serverId;
 		this->siteId = siteId;
 		identify = user + conference;
+		this->recordFilePath = "";
 	}
 	Channel(
 			const string& user,
@@ -64,6 +68,7 @@ typedef struct Channel {
 		this->serverId = serverId;
 		this->siteId = siteId;
 		identify = user + conference;
+		this->recordFilePath = "";
 	}
 	Channel(const Channel& item) {
 		this->user = item.user;
@@ -73,6 +78,7 @@ typedef struct Channel {
 		this->serverId = item.serverId;
 		this->siteId = item.siteId;
 		this->identify = this->user + this->conference;
+		this->recordFilePath = item.recordFilePath;
 	}
 	Channel& operator=(const Channel& item) {
 		this->user = item.user;
@@ -82,6 +88,7 @@ typedef struct Channel {
 		this->serverId = item.serverId;
 		this->siteId = item.siteId;
 		this->identify = item.user + item.conference;
+		this->recordFilePath = item.recordFilePath;
 		return *this;
 	}
 
@@ -96,6 +103,7 @@ typedef struct Channel {
 	string identify;
 	string serverId;
 	string siteId;
+	string recordFilePath;
 
 } Channel;
 
@@ -273,10 +281,18 @@ private:
 
 	/**
 	 * 开始录制会议视频
-	 * @param	conference	会议名字
-	 * @param	siteId		站点Id
+	 * @param	conference		会议名字
+	 * @param	siteId			站点Id
+	 * @param	filePath[出参]	录制文件路径
 	 */
-	bool StartRecordConference(const string& conference, const string& siteId);
+	bool StartRecordConference(const string& conference, const string& siteId, OUT string& filePath);
+
+	/**
+	 * 停止录制会议视频
+	 * @param	conference	会议名字
+	 * @param	filePath	录制文件路径
+	 */
+	bool StopRecordConference(const string& conference, string& filePath);
 
 	/**
 	 * 开始录制频道视频

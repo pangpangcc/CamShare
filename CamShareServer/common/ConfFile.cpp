@@ -95,8 +95,9 @@ bool ConfFile::LoadConfFile()
                 strKey = token;
             }else if (i == 1) {
                 strValue = token;
+                break;
             }
-            token = strtok(NULL, "=\n");
+            token = strtok(NULL, "\n");
             i++;
         }
         strSpaceKey = strSpace + "\t" + strKey;

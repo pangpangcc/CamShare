@@ -10,6 +10,8 @@
 
 #include <sys/syscall.h>
 
+#include <simulatorchecker/SimulatorProtocolTool.h>
+
 #include <httpclient/HttpClient.h>
 
 #include <request/EnterConferenceRequest.h>
@@ -205,7 +207,7 @@ bool CamShareMiddleware::Run() {
 			"miMaxClient : %d, "
 			"miMaxHandleThread : %d, "
 			"miMaxQueryPerThread : %d, "
-			"miTimeout : %d, "
+			"miTimeout : %d秒, "
 			"miFlashTimeout : %d, "
 			"miStateTime, %d "
 			")",
@@ -513,6 +515,8 @@ bool CamShareMiddleware::Stop() {
 		mpSiteConfig = NULL;
 	}
 
+	LogManager::GetLogManager()->Stop();
+
 	return true;
 }
 
@@ -754,8 +758,6 @@ void CamShareMiddleware::TcpServerRecvMessageHandle(TcpServer *ts, Message *m) {
 }
 
 void CamShareMiddleware::TcpServerTimeoutMessageHandle(TcpServer *ts, Message *m) {
-	int ret = -1;
-
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"CamShareMiddleware::TcpServerTimeoutMessageHandle( "
@@ -778,7 +780,7 @@ void CamShareMiddleware::StateHandle() {
 
 	unsigned int iTotal = 0;
 	double iSecondTotal = 0;
-	double iResponed = 0;
+//	double iResponed = 0;
 
 	while( IsRunning() ) {
 		if ( iCount < iStateTime ) {
@@ -787,7 +789,7 @@ void CamShareMiddleware::StateHandle() {
 		} else {
 			iCount = 0;
 			iSecondTotal = 0;
-			iResponed = 0;
+//			iResponed = 0;
 
 			mCountMutex.lock();
 			iTotal = mTotal;
@@ -795,9 +797,9 @@ void CamShareMiddleware::StateHandle() {
 			if( iStateTime != 0 ) {
 				iSecondTotal = 1.0 * iTotal / iStateTime;
 			}
-			if( iTotal != 0 ) {
-				iResponed = 1.0 * mResponed / iTotal;
-			}
+//			if( iTotal != 0 ) {
+//				iResponed = 1.0 * mResponed / iTotal;
+//			}
 
 			mTotal = 0;
 			mResponed = 0;
@@ -928,6 +930,7 @@ void CamShareMiddleware::UploadRecordsHandle() {
 	Record records[selectCount];
 	int getSize = 0;
 	HttpClient client;
+	bool success = false;
 
 	while( IsRunning() ) {
 		// 从本地数据库获取记录
@@ -936,22 +939,19 @@ void CamShareMiddleware::UploadRecordsHandle() {
 		if( getSize > 0 ) {
 			for(int i = 0; i < getSize; i++) {
 				// 发送记录到服务器
-				while ( !SendRecordFinish(&client, records[i]) ) {
+				while ( !SendRecordFinish(&client, records[i], success) ) {
 					// 发送记录直至成功
 					sleep(miUploadTime);
 				}
+
+				// 发送成功, 删除本地记录
+				mDBHandler.RemoveRecord(records[i]);
 			}
 
-			// 删除本地记录
-			mDBHandler.RemoveRecords(records, getSize);
+			// 删除本地记录(批量)
+//			mDBHandler.RemoveRecords(records, getSize);
 
 		} else {
-//			LogManager::GetLogManager()->Log(
-//					LOG_WARNING,
-//					"CamShareMiddleware::UploadRecordsHandle( "
-//					"[上传录制文件完成记录, 完成] "
-//					")"
-//					);
 			sleep(miUploadTime);
 		}
 
@@ -1383,7 +1383,7 @@ void CamShareMiddleware::OnConnect(
 				"tid : %d, "
 				"[外部服务(LiveChat), 连接服务器失败], "
 				"livechat : %p, "
-				"siteId : '[%s', "
+				"siteId : '%s', "
 				"err : '%d', "
 				"errmsg : '%s' "
 				")",
@@ -1881,13 +1881,29 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 
 bool CamShareMiddleware::SendRecordFinish(
 		HttpClient* client,
-		const Record& record
+		const Record& record,
+		bool &success
 		) {
 	bool bFlag = false;
+	success = false;
 
 	const char* respond = NULL;
 	int respondSize = 0;
 	HttpEntiy httpEntiy;
+
+	httpEntiy.AddContent("userId", record.conference);
+	httpEntiy.AddContent("startTime", record.startTime);
+	httpEntiy.AddContent("endTime", record.endTime);
+	httpEntiy.AddContent("fileName", record.filePath);
+
+	char content[128];
+	SimulatorProtocolTool tool;
+	unsigned int checkcode = tool.EncodeValue(true);
+	sprintf(content, "%08x", checkcode);
+	httpEntiy.AddContent("checkcode", content);
+
+	string checkInfo = tool.EncodeDesc(record.filePath, checkcode);
+	httpEntiy.AddContent("checkkey", checkInfo);
 
 	string url = "";
 	mSiteConfigMap.Lock();
@@ -1898,35 +1914,46 @@ bool CamShareMiddleware::SendRecordFinish(
 	}
 	mSiteConfigMap.Unlock();
 
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::SendRecordFinish( "
+			"[发送录制文件完成记录到服务器], "
+			"url : '%s', "
+			"conference : '%s', "
+			"siteId : '%s', "
+			"filePath : '%s', "
+			"startTime : '%s', "
+			"endTime : '%s' "
+			")",
+			url.c_str(),
+			record.conference.c_str(),
+			record.siteId.c_str(),
+			record.filePath.c_str(),
+			record.startTime.c_str(),
+			record.endTime.c_str()
+			);
+
 	if( client->Request(url.c_str(), &httpEntiy) ) {
+		// 发送成功
+		bFlag = true;
+
 		client->GetBody(&respond, respondSize);
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"CamShareMiddleware::SendRecordFinish( "
+				"[发送录制文件完成记录到服务器, 返回], "
+				"respond : '%s' "
+				")",
+				respond
+				);
 		if( respondSize > 0 ) {
 			// 发送成功
 			Json::Value root;
 			Json::Reader reader;
 			if( reader.parse(respond, root, false) ) {
-				if( root["ret"].isInt() && root["ret"].asInt() == 1 ) {
+				if( root["result"].isInt() && root["result"].asInt() == 1 ) {
 					// 上传成功
-					LogManager::GetLogManager()->Log(
-							LOG_WARNING,
-							"CamShareMiddleware::SendRecordFinish( "
-							"[发送录制文件完成记录到服务器, 成功], "
-							"url : '%s', "
-							"conference : '%s', "
-							"siteId : '%s', "
-							"filePath : '%s', "
-							"startTime : '%s', "
-							"endTime : '%s' "
-							")",
-							url.c_str(),
-							record.conference.c_str(),
-							record.siteId.c_str(),
-							record.filePath.c_str(),
-							record.startTime.c_str(),
-							record.endTime.c_str()
-							);
-
-					bFlag = true;
+					success = true;
 				}
 			}
 		}
@@ -1942,14 +1969,16 @@ bool CamShareMiddleware::SendRecordFinish(
 				"siteId : '%s', "
 				"filePath : '%s', "
 				"startTime : '%s', "
-				"endTime : '%s' "
+				"endTime : '%s', "
+				"respond : '%s' "
 				")",
 				url.c_str(),
 				record.conference.c_str(),
 				record.siteId.c_str(),
 				record.filePath.c_str(),
 				record.startTime.c_str(),
-				record.endTime.c_str()
+				record.endTime.c_str(),
+				respond
 				);
 	}
 

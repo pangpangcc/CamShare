@@ -2,6 +2,8 @@
 
 echo "# copy freeswitch bin ..."
 cp -rf ./install/bin/* /usr/local/freeswitch/bin/
+chmod +x /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh
+chmod +x /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh
 
 echo "# copy freeswitch scripts ..."
 cp -rf ./install/scripts/* /usr/local/freeswitch/scripts/

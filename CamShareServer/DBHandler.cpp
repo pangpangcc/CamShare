@@ -150,16 +150,38 @@ bool DBHandler::GetRecords(Record* records, int maxSize, int& getSize) {
 	return bResult;
 }
 
+bool DBHandler::RemoveRecord(const Record& record) {
+	bool bResult = false;
+	char sql[2048] = {'\0'};
+
+	sprintf(sql, "DELETE FROM record WHERE conference = '%s' AND siteid = '%s';", record.conference.c_str(), record.siteId.c_str());
+	bResult = mSqliteManager.ExecSQL(sql);
+
+	if( !bResult ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::RemoveRecord( "
+				"tid : %d, "
+				"[删除录制完成记录, 失败]"
+				"sql : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				sql
+				);
+	}
+
+	return bResult;
+}
+
 bool DBHandler::RemoveRecords(Record* records, int size) {
 	bool bResult = false;
-
 	char sql[2048] = {'\0'};
 
 	bResult = mSqliteManager.ExecSQL("BEGIN;");
 	if( bResult ) {
 		for(int i = 0; i < size; i++) {
 			Record record = records[i];
-			sprintf(sql, "DELETE * FROM record WHERE conference = '%s' AND siteid = '%s';", record.conference.c_str(), record.siteId.c_str());
+			sprintf(sql, "DELETE FROM record WHERE conference = '%s' AND siteid = '%s';", record.conference.c_str(), record.siteId.c_str());
 			bResult = mSqliteManager.ExecSQL(sql);
 		}
 
@@ -171,7 +193,7 @@ bool DBHandler::RemoveRecords(Record* records, int size) {
 				LOG_ERR_USER,
 				"DBHandler::RemoveRecords( "
 				"tid : %d, "
-				"[删除录制完成记录, 失败]"
+				"[删除录制完成记录(批量), 失败]"
 				"sql : %s "
 				")",
 				(int)syscall(SYS_gettid),

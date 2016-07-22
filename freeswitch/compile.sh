@@ -12,7 +12,9 @@ cp -rf ./src/* ./freeswitch/
 
 echo "# compile freeswitch ..."
 cd freeswitch
+chmod +x ./bootstrap.sh
 ./bootstrap.sh
+chmod +x ./configure
 ./configure --enable-core-odbc-support=no
 make
 make install
@@ -20,6 +22,7 @@ make distclean
 cd ..
 
 echo "# copy freeswitch file ..."
+chmod +x ./fs-copy.sh
 ./fs-copy.sh
 
 echo ""

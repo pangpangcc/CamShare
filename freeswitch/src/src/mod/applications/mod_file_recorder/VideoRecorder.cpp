@@ -782,7 +782,7 @@ void VideoRecorder::RunCloseShell()
 	{
 		// get mp4Path
 		char mp4Path[MAX_PATH_LENGTH] = {0};
-		GetMp4FilePath(mp4Path, mcH264Path, mcMp4Dir);
+		GetMp4FilePath(mp4Path, mcMp4Dir);
 
 		// get userId
 		char userId[MAX_PATH_LENGTH] = {0};
@@ -794,14 +794,21 @@ void VideoRecorder::RunCloseShell()
 
 		// get startTime
 		char startTime[MAX_PATH_LENGTH] = {0};
-		GetStartTimeWithFilePath(userId, mcH264Path);
+		GetStartTimeWithFilePath(startTime, mcH264Path);
+		char startStandardTime[32] = {0};
+		GetStandardTime(startStandardTime, startTime);
+
+		// print param
+//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: run close shell, 0:%s, 1:%s, 2:%s, 3:%s, 4:%s, 5:%s, 6:%s\n"
+//						, mcCloseShell, mcH264Path, mp4Path, mcPicPath, userId, siteId, startStandardTime);
 
 		// build shell处理文件
 		// shell h264Path mp4Path jpgPath userId siteId startTime
 		char cmd[MAX_PATH_LENGTH] = {0};
-		snprintf(cmd, sizeof(cmd), "%s %s %s %s %s %s %s"
+		snprintf(cmd, sizeof(cmd), "%s '%s' '%s' '%s' '%s' '%s' '%s'"
 				, mcCloseShell, mcH264Path, mp4Path, mcPicPath
-				, userId, siteId, startTime);
+				, userId, siteId, startStandardTime);
 
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -855,6 +862,42 @@ bool VideoRecorder::GetStartTimeWithFilePath(char* buffer, const char* srcPath)
 	if (GetFileNameWithoutExt(fileName, srcPath)
 		&& GetParamWithFileName(buffer, fileName, startTimeIndex))
 	{
+		result = true;
+	}
+	return result;
+}
+
+// 获取标准时间格式
+bool VideoRecorder::GetStandardTime(char* buffer, const char* srcTime)
+{
+	bool result = false;
+	if (NULL != srcTime && strlen(srcTime) == 14)
+	{
+		int i = 0;
+		int j = 0;
+		for (; srcTime[i] != 0; i++, j++)
+		{
+			if (i == 4
+				|| i == 6)
+			{
+				// 日期分隔
+				buffer[j++] = '-';
+			}
+			else if (i == 8)
+			{
+				// 日期与时间之间的分隔
+				buffer[j++] = ' ';
+			}
+			else if (i == 10
+					|| i == 12)
+			{
+				// 时间分隔
+				buffer[j++] = ':';
+			}
+			buffer[j] = srcTime[i];
+		}
+		buffer[j] = 0;
+
 		result = true;
 	}
 	return result;
@@ -967,11 +1010,10 @@ bool VideoRecorder::BuildH264FilePath(const char* srcPath)
 }
 
 // 获取mp4文件路径
-bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* srcPath, const char* dir)
+bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* dir)
 {
 	bool result = false;
-	if (NULL != srcPath && srcPath[0] != '\0'
-		&& NULL != dir && dir[0] != '\0')
+	if (NULL != dir && dir[0] != '\0')
 	{
 		int dirLen = strlen(dir);
 		if (dirLen > 0)
@@ -982,19 +1024,10 @@ bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* srcPath, const cha
 				&& dir[dirLen-1] != '\\')
 			{
 				strcat(mp4Path, "/");
+
 			}
 
-			// copy userId and startTime
-			char userId[MAX_PATH_LENGTH] = {0};
-			char startTime[MAX_PATH_LENGTH] = {0};
-			if (GetUserIdWithFilePath(userId, srcPath)
-				&& GetStartTimeWithFilePath(startTime, srcPath))
-			{
-				strcat(mp4Path, userId);
-				strcat(mp4Path, "_");
-				strcat(mp4Path, startTime);
-				result = true;
-			}
+			result = true;
 		}
 	}
 	return result;

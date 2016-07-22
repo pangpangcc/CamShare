@@ -61,6 +61,8 @@ private:
 	bool GetSiteIdWithFilePath(char* buffer, const char* srcPath);
 	// 根据源文件路径获取起始时间
 	bool GetStartTimeWithFilePath(char* buffer, const char* srcPath);
+	// 获取标准时间格式
+	bool GetStandardTime(char* buffer, const char* srcTime);
 	// 根据源文件路径获取用户名
 	bool GetUserIdWithFilePath(char* buffer, const char* srcPath);
 	// 获取文件名中的第index个参数(从0开始)
@@ -70,7 +72,7 @@ private:
 	// 生成录制h264文件路径
 	bool BuildH264FilePath(const char* srcPath);
 	// 获取mp4文件路径
-	bool GetMp4FilePath(char* mp4Path, const char* srcPath, const char* dir);
+	bool GetMp4FilePath(char* mp4Path, const char* dir);
 	// 把视频数据写入文件
 	bool WriteVideoData2File(const uint8_t* buffer, size_t bufferLen, size_t& writeLen);
 	// 释放视频录制队列里所有buffer及空闲队列

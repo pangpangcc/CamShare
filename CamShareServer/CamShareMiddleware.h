@@ -222,10 +222,15 @@ private:
 
 	/**
 	 * 发送录制文件完成记录到HTTP服务器
+	 * @param	client		HTTP Client
+	 * @param 	record		录制记录
+	 * @param 	success		服务器返回结果
+	 * @return	发送(成功/失败)
 	 */
 	bool SendRecordFinish(
 			HttpClient* client,
-			const Record& record
+			const Record& record,
+			bool &success
 			);
 
 	/***************************** 外部服务接口 end **************************************/
@@ -359,12 +364,12 @@ private:
 	/**
 	 * 站点数量
 	 */
-	unsigned int miSiteCount;
+	int miSiteCount;
 
 	/**
 	 * 上传视频录制记录时间间隔(秒)
 	 */
-	unsigned int miUploadTime;
+	int miUploadTime;
 
 	/**
 	 * 站点配置

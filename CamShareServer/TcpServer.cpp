@@ -807,6 +807,7 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			/* push this message into handle queue */
 			m->len = ret;
 			m->type = MessageTypeRecv;
+			m->starttime = GetTickCount();
 
 			if ( GetHandleSize() > 0 &&
 					GetHandleMessageList()->Size() > GetHandleSize() ) {

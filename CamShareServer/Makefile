@@ -25,7 +25,7 @@ LIBS =		-L. \
 			-Wl,-Bstatic -Lcurl/lib/.libs -lcurl \
 			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 
-COMMON  	=	common/LogFile.o common/md5.o common/KThread.o common/ConfFile.o common/Arithmetic.o\
+COMMON  	=	common/LogFile.o common/md5.o common/KThread.o common/ConfFile.o common/Arithmetic.o common/aes.o\
 				common/IAutoLock.o common/CommonFunc.o
 				
 JSON    	=	json/json_reader.o json/json_value.o json/json_writer.o
@@ -33,6 +33,8 @@ JSON    	=	json/json_reader.o json/json_value.o json/json_writer.o
 AMF	    	=	amf/AMF3.o amf/AmfParser.o
 
 XML			=   xml/tinystr.o xml/tinyxml.o xml/tinyxmlerror.o xml/tinyxmlparser.o
+
+CHECKER		=	simulatorchecker/SimulatorProtocolTool.o
 
 HTTPCLIENT	=	httpclient/HttpClient.o httpclient/HttpEntiy.o
 
@@ -58,6 +60,7 @@ OBJS +=		$(COMMON)
 OBJS +=		$(JSON)
 OBJS +=		$(AMF)
 OBJS +=		$(XML)
+OBJS +=		$(CHECKER)
 OBJS +=		$(HTTPCLIENT)
 OBJS +=		$(REQUEST)
 OBJS +=     $(RESPOND)

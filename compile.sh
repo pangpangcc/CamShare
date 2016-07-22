@@ -1,16 +1,20 @@
 #!/bin/sh
 
-# compile dependent tools
-cd deps
+# compile freeswtich
+cd freeswitch
+chmod +x ./compile.sh
 ./compile.sh
 cd ..
 
-# compile freeswtich
-cd freeswitch
+# compile dependent tools
+cd deps
+chmod +x ./compile.sh
 ./compile.sh
 cd ..
 
 # compile CamShareServer
 cd CamShareServer
+chmod +x ./compile.sh
 ./compile.sh
 cd ..
+

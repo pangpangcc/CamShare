@@ -104,7 +104,7 @@ int Counter::GetAndIncrement()
 		count = m_count;
 		m_count += m_step;
 		if (m_count < 0) {
-			m_count = m_count * (-1);
+			m_count = m_begin;
 		}
 		m_lock->Unlock();
 	}
@@ -120,7 +120,7 @@ int Counter::GetAndDecrement()
 		count = m_count;
 		m_count -= m_step;
 		if (m_count < 0) {
-			m_count = m_count * (-1);
+			m_count = m_begin;
 		}
 		m_lock->Unlock();
 	}
@@ -135,7 +135,7 @@ int Counter::IncrementAndGet()
 		m_lock->Lock();
 		m_count += m_step;
 		if (m_count < 0) {
-			m_count = m_count * (-1);
+			m_count = m_begin;
 		}
 		count = m_count;
 		m_lock->Unlock();
@@ -151,7 +151,7 @@ int Counter::DecrementAndGet()
 		m_lock->Lock();
 		m_count -= m_step;
 		if (m_count < 0) {
-			m_count = m_count * (-1);
+			m_count = m_begin;
 		}
 		count = m_count;
 		m_lock->Unlock();

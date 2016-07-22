@@ -879,7 +879,7 @@ bool FreeswitchClient::AuthorizationAllConference() {
 				LOG_MSG,
 				"FreeswitchClient::AuthorizationAllConference( "
 				"tid : %d, "
-				"[Freeswitch, 重新验证当前所有会议室用户, 未连接成功, 不处理返回] "
+				"[Freeswitch, 重新验证当前所有会议室用户, 未连接成功, 跳过] "
 				")",
 				(int)syscall(SYS_gettid)
 				);
@@ -1354,7 +1354,8 @@ list<string> FreeswitchClient::GetMemberIdByUserFromConference(
 
 bool FreeswitchClient::StartRecordConference(
 		const string& conference,
-		const string& siteId
+		const string& siteId,
+		string& outFilePath
 		) {
 	bool bFlag = false;
 	LogManager::GetLogManager()->Log(
@@ -1370,7 +1371,7 @@ bool FreeswitchClient::StartRecordConference(
 			siteId.c_str()
 			);
 
-	char temp[1024] = {'\0'};
+	char temp[2048] = {'\0'};
 	string result = "";
 
 	// get current time
@@ -1380,12 +1381,18 @@ bool FreeswitchClient::StartRecordConference(
 	localtime_r(&stm, &tTime);
 	snprintf(timeBuffer, 64, "%d%02d%02d%02d%02d%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-	snprintf(temp, sizeof(temp), "api conference %s record %s/%s_%s_%s.h264",
-			conference.c_str(),
+	char filePath[1024];
+	snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264",
 			mRecordingPath.c_str(),
 			conference.c_str(),
 			siteId.c_str(),
 			timeBuffer
+			);
+	outFilePath = filePath;
+
+	snprintf(temp, sizeof(temp), "api conference %s record %s",
+			conference.c_str(),
+			outFilePath.c_str()
 			);
 
 	if( SendCommandGetResult(temp, result) ) {
@@ -1395,11 +1402,13 @@ bool FreeswitchClient::StartRecordConference(
 				"tid : %d, "
 				"[Freeswitch, 开始录制会议视频, 成功], "
 				"conference : %s, "
-				"siteId : %s "
+				"siteId : %s, "
+				"outFilePath : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				conference.c_str(),
-				siteId.c_str()
+				siteId.c_str(),
+				outFilePath.c_str()
 				);
 		bFlag = true;
 	}
@@ -1412,10 +1421,69 @@ bool FreeswitchClient::StartRecordConference(
 				"[Freeswitch, 开始录制会议视频, 失败], "
 				"conference : %s, "
 				"siteId : %s "
+				"outFilePath : %s "
 				")",
 				(int)syscall(SYS_gettid),
 				conference.c_str(),
-				siteId.c_str()
+				siteId.c_str(),
+				outFilePath.c_str()
+				);
+	}
+
+	return bFlag;
+}
+
+bool FreeswitchClient::StopRecordConference(const string& conference, string& filePath) {
+	bool bFlag = false;
+
+	LogManager::GetLogManager()->Log(
+			LOG_MSG,
+			"FreeswitchClient::StopRecordConference( "
+			"tid : %d, "
+			"[Freeswitch, 停止录制会议视频], "
+			"conference : %s, "
+			"filePath : %s "
+			")",
+			(int)syscall(SYS_gettid),
+			conference.c_str(),
+			filePath.c_str()
+			);
+
+	char temp[1024] = {'\0'};
+	string result = "";
+	snprintf(temp, sizeof(temp), "api conference %s recording stop %s",
+			conference.c_str(),
+			filePath.c_str()
+			);
+
+	if( SendCommandGetResult(temp, result) ) {
+		LogManager::GetLogManager()->Log(
+				LOG_STAT,
+				"FreeswitchClient::StartRecordConference( "
+				"tid : %d, "
+				"[Freeswitch, 停止录制会议视频, 成功], "
+				"conference : %s, "
+				"filePath : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				conference.c_str(),
+				filePath.c_str()
+				);
+		bFlag = true;
+	}
+
+	if( !bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"FreeswitchClient::StopRecordConference( "
+				"tid : %d, "
+				"[Freeswitch, 停止录制会议视频, 失败], "
+				"conference : %s, "
+				"filePath : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				conference.c_str(),
+				filePath.c_str()
 				);
 	}
 
@@ -1770,7 +1838,7 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 	    	if( type == Moderator ) {
 	    		if( mbIsRecording && conference.length() > 0 && channel->siteId.length() > 0 ) {
 	        		// 开始录制视频
-	        		StartRecordConference(conference, channel->siteId);
+	        		StartRecordConference(conference, channel->siteId, channel->recordFilePath);
 	    		}
 	    	}
 
@@ -1833,7 +1901,12 @@ void FreeswitchClient::FreeswitchEventConferenceDelMember(const Json::Value& roo
 		mRtmpChannel2UserMap.Unlock();
 
 		if( channel ) {
-			// 回调用户进入聊天室
+			// 停止录制视频
+			if( channel->type == Moderator ) {
+				StopRecordConference(conference, channel->recordFilePath);
+			}
+
+			// 回调用户退出聊天室
 			if( mpFreeswitchClientListener ) {
 				mpFreeswitchClientListener->OnFreeswitchEventConferenceDelMember(this, channel);
 			}

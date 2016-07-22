@@ -66,7 +66,7 @@ bool CLiveChatClient::Init(const list<string>& svrIPs, unsigned int svrPort, ILi
 
 		// 初始化 seq计数器
 		if (result) {
-			result = m_seqCounter.Init();
+			result = m_seqCounter.Init(1);
 		}
 
 		if (result) {
@@ -104,6 +104,8 @@ bool CLiveChatClient::ConnectServer(string siteId, string name) {
 
 	m_pConnectLock->Lock();
 	if( !m_bConnectForbidden ) {
+		m_pConnectLock->Unlock();
+
 		FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( siteId : %s, name : %s )", siteId.c_str(), name.c_str());
 		if ( ConnectServer() )
 		{
@@ -121,8 +123,10 @@ bool CLiveChatClient::ConnectServer(string siteId, string name) {
 
 			result = true;
 		}
+
+	} else {
+		m_pConnectLock->Unlock();
 	}
-	m_pConnectLock->Unlock();
 
 //	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( type : %d, name : %s ) end", type, name.c_str());
 
@@ -134,7 +138,7 @@ bool CLiveChatClient::ConnectServer()
 {
 	bool result = false;
 
-	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer() begin, siteId : %s ", m_siteId.c_str());
+	FileLog("LiveChatClient", "CLiveChatClient::ConnectServer() begin");
 
 	if (m_bInit) {
 		if (NULL != m_taskManager) {
@@ -142,7 +146,7 @@ bool CLiveChatClient::ConnectServer()
 				m_taskManager->Stop();
 			}
 			result = m_taskManager->Start();
-			FileLog("LiveChatClient", "CLiveChatClient::ConnectServer(), result: %d, siteId : %s", result, m_siteId.c_str());
+			FileLog("LiveChatClient", "CLiveChatClient::ConnectServer(), result: %d", result);
 		}
 	}
 
@@ -321,8 +325,8 @@ bool CLiveChatClient::CheckVersionProc()
 		sprintf(siteId, "1.1.0.0X%sX%sX%sX7", m_connectName.c_str(), m_siteId.c_str(), m_groupName.c_str());
 		checkVerTask->InitParam(siteId);
 
-		int seq = m_seqCounter.GetAndIncrement();
-		checkVerTask->SetSeq(seq);
+		m_seqCounter.GetAndIncrement();
+		checkVerTask->SetSeq(0);
 		result = m_taskManager->HandleRequestTask(checkVerTask);
 	}
 	return result;
