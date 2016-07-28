@@ -21,6 +21,7 @@ using namespace std;
 string sConf = "";  // 配置文件
 
 bool Parse(int argc, char *argv[]);
+void SignalFunc(int sign_no);
 
 int main(int argc, char *argv[]) {
 	printf("############## CamShare Middleware ############## \n");
@@ -28,11 +29,30 @@ int main(int argc, char *argv[]) {
 	printf("# Build date : %s %s \n", __DATE__, __TIME__ );
 	srand(time(0));
 
-	/* Ignore SIGPIPE */
+	/* Ignore */
 	struct sigaction sa;
 	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
+
+	/* Handle */
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SignalFunc;
+	sa.sa_flags = SA_RESTART;
+	sigemptyset(&sa.sa_mask);
+
+//	sigaction(SIGHUP, &sa, 0);
+	sigaction(SIGINT, &sa, 0); // Ctrl-C
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGILL, &sa, 0);
+	sigaction(SIGABRT, &sa, 0);
+	sigaction(SIGFPE, &sa, 0);
+	sigaction(SIGBUS, &sa, 0);
+	sigaction(SIGSEGV, &sa, 0);
+	sigaction(SIGSYS, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+	sigaction(SIGXCPU, &sa, 0);
+	sigaction(SIGXFSZ, &sa, 0);
 
 	Parse(argc, argv);
 
@@ -65,4 +85,15 @@ bool Parse(int argc, char *argv[]) {
 	}
 
 	return true;
+}
+
+void SignalFunc(int sign_no) {
+	LogManager::GetLogManager()->Log(LOG_ERR_SYS, "main( Get signal : %d )", sign_no);
+	LogManager::GetLogManager()->LogFlushMem2File();
+
+	switch(sign_no) {
+	default:{
+		exit(EXIT_SUCCESS);
+	}break;
+	}
 }

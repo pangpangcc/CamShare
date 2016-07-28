@@ -11,6 +11,7 @@
 
 #include "MessageList.h"
 
+#include <common/KMutex.h>
 #include <common/KThread.h>
 #include <common/LogFile.hpp>
 
@@ -32,32 +33,37 @@ public:
 
 	static LogManager *GetLogManager();
 
-	static void LogSetFlushBuffer(unsigned int iLen);
-	static void LogFlushMem2File();
-
 	LogManager();
 	virtual ~LogManager();
 
-	bool Start(int maxIdle, LOG_LEVEL nLevel = LOG_STAT, const string& dir = "log");
+	bool Start(LOG_LEVEL nLevel = LOG_STAT, const string& dir = "log");
 	bool Stop();
 	bool IsRunning();
 	bool Log(LOG_LEVEL nLevel, const char *format, ...);
 	int MkDir(const char* pDir);
 	void SetLogLevel(LOG_LEVEL nLevel = LOG_STAT);
 
-//	MessageList *GetIdleMessageList();
-//	MessageList *GetLogMessageList();
+	void LogSetFlushBuffer(unsigned int iLen);
+	void LogFlushMem2File();
+	void SetDebugMode(bool debugMode);
 
 public:
 	MessageList mIdleMessageList;
 	MessageList mLogMessageList;
 
 private:
-	KThread *mpLogThread;
+	KThread mLogThread;
 	LogRunnable *mpLogRunnable;
 	bool mIsRunning;
 
 	string mLogDir;
+
+	KMutex mKFileCtrlMutex;
+	CFileCtrl *mpFileCtrl;
+	LOG_LEVEL mLogLevel;
+
+	CFileCtrl *mpFileCtrlDebug;
+	bool mDebugMode;
 };
 
 #endif /* LOGMANAGER_H_ */

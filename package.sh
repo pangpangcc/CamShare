@@ -1,5 +1,20 @@
 #!/bin/sh
 
+# define param
+env=$1
+
+# print param error
+param_err="0"
+if [ "$env" != "develop" ] && [ "$env" != "demo" ] && [ "$env" != "operating" ]; then
+  echo "$env"
+  echo "develop"
+  param_err="1"
+fi
+if [ "$param_err" = "1" ]; then
+  echo "$0 [develop | demo | operating]"
+  exit 0
+fi
+
 # clean package folder
 rm -rf ./package
 mkdir ./package
@@ -8,28 +23,28 @@ mkdir ./package/camshare
 # package dependents tool
 cd deps
 chmod +x ./package.sh
-./package.sh
+./package.sh $env
 cd ..
 cp ./deps/package/* ./package/camshare/
 
 # package dependents tool rpm packages
 cd deps-pkg
 chmod +x package.sh
-./package.sh
+./package.sh $env
 cd ..
 cp ./deps-pkg/package/* ./package/camshare/
 
 # package freeswitch
 cd freeswitch
 chmod +x package.sh
-./package.sh
+./package.sh $env
 cd ..
 cp ./freeswitch/package/* ./package/camshare/
 
 # package CamShareServer
 cd CamShareServer
 chmod +x package.sh
-./package.sh
+./package.sh $env
 cd ..
 cp ./CamShareServer/package/* ./package/camshare/
 
@@ -39,6 +54,6 @@ cp ./install.sh ./package/camshare/
 
 # package all
 cd package
-tar zcvf camshare.tar.gz camshare
+tar zcvf camshare_$env.tar.gz camshare
 rm -rf camshare
 cd ..

@@ -15,17 +15,6 @@
 #include <unistd.h>
 #include <string.h>
 
-// Just 4 log
-static int g_bCreated = false;              //create flag
-
-void LogManager::LogSetFlushBuffer(unsigned int iLen) {
-    SetFlushBuffer(iLen);
-}
-
-void LogManager::LogFlushMem2File() {
-	FlushMem2File();
-}
-
 /* log thread */
 class LogRunnable : public KRunnable {
 public:
@@ -43,30 +32,10 @@ protected:
 				iCount++;
 			} else {
 				iCount = 0;
-				LogManager::LogFlushMem2File();
+				mContainer->LogFlushMem2File();
 			}
 			sleep(1);
 		}
-
-//		while( mContainer->IsRunning() ) {
-//			Message *m = NULL;
-//			do {
-//				m = mContainer->GetLogMessageList()->PopFront();
-//				if( m == NULL ) {
-//					break;
-//				}
-//
-//				/* log data here */
-//				char *buffer = m->buffer;
-//
-////				KLog::LogToFile("log", "", "%s", buffer);
-//
-////				printf("%s\n", buffer);
-//
-//				mContainer->GetIdleMessageList()->PushBack(m);
-//			} while( NULL != m );
-//			sleep(1);
-//		}
 	}
 
 private:
@@ -84,71 +53,57 @@ LogManager *LogManager::GetLogManager() {
 LogManager::LogManager() {
 	// TODO Auto-generated constructor stub
 	mIsRunning = false;
-	mpLogThread = NULL;
-	mpLogRunnable = NULL;
+	mpFileCtrl = NULL;
+	mLogLevel = LOG_STAT;
+	mpFileCtrlDebug = NULL;
+	mDebugMode = false;
+	mpLogRunnable = new LogRunnable(this);
 }
 
 LogManager::~LogManager() {
 	// TODO Auto-generated destructor stub
-	mIsRunning = false;
 	Stop();
+	if( mpLogRunnable ) {
+		delete mpLogRunnable;
+	}
 }
 
 bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
-	if( !mIsRunning )
+	if( !mIsRunning ) {
 		return false;
-//	if (g_iLogLevel >= nLevel) {
-//		Message *lm = mIdleMessageList.PopFront();
-//		if( lm != NULL ) {
-//			lm->Reset();
-//			va_list	agList;
-//			va_start(agList, format);
-//			vsnprintf(lm->buffer, MAX_BUFFER_LEN - 1, format, agList);
-//			va_end(agList);
-//			mLogMessageList.PushBack(lm);
-//			return true;
-//		} else {
-//			return false;
-//		}
-//	}
+	}
 
-    if (g_iLogLevel >= nLevel) {
-        if (g_bCreated == false) {
-            g_bCreated = true;
-            if (g_pFileCtrl) {
-                delete g_pFileCtrl;
-            }
-            g_pFileCtrl = NULL;
-            g_pFileCtrl = new CFileCtrl(mLogDir.c_str(), "Log", 30);
-            if (!g_pFileCtrl) {
-                return -1;
-            }
-            g_pFileCtrl->Initialize();
-            g_pFileCtrl->OpenLogFile();
-	    }
+	bool bNeedLog = false;
+	if( mDebugMode ) {
+		bNeedLog = true;
+	} else if( mLogLevel >= nLevel ) {
+		bNeedLog = true;
+	}
 
-        Message *lm = mIdleMessageList.PopFront();
-        if( lm != NULL ) {
-            lm->Reset();
+    if( bNeedLog ) {
+        char logBuffer[MAX_LOG_BUFFER_LEN];
+		char bitBuffer[64];
 
-			char bitBuffer[64];
+	    //get current time
+	    time_t stm = time(NULL);
+        struct tm tTime;
+        localtime_r(&stm,&tTime);
+        snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d ] ", tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-    	    //get current time
-    	    time_t stm = time(NULL);
-            struct tm tTime;
-            localtime_r(&stm,&tTime);
-            snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d ] ", tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
+        //get va_list
+        va_list	agList;
+        va_start(agList, format);
+        vsnprintf(logBuffer, MAX_LOG_BUFFER_LEN - 1, format, agList);
+        va_end(agList);
 
-            //get va_list
-            va_list	agList;
-            va_start(agList, format);
-            vsnprintf(lm->buffer, MAX_LOG_BUFFER_LEN - 1, format, agList);
-            va_end(agList);
+        strcat(logBuffer, "\n");
 
-            strcat(lm->buffer, "\n");
-            g_pFileCtrl->LogMsg(lm->buffer, (int)strlen(lm->buffer), bitBuffer);
+        if( mLogLevel >= nLevel ) {
+        	mpFileCtrl->LogMsg(logBuffer, (int)strlen(logBuffer), bitBuffer);
+        }
 
-            mIdleMessageList.PushBack(lm);
+        if( mDebugMode ) {
+        	mpFileCtrlDebug->LogMsg(logBuffer, (int)strlen(logBuffer), bitBuffer);
         }
 
         return true;
@@ -157,35 +112,43 @@ bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
 	return true;
 }
 
-bool LogManager::Start(int maxIdle, LOG_LEVEL nLevel, const string& dir) {
-	if( !mIsRunning ) {
-		mIsRunning = true;
-	} else {
+bool LogManager::Start(LOG_LEVEL nLevel, const string& dir) {
+	if( mIsRunning ) {
 		return false;
 	}
 
 	printf("# LogManager starting... \n");
 
-	/* create log buffers */
-	for(int i = 0; i < maxIdle; i++) {
-		Message *m = new Message();
-		mIdleMessageList.PushBack(m);
-	}
-
-	// Just 4 log
-	g_iLogLevel = nLevel;
-    MkDir(dir.c_str());
+	mLogLevel = nLevel;
     mLogDir = dir;
-//    MkDir(g_SysConf.strTempPath.c_str());
-//    InitMsgList(maxIdle);
-//    KLog::SetLogDirectory(g_SysConf.strLogPath.c_str());
+
+	// Nornal Log Config
+    string infoLogDir = mLogDir + "/info";
+    MkDir(infoLogDir.c_str());
+    mpFileCtrl = new CFileCtrl();
+    if( !mpFileCtrl ) {
+        return false;
+    }
+    mpFileCtrl->Initialize(infoLogDir.c_str(), "Log", 30);
+    mpFileCtrl->OpenLogFile();
+
+    // Debug Log Config
+    string debugLogDir = mLogDir + "/debug";
+    MkDir(debugLogDir.c_str());
+    mpFileCtrlDebug = new CFileCtrl();
+    if( !mpFileCtrlDebug ) {
+        return false;
+    }
+    mpFileCtrlDebug->Initialize(debugLogDir.c_str(), "Log", 30);
+    mpFileCtrlDebug->OpenLogFile();
+
+    mIsRunning = true;
 
 	/* start log thread */
-    mpLogRunnable = new LogRunnable(this);
-	mpLogThread = new KThread(mpLogRunnable);
-	if( mpLogThread->start() != 0 ) {
-//		printf("# Create log thread ok \n");
+	if( mLogThread.start(mpLogRunnable) != 0 ) {
+
 	}
+
 	printf("# LogManager start OK. \n");
 	return true;
 }
@@ -200,25 +163,16 @@ bool LogManager::Stop() {
 	printf("# LogManager stopping... \n");
 
 	/* stop log thread */
+	mLogThread.stop();
 
-	if( mpLogThread ) {
-		mpLogThread->stop();
+	if( mpFileCtrl ) {
+		delete mpFileCtrl;
+		mpFileCtrl = NULL;
 	}
-	if( mpLogRunnable ) {
-		delete mpLogRunnable;
-	}
 
-	/* release log buffers */
-	Message *m;
-
-//	while( NULL != ( m = mLogMessageList.PopFront() ) ) {
-//		char *buffer = m->buffer;
-//		KLog::LogToFile("log", "", "%s \n", buffer);
-//		delete m;
-//	}
-
-	while( NULL != ( m = mIdleMessageList.PopFront() ) ) {
-		delete m;
+	if( mpFileCtrlDebug ) {
+		delete mpFileCtrlDebug;
+		mpFileCtrlDebug = NULL;
 	}
 
 	printf("# LogManager stop OK. \n");
@@ -229,14 +183,6 @@ bool LogManager::Stop() {
 bool LogManager::IsRunning() {
 	return mIsRunning;
 }
-
-//MessageList *LogManager::GetIdleMessageList() {
-//	return &mIdleMessageList;
-//}
-//
-//MessageList *LogManager::GetLogMessageList() {
-//	return &mLogMessageList;
-//}
 
 int LogManager::MkDir(const char* pDir) {
     int ret = 0;
@@ -277,5 +223,27 @@ int LogManager::MkDir(const char* pDir) {
 }
 
 void LogManager::SetLogLevel(LOG_LEVEL nLevel) {
-	g_iLogLevel = nLevel;
+	mLogLevel = nLevel;
+}
+
+void LogManager::LogSetFlushBuffer(unsigned int iLen) {
+	if( mIsRunning ) {
+		mpFileCtrl->SetFlushBuffer(iLen);
+		if( mDebugMode ) {
+			mpFileCtrlDebug->SetFlushBuffer(iLen);
+		}
+	}
+}
+
+void LogManager::LogFlushMem2File() {
+	if( mIsRunning ) {
+		mpFileCtrl->FlushMem2File();
+		if( mDebugMode ) {
+			mpFileCtrlDebug->FlushMem2File();
+		}
+	}
+}
+
+void LogManager::SetDebugMode(bool debugMode) {
+	mDebugMode = debugMode;
 }

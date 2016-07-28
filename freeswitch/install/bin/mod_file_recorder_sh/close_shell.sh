@@ -38,7 +38,8 @@ fi
 # -- build mp4 file 
 mp4filename=$userid'_'$starttime'-'$endtime'.mp4'
 mp4filepath=$mp4filedir$mp4filename
-ffmpeg -i $h264path -y -vcodec copy $mp4filepath > /dev/null 2>&1
+tranvideo_cmd="ffmpeg -i $h264path -y -vcodec copy $mp4filepath > /dev/null 2>&1"
+eval $tranvideo_cmd
 #echo "$mp4filepath" >> $log_file
 #echo "build mp4 file finish"
 
@@ -63,8 +64,10 @@ fi
 # -- h264 file not exist
 if [ ! -e "$h264path" ]; then
   echo "$log_time h264 file is not exist, userId:$userid, siteId:$siteid, startTime:$starttime, endTime:$endtime, h264Path:$h264path, mp4FileName:$mp4filename, mp4FilePath:$mp4filepath" >> $log_file
+  echo "$tranvideo_cmd" >> $log_file
 fi
 # -- mp4 file not exist
 if [ ! -e "$mp4filepath" ]; then
   echo "$log_time mp4 file is not exist, userId:$userid, siteId:$siteid, startTime:$starttime, endTime:$endtime, mp4FileName:$mp4filename, mp4FilePath:$mp4filepath" >> $log_file
+  echo "$tranvideo_cmd" >> $log_file
 fi

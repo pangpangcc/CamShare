@@ -44,6 +44,10 @@ public:
 private:
 	// 连接服务器
 	bool ConnectServer();
+	// 检测版本号
+	bool CheckVersionProc();
+	// 启动发送心跳包线程
+	void HearbeatThreadStart();
 
 // ITaskManagerListener接口函数
 private:
@@ -58,9 +62,9 @@ private:
 private:
 	void OnCheckVerTaskDone(ITask* task);
 
-private:
-	// 检测版本号
-	bool CheckVersionProc();
+protected:
+	static TH_RETURN_PARAM HearbeatThread(void* arg);
+	void HearbeatProc();
 
 private:
 	bool			m_bInit;	// 初始化标志

@@ -9,94 +9,30 @@
 #include <sys/stat.h>
 #include "LogFile.hpp"
 
-LOG_LEVEL g_iLogLevel = LOG_MSG;
-CFileCtrl *g_pFileCtrl = NULL;              //Log class
-//static int g_bCreated = false;              //create flag
-static unsigned g_iMemSize = 0;
-pthread_mutex_t m_hMutexBuffer;
-
-void SetFlushBuffer(unsigned int iLen)
+CFileCtrl::CFileCtrl()
 {
-    g_iMemSize = iLen;
-}
-
-void FlushMem2File()
-{
-    if (g_pFileCtrl) {
-        pthread_mutex_lock(&m_hMutexBuffer);
-        g_pFileCtrl->Mem2File();
-        pthread_mutex_unlock(&m_hMutexBuffer);
-    }
-}
-
-//int saveLog(LOG_LEVEL nLevel, const char *szfmt, ...)
-//{
-//    if (g_iLogLevel >= nLevel) {
-//        if (g_bCreated == false) {
-//            g_bCreated = true;
-//            if (g_pFileCtrl) {
-//                delete g_pFileCtrl;
-//            }
-//            g_pFileCtrl = NULL;
-//            g_pFileCtrl = new CFileCtrl(g_SysConf.strLogPath.c_str(), "Log", 128);
-//            if (!g_pFileCtrl) {
-//                return -1;
-//            }
-//            g_pFileCtrl->Initialize();
-//            g_pFileCtrl->OpenLogFile();
-//	    }
-//	    LPMESSAGE_DATA pMsg = GetIdleMsgBuff();
-//	    pMsg->pData->ReSet();
-//
-//	    //get current time
-//	    time_t stm = time(NULL);
-//        struct tm tTime;
-//        localtime_r(&stm,&tTime);
-//        snprintf(pMsg->pData->m_cChk, 64, "[ %d-%02d-%02d %02d:%02d:%02d ] ", tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
-//
-//        //get va_list
-//        char *p = pMsg->pData->m_cRsp;
-//        va_list	agList;
-//        va_start(agList, szfmt);
-//        vsnprintf(p, BUFFER_SIZE_5K, szfmt, agList);
-//        va_end(agList);
-//
-//        strcat(pMsg->pData->m_cRsp, "\n");
-//        g_pFileCtrl->LogMsg(pMsg->pData->m_cRsp, (int)strlen(pMsg->pData->m_cRsp), pMsg->pData->m_cChk);
-//
-//        PutIdleMsgBuff(pMsg);
-//        return 1;
-//    }
-//    return 0;
-//}
-
-CFileCtrl::CFileCtrl(const char *szlogPath, const char* szFileName, unsigned long aiFileLen, int bSingle)
-{
-    m_dwMaxFileLength = aiFileLen;
+    m_dwMaxFileLength = 0;
     m_pLogFile = NULL;
     memset(m_szLogFileName, 0, MAX_PATH * sizeof(char));
-    snprintf(m_szLogFileName, MAX_PATH, "%s", szFileName);
-    
     memset(m_szLogPath, 0, MAX_PATH * sizeof(char));
-    snprintf(m_szLogPath, MAX_PATH, "%s", szlogPath);
     
-    //printf("%s:%s", m_szLogPath, m_szLogFileName );
-	m_bSingle = bSingle;
+	m_bSingle = 0;
 	m_pBuffer = NULL;
 	m_nBufferUse = 0;
-	if (g_iMemSize) {
-	    m_pBuffer = new char[g_iMemSize];
-	}
+
+	m_nFileLen = 0;
+	m_ncurRead = 0;
+	m_iMemSize = 0;
+
 }
 
 CFileCtrl::~CFileCtrl()
 {
     pthread_mutex_destroy(&m_hMutex);
-    pthread_mutex_destroy(&m_hMutexBuffer);
     
     CloseFile();
     if (m_pBuffer) {
-        delete m_pBuffer;
+        delete[] m_pBuffer;
     }
 }
 
@@ -109,8 +45,38 @@ int CFileCtrl::CloseFile()
     return 0;
 }
 
-int CFileCtrl::Initialize()
+int CFileCtrl::Initialize(
+		const char *szlogPath,
+		const char* szFileName,
+		unsigned long aiFileLen,
+		unsigned int iMemSize,
+		int bSingle
+		)
 {
+    m_dwMaxFileLength = aiFileLen;
+    m_pLogFile = NULL;
+    memset(m_szLogFileName, 0, MAX_PATH * sizeof(char));
+    snprintf(m_szLogFileName, MAX_PATH, "%s", szFileName);
+
+    memset(m_szLogPath, 0, MAX_PATH * sizeof(char));
+    snprintf(m_szLogPath, MAX_PATH, "%s", szlogPath);
+
+    //printf("%s:%s", m_szLogPath, m_szLogFileName );
+	m_bSingle = bSingle;
+	if( m_pBuffer ) {
+		delete[] m_pBuffer;
+		m_pBuffer = NULL;
+	}
+	m_nBufferUse = 0;
+
+	m_nFileLen = 0;
+	m_ncurRead = 0;
+
+	m_iMemSize = iMemSize;
+	if( m_iMemSize > 0 ) {
+	    m_pBuffer = new char[m_iMemSize];
+	}
+
     if (m_dwMaxFileLength == 0) {
         m_dwMaxFileLength = 2;
     }
@@ -195,9 +161,7 @@ int CFileCtrl::LogMsg(const char* pszFormat, int aiLen, const char* pszHead)
         
         fflush(m_pLogFile);
     } else {
-        pthread_mutex_lock(&m_hMutexBuffer); 
-        
-        if ((m_nBufferUse + (unsigned int)strlen(pszHead) + (unsigned int)aiLen) >= g_iMemSize) {//memory full
+        if ((m_nBufferUse + (unsigned int)strlen(pszHead) + (unsigned int)aiLen) >= m_iMemSize) {//memory full
             Mem2File();//change m_nBufferUse to 0
         }
         //add buffer len for those in use
@@ -205,8 +169,6 @@ int CFileCtrl::LogMsg(const char* pszFormat, int aiLen, const char* pszHead)
         m_nBufferUse += (unsigned int)strlen(pszHead);
         memcpy(m_pBuffer + m_nBufferUse, pszFormat, (unsigned int)aiLen);
         m_nBufferUse += (unsigned int)aiLen;
-        
-        pthread_mutex_unlock(&m_hMutexBuffer);
         
         m_nFileLen = m_nFileLen +  (unsigned int)strlen(pszHead) + (unsigned int)aiLen;//add file len for create file
     }
@@ -267,43 +229,47 @@ bool CFileCtrl::IsEnd()
     return true;	
 }
 
-int CFileCtrl::printLog(const char *szfmt, ...)
-{	
-    char lsbuf[BUFFER_SIZE_2K];
-    memset(lsbuf, 0, BUFFER_SIZE_2K * sizeof(char));
-
-    va_list args;
-    va_start(args, szfmt);
-
-    int nStrLen = (int)strlen(szfmt);
-    if (nStrLen >= BUFFER_SIZE_2K) {
-        return -1;
-    }
-    vsprintf(lsbuf, szfmt, args);
-    va_end(args);
-
-    //write file
-    if (!m_bSingle) {
-        pthread_mutex_lock(&m_hMutex); 
-    }
-    int len = (int)fwrite(lsbuf, sizeof(char), (unsigned int)strlen(lsbuf), m_pLogFile);
-    m_nFileLen += len;
-	
-	//over file size, create again
-    if (m_nFileLen >= (long)m_dwMaxFileLength) {
-        CreateLog();
-    }
-    if (!m_bSingle) {
-        pthread_mutex_unlock(&m_hMutex); 
-    }
-    return 0;
-}
-
 void CFileCtrl::Mem2File()
 {
     if (m_pLogFile && m_pBuffer && (m_nBufferUse > 0)){
         (int)fwrite(m_pBuffer, sizeof(char), m_nBufferUse, m_pLogFile);
         m_nBufferUse = 0;
         fflush(m_pLogFile);
+    }
+}
+
+void CFileCtrl::SetFlushBuffer(unsigned int iLen)
+{
+    if (!m_bSingle) {
+        pthread_mutex_lock(&m_hMutex);
+    }
+
+	Mem2File();
+
+	if( m_pBuffer ) {
+		delete[] m_pBuffer;
+		m_pBuffer = NULL;
+	}
+
+    m_iMemSize = iLen;
+	if( m_iMemSize > 0 ) {
+	    m_pBuffer = new char[m_iMemSize];
+	}
+
+    if (!m_bSingle) {
+        pthread_mutex_unlock(&m_hMutex);
+    }
+}
+
+void CFileCtrl::FlushMem2File()
+{
+    if (!m_bSingle) {
+        pthread_mutex_lock(&m_hMutex);
+    }
+
+	Mem2File();
+
+    if (!m_bSingle) {
+        pthread_mutex_unlock(&m_hMutex);
     }
 }

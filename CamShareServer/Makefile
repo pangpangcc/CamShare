@@ -50,7 +50,8 @@ LIVECHAT	=	livechat/Counter.o livechat/ILiveChatClient.o livechat/ISocketHandler
 				livechat/task/ITask.o livechat/task/BaseTask.o \
 				livechat/task/CheckVerTask.o livechat/task/RecvEnterConferenceTask.o \
 				livechat/task/RecvKickUserFromConferenceTask.o \
-				livechat/task/SendEnterConferenceTask.o livechat/task/SendMsgTask.o
+				livechat/task/SendEnterConferenceTask.o livechat/task/SendMsgTask.o \
+				livechat/task/HearbeatTask.o
 				
 OBJS 		=	server.o CamShareMiddleware.o TcpServer.o MessageList.o LogManager.o Client.o\
 				DataHttpParser.o DataParser.o Session.o FreeswitchClient.o SessionManager.o \

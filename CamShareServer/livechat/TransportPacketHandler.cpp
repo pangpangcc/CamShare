@@ -41,18 +41,6 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 		{
 			dataLen = bodyLen;
 		}
-
-//		if (dataSize > sizeof(NoHeadTransportProtocol)) {
-//			NoHeadTransportProtocol* protocol = (NoHeadTransportProtocol*)data;
-//
-//			// 获取数据
-//			unsigned int bodyLen = 0;
-//			result = task->GetSendData((void*)&(protocol->data), dataSize, bodyLen);
-//			if  (result)
-//			{
-//				dataLen = bodyLen;
-//			}
-//		}
 	}
 	else {
 		TransportSendHeader* sendHeader = (TransportSendHeader *)data;
@@ -138,16 +126,14 @@ UNPACKET_RESULT_TYPE CTransportPacketHandler::Unpacket(void* data, unsigned int 
 	UNPACKET_RESULT_TYPE result = UNPACKET_FAIL;
 	useLen = 0;
 	*ppTp = NULL;
-	TransportProtocol* tp = NULL;
+	TransportProtocol* tp = (TransportProtocol*)data;
 	unsigned int length = 0;
 
 	FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() begin");
 
-	if (dataLen >= sizeof(TransportProtocol))
+	if (dataLen >= sizeof(tp->header.length))
 	{
-		tp = (TransportProtocol*)data;
 		length = ntohl(tp->header.length);
-		FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket( length : %u, dataLen : %u )", length, dataLen);
 		if (length == 0)
 		{
 			// 心跳包
@@ -176,7 +162,6 @@ UNPACKET_RESULT_TYPE CTransportPacketHandler::Unpacket(void* data, unsigned int 
 			}
 			else if (maxLen >= length + sizeof(length))
 			{
-				tp->header.length = length;
 				// 需要更多数据，且有足够buffer接收
 				result = UNPACKET_MOREDATA;
 			}

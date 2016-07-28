@@ -5,6 +5,7 @@
  */
 
 #include "CheckVerTask.h"
+
 #include <amf/AmfParser.h>
 #include <json/json/json.h>
 #include <common/KLog.h>

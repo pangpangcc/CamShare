@@ -27,28 +27,25 @@ typedef unsigned long   LOG_LEVEL;
     #define BUFFER_SIZE_5K  5120
 #endif
 
-extern unsigned long    g_iLogLevel;
-
 /*
   create a memory block, flush memory into file by application or memories were filled [ usLen == 0 then flush into file immediately]
   make sure the memory block is larger than 1 record
  */
 
-void SetFlushBuffer(unsigned int iLen);
-void FlushMem2File();
-
-//#define gvLog saveLog
-
-//int saveLog(LOG_LEVEL nLevel, const char *szfmt, ...);
-
 class CFileCtrl
 {
 public:
-    CFileCtrl(const char *szlogPath, const char* szLogFileName, unsigned long alFileLen = 30, int bSingle = 0);
+    CFileCtrl();
     virtual ~CFileCtrl();
 
 public:
-    int Initialize();
+    int Initialize(
+    		const char *szlogPath,
+			const char* szLogFileName,
+			unsigned long alFileLen = 30,
+			unsigned int iMemSize = 0,
+			int bSingle = 0
+    		);
     FILE* OpenLogFile();
     FILE* FileOpen(const char *szFileName, int aiMod);
     int LogMsg(const char* pszFormat, int aiLen, const char* pszHead);
@@ -64,6 +61,9 @@ public:
     long GetFileLen() {return m_nFileLen;};
     long GetCurLen() {return m_ncurRead;};
 
+    void SetFlushBuffer(unsigned int iLen);
+    void FlushMem2File();
+
 protected:
     FILE* CreateLog();
 
@@ -78,6 +78,9 @@ private:
     int m_bSingle;                      //need for mutithread
     char* m_pBuffer;                    //buffer
     long m_nBufferUse;                  //buffer in use
+
+    unsigned m_iMemSize;
+    pthread_mutex_t m_hMutexBuffer;
+
 };
-extern CFileCtrl *g_pFileCtrl;              //Log class
 #endif

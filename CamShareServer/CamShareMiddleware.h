@@ -16,6 +16,7 @@
 #include "FreeswitchClient.h"
 #include "SessionManager.h"
 #include "DBHandler.h"
+#include "LogManager.h"
 
 #include <common/ConfFile.hpp>
 #include <common/KSafeMap.h>
@@ -225,12 +226,14 @@ private:
 	 * @param	client		HTTP Client
 	 * @param 	record		录制记录
 	 * @param 	success		服务器返回结果
-	 * @return	发送(成功/失败)
+	 * @param 	errorRecord	参数错误
+	 * @return	发送处理		(成功/失败)
 	 */
 	bool SendRecordFinish(
 			HttpClient* client,
 			const Record& record,
-			bool &success
+			bool &success,
+			bool &errorRecord
 			);
 
 	/***************************** 外部服务接口 end **************************************/

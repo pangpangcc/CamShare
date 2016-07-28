@@ -21,7 +21,7 @@ CXXFLAGS +=	-I. -I../ -I../libev
 LIBS =		-L. \
 			-Wl,-Bdynamic -ldl -lz -lpthread 
 
-COMMON  	=	../common/LogFile.o ../common/md5.o ../common/KThread.o ../common/ConfFile.o ../common/Arithmetic.o\
+COMMON  	=	../common/LogFile.o ../common/md5.o ../common/KThread.o ../common/ConfFile.o ../common/Arithmetic.o ../common/aes.o\
 				../common/IAutoLock.o ../common/CommonFunc.o
 				
 OBJS	+= $(COMMON)		

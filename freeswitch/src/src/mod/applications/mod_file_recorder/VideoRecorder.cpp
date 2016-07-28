@@ -669,7 +669,7 @@ void VideoRecorder::RecordPicture2FileProc()
 		// 等下一个周期
 		while (mbRunning && getCurrentTime() < endTime)
 		{
-			usleep(100 * 1000);
+			usleep(1000 * 1000);
 		}
 	}
 
@@ -1206,14 +1206,14 @@ bool VideoRecorder::RunPictureShell()
 	if (result) {
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: transcode to jpeg success, result:%d, cmd:%s\n"
-//					, result, cmd);
+//					, "mod_file_recorder: transcode to jpeg success, code:%d, cmd:%s\n"
+//					, code, cmd);
 	}
 	else {
 		// error
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-					, "mod_file_recorder: transcode to jpeg fail! result:%d, cmd:%s\n"
-					, result, cmd);
+					, "mod_file_recorder: transcode to jpeg fail! code:%d, cmd:%s\n"
+					, code, cmd);
 	}
 
 	return result;

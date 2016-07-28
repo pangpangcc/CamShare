@@ -20,16 +20,16 @@ public:
 // ITask接口函数
 public:
 	// 处理已接收数据
-	virtual bool Handle(const TransportProtocol* tp);
+	bool Handle(const TransportProtocol* tp);
 	// 获取待发送的数据，可先获取data长度，如：GetSendData(NULL, 0, dataLen);
-	virtual bool GetSendData(void* data, unsigned int dataSize, unsigned int& dataLen);
+	bool GetSendData(void* data, unsigned int dataSize, unsigned int& dataLen);
 	TASK_PROTOCOL_TYPE GetSendDataProtocolType();
 	// 获取命令号
-	virtual int GetCmdCode();
+	int GetCmdCode();
 	// 获取处理结果
-	virtual void GetHandleResult(LCC_ERR_TYPE& errType, string& errmsg);
+	void GetHandleResult(LCC_ERR_TYPE& errType, string& errmsg);
 	// 未完成任务的断线通知
-	virtual void OnDisconnect();
+	void OnDisconnect();
 
 public:
 	// 初始化参数

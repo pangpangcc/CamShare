@@ -1104,8 +1104,8 @@ public:
 				);
 //		client->Close();
 		char temp[1024];
-//		sprintf(temp, "WW%d@192.168.88.143", client->mIndex);
-		sprintf(temp, "MAX%d@192.168.88.143", client->mIndex);
+		sprintf(temp, "WW%d@192.168.88.143", client->mIndex);
+//		sprintf(temp, "MAX%d@192.168.88.143", client->mIndex);
 		client->Login(temp, "", "1", "sid=SESSION123456&userType=1");
 	}
 
@@ -1115,14 +1115,15 @@ public:
 	void OnLogin(RtmpClient* client, bool bSuccess) {
 		if( bSuccess ) {
 			char temp[1024];
-//			sprintf(temp, "MM%d|||PC0|||1", client->mIndex);
-			sprintf(temp, "SAMSON%d|||PC0|||1", client->mIndex);
+			sprintf(temp, "MM%d|||PC0|||1", client->mIndex);
+//			sprintf(temp, "SAMSON%d|||PC0|||1", client->mIndex);
 			client->MakeCall(temp);
 //			client->CreatePublishStream();
 		}
 	}
 	void OnMakeCall(RtmpClient* client, bool bSuccess) {
-//		client->Close();
+		sleep(1);
+		client->Close();
 	}
 	void OnCreatePublishStream(RtmpClient* client) {
 //		sendThread.start(new SendVideoRunnable(client));
@@ -1145,11 +1146,11 @@ int main(int argc, char *argv[]) {
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
 
-	LogManager::GetLogManager()->Start(1000, 4, "log_rtmp_client");
+	LogManager::GetLogManager()->Start(LOG_MSG, "log_rtmp_client");
 
 	InitFrame();
 
-	int size = 1;
+	int size = 10;
 	RtmpClient client[size];
 
 	for(int i = 0; i < size; i++) {

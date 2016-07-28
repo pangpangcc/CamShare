@@ -1,0 +1,87 @@
+# 基本配置
+[BASE]
+# 端口
+PORT=9200
+# 最大连接数
+MAXCLIENT=100
+# 处理线程数目, 一般为cpu内核数目
+MAXHANDLETHREAD=4
+# 单核每秒处理请求数目
+MAXQUERYPERCOPY=0
+# 单个HTTP请求超时时间(秒), 0为不超时
+TIMEOUT=0
+# 统计信息输出时间间隔(秒)
+STATETIME=60
+# flash客户端请求处理超时时间(秒), 0为不超时
+FLASH_TIMEOUT=5
+
+# 日志配置
+[LOG]
+# 日志级别(0-5, 0:关闭, 5:全开)
+LOGLEVEL=4
+# 日志路径
+LOGDIR=log
+# 调试模式(0:关闭, 1:开启)
+DEBUGMODE=1
+
+# Livechat服务器配置
+[LIVECHAT]
+# 端口
+PORT=4311
+# IP
+IP=58.64.141.117
+# 服务器对本应用唯一标识,不能重复
+NAME=CAM143
+#NAME=CAMDEMO
+# 连接成功是否重新验所有证会议室用户
+AUTHORIZATION_ALL_CONFERENCE=1
+
+# Freeswitch服务器配置
+[FREESWITCH]
+# 端口
+PORT=8021
+# IP
+IP=127.0.0.1
+# 用户名
+USER=
+# 密码
+PASSWORD=ClueCon
+# 是否开启录制视频
+ISRECORDING=1
+# 录制视频目录
+RECORDINGPATH=/usr/local/freeswitch/recordings/video_h264
+
+# 站点配置
+[SITE]
+# 站点数量
+SITE_COUNT=4
+# 上传视频录制记录时间间隔(秒)
+UPLOADTIME=60
+
+# 站点配置(CL)
+[SITE_0]
+# 站点Id
+SITE_ID=0
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=http://demo.chnlove.com/livechat/setstatus.php?action=savecamsharevideo
+
+# 站点配置(IDA)
+[SITE_1]
+# 站点Id
+SITE_ID=1
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=http://demo.idateasia.com/livechat/setstatus.php?action=savecamsharevideo
+
+# 站点配置(CD)
+[SITE_2]
+# 站点Id
+SITE_ID=4
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=http://demo.charmdate.com/livechat/setstatus.php?action=savecamsharevideo
+
+# 站点配置(LD)
+[SITE_3]
+# 站点Id
+SITE_ID=5
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=http://demo.latamdate.com/livechat/setstatus.php?action=savecamsharevideo

@@ -15,6 +15,7 @@
 #include "task/CheckVerTask.h"
 #include "task/SendEnterConferenceTask.h"
 #include "task/SendMsgTask.h"
+#include "task/HearbeatTask.h"
 
 CLiveChatClient::CLiveChatClient()
 {
@@ -241,8 +242,8 @@ void CLiveChatClient::OnConnect(bool success)
 		FileLog("LiveChatClient", "CLiveChatClient::OnConnect) CheckVersionProc(), siteId : %s", m_siteId.c_str());
 		// 连接服务器成功，检测版本号
 		CheckVersionProc();
-//		// 启动发送心跳包线程
-//		HearbeatThreadStart();
+		// 启动发送心跳包线程
+		HearbeatThreadStart();
 	}
 	else {
 		FileLog("LiveChatClient", "CLiveChatClient::OnConnect() LCC_ERR_CONNECTFAIL, m_listener:%p, siteId : %s", m_listener, m_siteId.c_str());
@@ -267,13 +268,13 @@ void CLiveChatClient::OnDisconnect(const TaskList& listUnsentTask)
 		(*iter)->OnDisconnect();
 	}
 
-//	// 停止心跳线程
-//	if (NULL != m_hearbeatThread) {
-//		m_isHearbeatThreadRun = false;
-//		m_hearbeatThread->WaitAndStop();
-//		IThreadHandler::ReleaseThreadHandler(m_hearbeatThread);
-//		m_hearbeatThread = NULL;
-//	}
+	// 停止心跳线程
+	if (NULL != m_hearbeatThread) {
+		m_isHearbeatThreadRun = false;
+		m_hearbeatThread->WaitAndStop();
+		IThreadHandler::ReleaseThreadHandler(m_hearbeatThread);
+		m_hearbeatThread = NULL;
+	}
 
 	m_listener->OnDisconnect(this, LCC_ERR_CONNECTFAIL, "");
 
@@ -330,4 +331,49 @@ bool CLiveChatClient::CheckVersionProc()
 		result = m_taskManager->HandleRequestTask(checkVerTask);
 	}
 	return result;
+}
+
+// ------------------------ 心跳处理函数 ------------------------------
+void CLiveChatClient::HearbeatThreadStart()
+{
+	// 启动心跳处理线程
+	m_isHearbeatThreadRun = true;
+	if (NULL == m_hearbeatThread) {
+		m_hearbeatThread = IThreadHandler::CreateThreadHandler();
+		m_hearbeatThread->Start(HearbeatThread, this);
+	}
+}
+
+TH_RETURN_PARAM CLiveChatClient::HearbeatThread(void* arg)
+{
+	CLiveChatClient* pThis = (CLiveChatClient*)arg;
+	pThis->HearbeatProc();
+	return NULL;
+}
+
+void CLiveChatClient::HearbeatProc()
+{
+	FileLog("LiveChatClient", "CLiveChatClient::HearbeatProc() begin");
+
+	const unsigned long nSleepStep = 200;	// ms
+	const unsigned long nSendStep = 30 * 1000; // ms
+
+	long long preTime = getCurrentTime();
+	long long curTime = getCurrentTime();
+	do {
+		curTime = getCurrentTime();
+		if (DiffTime(preTime, curTime) >= nSendStep) {
+			HearbeatTask* task = new HearbeatTask();
+			if (NULL != task) {
+				task->Init(this, m_listener);
+				int seq = m_seqCounter.GetAndIncrement();
+				task->SetSeq(seq);
+				m_taskManager->HandleRequestTask(task);
+			}
+			preTime = curTime;
+		}
+		Sleep(nSleepStep);
+	} while (m_isHearbeatThreadRun);
+
+	FileLog("LiveChatClient", "CLiveChatClient::HearbeatProc() end");
 }

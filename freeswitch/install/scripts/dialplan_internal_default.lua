@@ -5,34 +5,12 @@
 
 local cjson = require "cjson"
 
+dofile("/usr/local/freeswitch/scripts/common.lua");
+
 freeswitch.consoleLog("CONSOLE", "# 内网拨号计划->开始\n")
 
 -- 创建拨号规则
 api = freeswitch.API();
-
--- 字符串分隔
-function string_split(str, sep)
-    local tables = {};
-    local i = 1;
-    local j = 0;
-    local value;
-       
-    while true do
-        j = string.find(str, sep, i);
-        if j == nil then
-            value = string.sub(str, i, string.len(str));
-            table.insert(tables, value);
-            break;
-        else
-            value = string.sub(str, i, j - 1);
-            table.insert(tables, value);
-            
-            i = j + string.len(sep);
-        end;
-
-    end
-    return tables;
-end
 
 -- 输出变量
 function logChannelVar(k, v)

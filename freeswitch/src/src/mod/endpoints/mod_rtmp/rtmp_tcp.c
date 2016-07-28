@@ -382,6 +382,25 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't disable Nagle.\n");
 						}
 
+						if (switch_socket_opt_set(newsocket, SWITCH_SO_KEEPALIVE, 1)) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPALIVE.\n");
+						}
+
+						// 间隔idle秒没有数据包，则发送keepalive包；若对端回复，则等idle秒再发keepalive包
+						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPIDLE, 60)) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPIDLE.\n");
+						}
+
+						// 若发送keepalive对端没有回复，则间隔intvl秒再发送keepalive包
+						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPINTVL, 20)) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPINTVL.\n");
+						}
+
+						// 若发送keepalive包，超过keepcnt次没有回复就认为断线
+						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPCNT, 3)) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPCNT.\n");
+						}
+
 						if (rtmp_session_request(io->base.profile, &rsession) != SWITCH_STATUS_SUCCESS) {
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "RTMP session request failed\n");
 							switch_socket_close(newsocket);
@@ -426,20 +445,24 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 				rtmp_tcp_io_private_t *io_pvt = (rtmp_tcp_io_private_t*)rsession->io_private;
 
 				if (fds[i].rtnevents & (SWITCH_POLLERR|SWITCH_POLLHUP|SWITCH_POLLNVAL)) {
+					uint32_t handle_count = 0;
 					switch_bool_t is_destroy = SWITCH_FALSE;
 
 					switch_mutex_lock(rsession->handle_count_mutex);
 					is_destroy = rsession->handle_count <= 0;
+					handle_count = rsession->handle_count;
 					switch_mutex_unlock(rsession->handle_count_mutex);
 
 					if (is_destroy) {
 						if (NULL == rsession->account || NULL == rsession->account->user) {
 							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "uuid:%s, Closing socket\n", rsession->uuid);
+									, "Closing socket, uuid:%s, handle_count:%d\n"
+									, rsession->uuid, handle_count);
 						}
 						else {
 							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "uuid:%s, user:%s, Closing socket\n", rsession->uuid, rsession->account->user);
+									, "Closing socket, uuid:%s, user:%s, handle_count:%d\n"
+									, rsession->uuid, rsession->account->user, handle_count);
 						}
 
 						remove_from_timeout_list(io, rsession);
@@ -467,6 +490,19 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 
 						rtmp_session_destroy(&rsession);
 					}
+					else {
+						// print log
+						if (NULL == rsession->account || NULL == rsession->account->user) {
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+									, "Wait to close socket, uuid:%s, handle_count:%d\n"
+									, rsession->uuid, handle_count);
+						}
+						else {
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+									, "Wait to close socket, uuid:%s, user:%s, handle_count:%d\n"
+									, rsession->uuid, rsession->account->user, handle_count);
+						}
+					}
 				}
 				else if (fds[i].rtnevents & SWITCH_POLLIN) {
 					remove_from_timeout_list(io, rsession);
@@ -474,9 +510,18 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 					switch_mutex_lock(rsession->handle_count_mutex);
 					if (rsession->handle_count == 0) {
 						rsession->handle_count++;
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//								, "uuid:%s, handle_count:%d, Push queue\n", rsession->uuid, rsession->handle_count);
 						switch_queue_push(io->handle_queue, (void*)rsession);
+						// print log
+						if (NULL == rsession->account || NULL == rsession->account->user) {
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+									, "Push to handle queue, uuid:%s, handle_count:%d\n"
+									, rsession->uuid, rsession->handle_count);
+						}
+						else {
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+									, "Push to handle queue, uuid:%s, user:%s, handle_count:%d\n"
+									, rsession->uuid, rsession->account->user, rsession->handle_count);
+						}
 					}
 					switch_mutex_unlock(rsession->handle_count_mutex);
 				}
@@ -601,8 +646,17 @@ void *SWITCH_THREAD_FUNC rtmp_handle_thread(switch_thread_t *thread, void *obj)
 
 			switch_mutex_lock(rsession->handle_count_mutex);
 			rsession->handle_count--;
-//			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//					, "uuid:%s, handle_count:%d, Pop queue\n", rsession->uuid, rsession->handle_count);
+			// print log
+			if (NULL == rsession->account || NULL == rsession->account->user) {
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+						, "Pop queue and handle finish, uuid:%s, handle_count:%d\n"
+						, rsession->uuid, rsession->handle_count);
+			}
+			else {
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+						, "Pop queue and handle finish, uuid:%s, user:%s, handle_count:%d\n"
+						, rsession->uuid, rsession->account->user, rsession->handle_count);
+			}
 			switch_mutex_unlock(rsession->handle_count_mutex);
 		}
 	}
