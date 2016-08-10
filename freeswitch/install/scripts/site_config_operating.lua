@@ -12,10 +12,10 @@
 
 -- php接口路径
 loginPaths = {
-  ["0"] = "http://test:5179@demo.chnlove.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["1"] = "http://test:5179@demo.idateasia.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["4"] = "http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["5"] = "http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["0"] = "http://www.chnlove.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["1"] = "http://www.idateasia.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["4"] = "http://www.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["5"] = "http://www.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
 };
 
 function getLoginPath(siteId)
@@ -24,6 +24,11 @@ function getLoginPath(siteId)
     loginPath = loginPaths[siteId];
   end
   return loginPath;
+end
+
+-- 是否支持测试帐号
+function is_support_test()
+    return 0;
 end
 
 --return module;

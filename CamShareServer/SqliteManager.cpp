@@ -16,18 +16,18 @@ SqliteManager::~SqliteManager() {
 	// TODO Auto-generated destructor stub
 }
 
-bool SqliteManager::Init() {
-	printf("# SqliteManager initializing... \n");
+bool SqliteManager::Init(const string& dbname) {
+	printf("# SqliteManager initializing %s ... \n", dbname.c_str());
 
 	bool bFlag = false;
 	int ret;
 
-	ret = sqlite3_open("local.db", &mdb);
+	ret = sqlite3_open(dbname.c_str(), &mdb);
 	if( ret == SQLITE_OK ) {
 		bFlag = ExecSQL(mdb, (char*)"PRAGMA synchronous = OFF;", 0);
 	}
 
-	printf("# SqliteManager initialize OK. \n");
+	printf("# SqliteManager initialize %s OK. \n", dbname.c_str());
 
 	return bFlag;
 }

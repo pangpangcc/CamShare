@@ -18,7 +18,7 @@ FLASH_TIMEOUT=5
 # 日志配置
 [LOG]
 # 日志级别(0-5, 0:关闭, 5:全开)
-LOGLEVEL=4
+LOGLEVEL=3
 # 日志路径
 LOGDIR=log
 # 调试模式(0:关闭, 1:开启)
@@ -31,7 +31,7 @@ PORT=4311
 # IP
 IP=58.64.141.117
 # 服务器对本应用唯一标识,不能重复
-NAME=CAM143
+NAME=CAM007
 #NAME=CAMDEMO
 # 连接成功是否重新验所有证会议室用户
 AUTHORIZATION_ALL_CONFERENCE=1

@@ -15,7 +15,7 @@ else
 CXXFLAGS = -O2 -g
 endif
 
-CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable
+CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable -Wno-write-strings -Wno-narrowing -Wno-unused-variable
 CXXFLAGS +=	-I. -I../ -I../libev
 
 LIBS =		-L. \

@@ -36,6 +36,10 @@ void* KThread::thread_proc_func(void *args){
 }
 
 pthread_t KThread::start(KRunnable *runnable){
+	if( isRunning() ) {
+		return 0;
+	}
+
 	if( runnable != NULL ) {
 		this->m_pKRunnable = runnable;
 	}

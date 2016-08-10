@@ -8,7 +8,7 @@ rm -rf package
 mkdir package
 mkdir ./package/CamShareServer
 
-# package file
+# copy file
 cp -rf camshare-middleware ./package/CamShareServer/
 if [ "$env" = "develop" ]; then
   cp -rf camshare-middleware.config.develop ./package/CamShareServer/camshare-middleware.config
@@ -18,6 +18,8 @@ elif [ "$env" = "operating" ]; then
   cp -rf camshare-middleware.config.operating ./package/CamShareServer/camshare-middleware.config
 fi
 cp -rf ./bin/* ./package/CamShareServer/
+
+# package file
 cd package
 tar zcvf CamShareServer.tar.gz ./CamShareServer
 rm -rf ./CamShareServer

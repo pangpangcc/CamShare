@@ -808,6 +808,9 @@ bool FreeswitchClient::ParseSessionInfo(
 			// 最后一个
 			if( index < session.length() ) {
 				column = session.substr(index, session.length() - index);
+
+				// status
+				status = column;
 			}
 
 			bBreak = true;
@@ -822,9 +825,9 @@ bool FreeswitchClient::ParseSessionInfo(
 			// user
 			user = column;
 		}break;
-		case 8:{
-			// status
-			status = column;
+		case 5:{
+//			// status
+//			status = column;
 		}break;
 		default:break;
 		}

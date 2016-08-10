@@ -32,7 +32,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.3"
+#define VERSION_STRING "1.0.5"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -223,17 +223,19 @@ private:
 
 	/**
 	 * 发送录制文件完成记录到HTTP服务器
-	 * @param	client		HTTP Client
-	 * @param 	record		录制记录
-	 * @param 	success		服务器返回结果
-	 * @param 	errorRecord	参数错误
-	 * @return	发送处理		(成功/失败)
+	 * @param	client			HTTP Client
+	 * @param 	record			录制记录
+	 * @param 	success			服务器返回结果
+	 * @param 	errorRecord		是否参数错误
+	 * @param 	errorCode		服务器错误码
+	 * @return	发送处理			(成功/失败)
 	 */
 	bool SendRecordFinish(
 			HttpClient* client,
 			const Record& record,
 			bool &success,
-			bool &errorRecord
+			bool &errorRecord,
+			string& errorCode
 			);
 
 	/***************************** 外部服务接口 end **************************************/

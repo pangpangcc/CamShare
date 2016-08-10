@@ -34,7 +34,7 @@ public:
 	SqliteManager();
 	virtual ~SqliteManager();
 
-	bool Init();
+	bool Init(const string& dbname);
 	bool Query(char* sql, char*** result, int* iRow, int* iColumn);
 	void FinishQuery(char** result);
 	bool ExecSQL(const char* sql);

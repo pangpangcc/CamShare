@@ -39,48 +39,81 @@ end
 -- 用户信息字符串
 XML_STRING = "";
 
--- 从接口验证用户
-local loginPath = getLoginPath(siteId);
-if( loginPath ~= nil ) then
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. loginPath .. "\n");
-  response = api:execute("curl", loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom);
-  if response ~= nil then
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
-    json = cjson.decode(response);
-    body = json["body"];
-    if body ~= nil then
-      json = cjson.decode(body);
-      
-      result = json["result"];
-      errno = json["errno"];
-      errmsg = json["errmsg"];
-      
-      if result == 1 then
-  --    登陆成功
-        XML_STRING = 
-        [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-        <document type="freeswitch/xml">
-          <section name="directory">
-            <domain name="]] .. req_domain .. [[">
-              <user id="]] .. req_user .. [[" effective_caller_id_number="]] .. req_user .. [[">
-                <params>
-                  <param name="password" value="]] .. "" .. [["/>
-                  <param name="allow-empty-password" value="true"/>
-                  <param name="site-id" value="]] .. siteId .. [["/>
-                </params>
-                <variables>
-                </variables>
-              </user>
-            </domain>
-          </section>
-        </document>]]
-      end
+local support_test = is_support_test();
+local result = 0
+
+-- 判断是否测试帐号
+if support_test == 1 then
+  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "检查是否测试账号\n");
+  local index = string.find(req_user, "^WW%d+$");
+  if index == nil then
+    index = string.find(req_user, "^MM%d+$");
+  end
+  
+  if index ~= nil then
+    value = string.sub(req_user, index, string.len(req_user));
+    local size = string.len(value);
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
+    
+    if( size < 6 ) then
+      result = 1
+      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
+    else 
+      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
     end
   else
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回失败");
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
   end
-else 
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取登录接口失败\n")
+end
+  
+-- 从接口验证用户
+if result == 0 then 
+  local loginPath = getLoginPath(siteId);
+  if( loginPath ~= nil ) then
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. loginPath .. "\n");
+    response = api:execute("curl", loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom);
+    if response ~= nil then
+      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
+      json = cjson.decode(response);
+      body = json["body"];
+      if body ~= nil then
+        json = cjson.decode(body);
+      
+        result = json["result"];
+        errno = json["errno"];
+        errmsg = json["errmsg"];
+      else
+        freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->http返回协议解析失败");
+      end
+    else
+      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回失败");
+    end
+  else
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->没有找到http URL");
+  end
+end
+
+-- 登陆成功
+if result == 1 then
+  freeswitch.consoleLog("CONSOLE", "# 用户登陆成功:\n" .. req_user .. "\n");
+	
+  XML_STRING = 
+  [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+  <document type="freeswitch/xml">
+    <section name="directory">
+      <domain name="]] .. req_domain .. [[">
+        <user id="]] .. req_user .. [[" effective_caller_id_number="]] .. req_user .. [[">
+          <params>
+            <param name="password" value="]] .. "" .. [["/>
+            <param name="allow-empty-password" value="true"/>
+            <param name="site-id" value="]] .. siteId .. [["/>
+          </params>
+          <variables>
+          </variables>
+        </user>
+      </domain>
+    </section>
+  </document>]]
 end
 
 freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")

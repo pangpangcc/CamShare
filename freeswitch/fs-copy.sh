@@ -7,6 +7,7 @@ chmod +x /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh
 
 echo "# copy freeswitch scripts ..."
 cp -rf ./install/scripts/* /usr/local/freeswitch/scripts/
+cp -f ./install/scripts/site_config_develop.lua /usr/local/freeswitch/scripts/site_config.lua
 
 echo "# copy freeswitch conf ..."
 cp -rf ./install/conf/* /usr/local/freeswitch/conf/

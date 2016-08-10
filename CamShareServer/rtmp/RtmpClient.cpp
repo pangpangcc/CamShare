@@ -25,6 +25,7 @@
 RtmpClient::RtmpClient() {
 	// TODO Auto-generated constructor stub
 	mIndex = -1;
+	mUser = "";
 
 	mSession = "";
 	port = 1935;
@@ -61,6 +62,14 @@ void RtmpClient::SetIndex(int index) {
 	mIndex = index;
 }
 
+const string& RtmpClient::GetUser() {
+	return mUser;
+}
+
+bool RtmpClient::IsConnected() {
+	return mbConnected;
+}
+
 void RtmpClient::SetRtmpClientListener(RtmpClientListener *listener) {
 	mpRtmpClientListener = listener;
 }
@@ -69,9 +78,13 @@ bool RtmpClient::Connect(const string& hostName) {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::Connect( "
-			"index : %d "
+			"tid : %d, "
+			"index : '%d', "
+			"hostName : %s "
 			")",
-			mIndex
+			(int)syscall(SYS_gettid),
+			mIndex,
+			hostName.c_str()
 			);
 
 	hostname = hostName;
@@ -87,24 +100,52 @@ bool RtmpClient::Connect(const string& hostName) {
 			if( bFlag ) {
 				mbConnected = true;
 				bFlag = SendConnectPacket();
-//				if( mpRtmpClientListener != NULL ) {
-//					mpRtmpClientListener->OnConnect(this, "");
-//				}
 			}
 		} else {
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"RtmpClient::Connect( "
-					"index : %d, "
-					"TCP connect fail "
+					"tid : %d, "
+					"[Tcp connect fail], "
+					"index : '%d', "
+					"hostName : '%s' "
 					")",
-					mIndex
+					(int)syscall(SYS_gettid),
+					mIndex,
+					hostName.c_str()
 					);
 		}
 	}
 
 	if( !bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::Connect( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"hostName : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				hostName.c_str()
+				);
+
 		Close();
+
+	} else {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::Connect( "
+				"tid : %d, "
+				"[Success], "
+				"index : '%d', "
+				"hostName : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				hostName.c_str()
+				);
 	}
 
 	return bFlag;
@@ -114,28 +155,40 @@ void RtmpClient::Close() {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::Close( "
-			"index : %d, "
-			"port : %u "
+			"tid : %d, "
+			"index : '%d', "
+			"port : %u, "
+			"user : '%s, "
+			"dest : '%s' "
 			")",
+			(int)syscall(SYS_gettid),
 			mIndex,
-			m_socketHandler->GetPort()
+			m_socketHandler->GetPort(),
+			mUser.c_str(),
+			mDest.c_str()
 			);
+
+	if( m_socketHandler ) {
+		m_socketHandler->Shutdown();
+		m_socketHandler->Close();
+	}
+
 	mbConnected = false;
-	m_socketHandler->Shutdown();
-	m_socketHandler->Close();
 }
 
 bool RtmpClient::Login(const string& user, const string& password, const string& site, const string& custom) {
-//	printf("# RtmpClient::Login( start, user : %s, password : %s ) \n", user.c_str(), password.c_str());
+//	printf("# RtmpClient::Login( start, user : '%s, password : %s ) \n", user.c_str(), password.c_str());
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::Login( "
-			"index : %d, "
-			"user : %s, "
+			"tid : %d, "
+			"index : '%d', "
+			"user : '%s, "
 			"password : %s, "
 			"site : %s, "
 			"custom : %s "
 			")",
+			(int)syscall(SYS_gettid),
 			mIndex,
 			user.c_str(),
 			password.c_str(),
@@ -153,16 +206,29 @@ bool RtmpClient::Login(const string& user, const string& password, const string&
 	GetMD5String(temp.c_str(), auth);
 	bFlag = SendLoginPacket(user, auth, site, custom);
 	if( bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::Login( "
+				"tid : %d, "
+				"[Success], "
+				"user : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				user.c_str()
+				);
+		mUser = user;
+
 	} else {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"RtmpClient::Login( "
-				"index : %d, "
-				"fail "
+				"tid : %d, "
+				"[Fail], "
+				"user : '%s' "
 				")",
-				mIndex
+				(int)syscall(SYS_gettid),
+				user.c_str()
 				);
-//		printf("# RtmpClient::Login( fail ) \n");
 	}
 
 	return bFlag;
@@ -173,26 +239,51 @@ bool RtmpClient::MakeCall(const string& dest) {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::MakeCall( "
-			"index : %d, "
-			"dest : %s "
+			"tid : %d, "
+			"index : '%d', "
+			"user : '%s, "
+			"dest : '%s' "
 			")",
+			(int)syscall(SYS_gettid),
 			mIndex,
+			mUser.c_str(),
 			dest.c_str()
 			);
 
 	bool bFlag = false;
+	mDest = dest;
 
 	bFlag = SendMakeCallPacket(dest);
 	if( bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::MakeCall( "
+				"tid : %d, "
+				"[Success], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				dest.c_str()
+				);
 	} else {
 //		printf("# RtmpClient::MakeCall( fail ) \n");
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"RtmpClient::MakeCall( "
-				"index : %d, "
-				"fail "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
 				")",
-				mIndex
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				dest.c_str()
 				);
 	}
 	return bFlag;
@@ -203,9 +294,15 @@ bool RtmpClient::CreatePublishStream() {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"RtmpClient::CreatePublishStream( "
-			"index : %d, "
+			"tid : %d, "
+			"index : '%d', "
+			"user : '%s, "
+			"dest : '%s' "
 			")",
-			mIndex
+			(int)syscall(SYS_gettid),
+			mIndex,
+			mUser.c_str(),
+			mDest.c_str()
 			);
 
 	bool bFlag = false;
@@ -213,14 +310,34 @@ bool RtmpClient::CreatePublishStream() {
 	bFlag = SendCreateStream(STAND_INVOKE_TYPE_PUBLISH);
 
 	if( bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::CreatePublishStream( "
+				"tid : %d, "
+				"[Success], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
+				);
 	} else {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"RtmpClient::CreatePublishStream( "
-				"index : %d, "
-				"fail "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
 				")",
-				mIndex
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
 				);
 //		printf("# RtmpClient::CreatePublishStream( fail ) \n");
 	}
@@ -243,7 +360,21 @@ bool RtmpClient::SendVideoData(const char* data, unsigned int len, unsigned int 
 
 	// 发送包
 	if( !SendRtmpPacket(&packet) ) {
-		printf("# RtmpClient::SendVideoData( fail ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::SendVideoData( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s', "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
+				);
+//		printf("# RtmpClient::SendVideoData( fail ) \n");
 		return false;
 	}
 
@@ -284,11 +415,13 @@ bool RtmpClient::HandShake() {
 	result = m_socketHandler->Send(clientbuf, RTMP_SIG_SIZE + 1);
 	if (result == ISocketHandler::HANDLE_FAIL) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"first step send fail "
+				"tid : %d, "
+				"[First step send fail], "
+				"index : '%d', "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -299,11 +432,13 @@ bool RtmpClient::HandShake() {
 	result = m_socketHandler->Recv((void *)(&type), 1, iLen);
 	if( result == ISocketHandler::HANDLE_FAIL || (1 != iLen) ) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"first step recv type fail "
+				"tid : %d, "
+				"[First step receive type fail], ",
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -312,11 +447,13 @@ bool RtmpClient::HandShake() {
 	result = m_socketHandler->Recv((void *)serversig, RTMP_SIG_SIZE, iLen);
 	if( result == ISocketHandler::HANDLE_FAIL || (RTMP_SIG_SIZE != iLen) ) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"first step recv body fail "
+				"tid : %d, "
+				"[First step receive body fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -332,11 +469,13 @@ bool RtmpClient::HandShake() {
 	result = m_socketHandler->Send((void *)serversig, RTMP_SIG_SIZE);
 	if( result == ISocketHandler::HANDLE_FAIL ) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"second step send fail "
+				"tid : %d, "
+				"[Second step send fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -347,11 +486,13 @@ bool RtmpClient::HandShake() {
 	result = m_socketHandler->Recv((void *)serversig, RTMP_SIG_SIZE, iLen);
 	if( result == ISocketHandler::HANDLE_FAIL || (RTMP_SIG_SIZE != iLen) ) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"second step recv fail "
+				"tid : %d, "
+				"[Second step receive fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -362,11 +503,13 @@ bool RtmpClient::HandShake() {
 	bMatch = (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
 	if (!bMatch) {
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::HandShake( "
-				"index : %d, "
-				"handshake check fail "
+				"tid : %d, "
+				"[Handshake check fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -429,11 +572,13 @@ bool RtmpClient::SendConnectPacket() {
 	if( !SendRtmpPacket(&packet) ) {
 //		printf("# RtmpClient::SendConnectPacket( fail ) \n");
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::SendConnectPacket( "
-				"index : %d, "
-				"fail "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		miNumberInvokes--;
@@ -472,7 +617,22 @@ bool RtmpClient::SendCreateStream(STAND_INVOKE_TYPE type) {
 
 	// 发送包
 	if( !SendRtmpPacket(&packet) ) {
-		printf("# RtmpClient::SendCreateStream( fail ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::SendCreateStream( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
+				);
+
+//		printf("# RtmpClient::SendCreateStream( fail ) \n");
 		miNumberInvokes--;
 		return false;
 	}
@@ -512,7 +672,21 @@ bool RtmpClient::SendPublishPacket() {
 
 	// 发送包
 	if( !SendRtmpPacket(&packet) ) {
-		printf("# RtmpClient::SendPublishPacket( fail ) \n");
+//		printf("# RtmpClient::SendPublishPacket( fail ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::SendPublishPacket( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
+				);
 		return false;
 	}
 
@@ -556,7 +730,19 @@ bool RtmpClient::SendLoginPacket(const string& user, const string& auth, const s
 
 	// 发送包
 	if( !SendRtmpPacket(&packet) ) {
-		printf("# RtmpClient::SendLoginPacket( fail ) \n");
+//		printf("# RtmpClient::SendLoginPacket( fail ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::SendLoginPacket( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str()
+				);
 		return false;
 	}
 
@@ -610,7 +796,21 @@ bool RtmpClient::SendMakeCallPacket(const string& dest) {
 
 	// Send Packet
 	if( !SendRtmpPacket(&packet) ) {
-		printf("# RtmpClient::SendMakeCallPacket( fail ) \n");
+//		printf("# RtmpClient::SendMakeCallPacket( fail ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"RtmpClient::SendMakeCallPacket( "
+				"tid : %d, "
+				"[Fail], "
+				"index : '%d', "
+				"user : '%s, "
+				"dest : '%s' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex,
+				mUser.c_str(),
+				mDest.c_str()
+				);
 		return false;
 	}
 
@@ -619,18 +819,33 @@ bool RtmpClient::SendMakeCallPacket(const string& dest) {
 
 bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 //	printf("# RtmpClient::SendRtmpPacket() \n");
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"RtmpClient::SendRtmpPacket( "
+			"tid : %d, "
+			"[Dump Raw Packet], "
+			"index : '%d' "
+			")",
+			(int)syscall(SYS_gettid),
+			mIndex
+			);
+	// Dump Raw Packet
+	DumpRtmpPacket(packet);
 
 	if( !mbConnected ) {
 		return false;
 	}
 
-	// Change to Absolute Timestamp
-	unsigned int timestamp = packet->messageHeader.GetTimestamp() + (GetTime() - mTimestamp);
-	packet->messageHeader.SetTimestamp(timestamp);
+	unsigned int timestamp = 0;
+//	// Change to Absolute Timestamp
+//	unsigned int timestamp = packet->messageHeader.GetTimestamp() + (GetTime() - mTimestamp);
+//	packet->messageHeader.SetTimestamp(timestamp);
 
+	unsigned int chunkId = -1;
 	unsigned int streamId = -1;
 	unsigned int lastTimestamp = 0;
 	if( mpLastSendPacket != NULL ) {
+		chunkId = mpLastSendPacket->baseHeader.GetChunkId();
 		streamId = mpLastSendPacket->messageHeader.GetStreamId();
 		lastTimestamp = mpLastSendPacket->messageHeader.GetTimestamp();
 
@@ -642,8 +857,8 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 	// Dump packet
 	*mpLastSendPacket = *packet;
 
-	// Same Stream
-	if( streamId == packet->messageHeader.GetStreamId() ) {
+	// Same Chunk && Same Stream
+	if( chunkId == packet->baseHeader.GetChunkId() && streamId == packet->messageHeader.GetStreamId() ) {
 		// Modify ChunkType to Medium
 		packet->baseHeader.SetChunkType(RTMP_HEADER_CHUNK_TYPE_MEDIUM);
 
@@ -654,8 +869,18 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 		packet->messageHeader.SetTimestamp(timestamp);
 	}
 
-	// Dump Packet
-//	DumpRtmpPacket(packet);
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"RtmpClient::SendRtmpPacket( "
+			"tid : %d, "
+			"[Dump Send Packet], "
+			"index : '%d' "
+			")",
+			(int)syscall(SYS_gettid),
+			mIndex
+			);
+	// Dump Send Packet
+	DumpRtmpPacket(packet);
 
 	// Send Header
 	ISocketHandler::HANDLE_RESULT result = ISocketHandler::HANDLE_FAIL;
@@ -663,14 +888,18 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 	if (result == ISocketHandler::HANDLE_FAIL) {
 //		printf("# RtmpClient::SendRtmpPacket( Send Header Fail ) \n");
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::SendRtmpPacket( "
-				"index : %d, "
-				"Send Header Fail "
+				"tid : %d, "
+				"[Send Header Fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
+
 		Close();
+
 		if( mpRtmpClientListener != NULL ) {
 			mpRtmpClientListener->OnDisconnect(this);
 		}
@@ -715,14 +944,18 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 			if (result == ISocketHandler::HANDLE_FAIL) {
 //				printf("# RtmpClient::SendRtmpPacket( Send Body Fail ) \n");
 				LogManager::GetLogManager()->Log(
-						LOG_ERR_USER,
+						LOG_MSG,
 						"RtmpClient::SendRtmpPacket( "
-						"index : %d, "
-						"Send Body Fail "
+						"tid : %d, "
+						"[Send Body Fail], "
+						"index : '%d' "
 						")",
+						(int)syscall(SYS_gettid),
 						mIndex
 						);
+
 				Close();
+
 				if( mpRtmpClientListener != NULL ) {
 					mpRtmpClientListener->OnDisconnect(this);
 				}
@@ -742,14 +975,18 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 			if (result == ISocketHandler::HANDLE_FAIL) {
 //				printf("# RtmpClient::SendRtmpPacket( Send Chunk Separate Fail ) \n");
 				LogManager::GetLogManager()->Log(
-						LOG_ERR_USER,
+						LOG_MSG,
 						"RtmpClient::SendRtmpPacket( "
-						"index : %d, "
-						"Send Chunk Separate Fail "
+						"tid : %d, "
+						"[Send Chunk Separate Fail], "
+						"index : '%d' "
 						")",
+						(int)syscall(SYS_gettid),
 						mIndex
 						);
+
 				Close();
+
 				if( mpRtmpClientListener != NULL ) {
 					mpRtmpClientListener->OnDisconnect(this);
 				}
@@ -763,22 +1000,27 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 
 bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 //	printf("# RtmpClient::RecvRtmpPacket() \n");
-
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"RtmpClient::RecvRtmpPacket( "
-			"index : %d "
+			"tid : %d, "
+			"[Dump Raw Packet], "
+			"index : '%d' "
 			")",
+			(int)syscall(SYS_gettid),
 			mIndex
 			);
+	DumpRtmpPacket(packet);
 
 	if( !mbConnected ) {
 		LogManager::GetLogManager()->Log(
-				LOG_STAT,
+				LOG_MSG,
 				"RtmpClient::RecvRtmpPacket( "
-				"index : %d, "
-				"Disconnected "
+				"tid : %d, "
+				"[Not connected], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		m_socketHandler->Close();
@@ -793,14 +1035,18 @@ bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 	if( ISocketHandler::HANDLE_FAIL == result || (1 != len) ) {
 //		printf("# RtmpClient::RecvRtmpPacket( Read Base Header Header fail ) \n");
 		LogManager::GetLogManager()->Log(
-				LOG_ERR_USER,
+				LOG_MSG,
 				"RtmpClient::RecvRtmpPacket( "
-				"index : %d, "
-				"Read Base Header Header fail "
+				"tid : %d, "
+				"[Read Base Header Header fail], "
+				"index : '%d' "
 				")",
+				(int)syscall(SYS_gettid),
 				mIndex
 				);
+
 		Close();
+
 		if( mpRtmpClientListener != NULL ) {
 			mpRtmpClientListener->OnDisconnect(this);
 		}
@@ -813,14 +1059,18 @@ bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 		if( ISocketHandler::HANDLE_FAIL == result || (packet->GetMessageHeaderLength() != len) ) {
 //			printf("# RtmpClient::RecvRtmpPacket( Read Message Header fail ) \n");
 			LogManager::GetLogManager()->Log(
-					LOG_ERR_USER,
+					LOG_MSG,
 					"RtmpClient::RecvRtmpPacket( "
-					"index : %d, "
-					"Read Message Header Header fail "
+					"tid : %d, "
+					"[Read Message Header Header fail], "
+					"index : '%d' "
 					")",
+					(int)syscall(SYS_gettid),
 					mIndex
 					);
+
 			Close();
+
 			if( mpRtmpClientListener != NULL ) {
 				mpRtmpClientListener->OnDisconnect(this);
 			}
@@ -864,14 +1114,18 @@ bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 		if( ISocketHandler::HANDLE_FAIL == result || (packet->messageHeader.GetBodySize() != len) ) {
 //			printf("# RtmpClient::RecvRtmpPacket( Read Body fail ) \n");
 			LogManager::GetLogManager()->Log(
-					LOG_ERR_USER,
+					LOG_MSG,
 					"RtmpClient::RecvRtmpPacket( "
-					"index : %d, "
-					"Read Body fail "
+					"tid : %d, "
+					"[Read Body fail], "
+					"index : '%d' "
 					")",
+					(int)syscall(SYS_gettid),
 					mIndex
 					);
+
 			Close();
+
 			if( mpRtmpClientListener != NULL ) {
 				mpRtmpClientListener->OnDisconnect(this);
 			}
@@ -902,7 +1156,7 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 			int seq = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 1));
 //			printf("# RtmpClient::ParseRtmpPacket( INVOKE : _result, seq : %u ) \n", seq);
 
-			STAND_INVOKE_TYPE invoke_type;
+			STAND_INVOKE_TYPE invoke_type = STAND_INVOKE_TYPE_UNKNOW;
 			mpStandInvokeMap.Lock();
 			StandInvokeMap::iterator itr = mpStandInvokeMap.Find(seq);
 			if( itr != mpStandInvokeMap.End() ) {
@@ -932,6 +1186,7 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 //				printf("# RtmpClient::ParseRtmpPacket( INVOKE : _result, play, streamId : %u ) \n", streamId);
 
 			}break;
+			default:break;
 			}
 
 		} else if( memcmp(method.av_val, "connected", strlen("connected")) == 0 ) {
@@ -948,10 +1203,13 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
-					"RtmpClient::OnConnect( "
-					"index : %d, "
+					"RtmpClient::ParseRtmpPacket( "
+					"tid : %d, "
+					"[connected], "
+					"index : '%d', "
 					"sessionId : %s "
 					")",
+					(int)syscall(SYS_gettid),
 					mIndex,
 					mSession.c_str()
 					);
@@ -973,10 +1231,13 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
-					"RtmpClient::onLogin( "
-					"index : %d, "
+					"RtmpClient::ParseRtmpPacket( "
+					"tid : %d, "
+					"[onLogin], "
+					"index : '%d', "
 					"bFlag : %s "
 					")",
+					(int)syscall(SYS_gettid),
 					mIndex,
 					bFlag?"true":"false"
 					);
@@ -984,26 +1245,81 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 			if( mpRtmpClientListener != NULL ) {
 				mpRtmpClientListener->OnLogin(this, bFlag);
 			}
-		}
+		} else if( memcmp(method.av_val, "onMakeCall", strlen("onMakeCall")) == 0 ) {
+			// Parse onMakeCall
+			AVal av_channelId;
+			AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &av_channelId);
 
-		// Parse onMakeCall
-		if( memcmp(method.av_val, "onMakeCall", strlen("onMakeCall")) == 0 ) {
+			memcpy(temp, av_channelId.av_val, av_channelId.av_len);
+			temp[av_channelId.av_len] = '\0';
+			string channelId = temp;
+
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
-					"RtmpClient::onMakeCall( "
-					"index : %d "
+					"RtmpClient::ParseRtmpPacket( "
+					"tid : %d, "
+					"[onMakeCall], "
+					"index : '%d', "
+					"channelId : '%s' "
 					")",
-					mIndex
+					(int)syscall(SYS_gettid),
+					mIndex,
+					channelId.c_str()
 					);
 //			printf("# RtmpClient::ParseRtmpPacket( INVOKE : onMakeCall ) \n");
 			if( mpRtmpClientListener != NULL ) {
-				mpRtmpClientListener->OnMakeCall(this, true);
+				mpRtmpClientListener->OnMakeCall(this, true, channelId);
+			}
+		} else if( memcmp(method.av_val, "onHangup", strlen("onHangup")) == 0 ) {
+			// Parse onHangup
+
+			AVal av_channelId;
+			AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &av_channelId);
+
+			memcpy(temp, av_channelId.av_val, av_channelId.av_len);
+			temp[av_channelId.av_len] = '\0';
+			string channelId = temp;
+
+			AVal av_cause;
+			AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &av_cause);
+
+			memcpy(temp, av_cause.av_val, av_cause.av_len);
+			temp[av_cause.av_len] = '\0';
+			string cause = temp;
+
+			LogManager::GetLogManager()->Log(
+					LOG_MSG,
+					"RtmpClient::ParseRtmpPacket( "
+					"tid : %d, "
+					"[onHangup], "
+					"index : '%d', "
+					"channelId : %s, "
+					"cause : %s "
+					")",
+					(int)syscall(SYS_gettid),
+					mIndex,
+					channelId.c_str(),
+					cause.c_str()
+					);
+//			printf("# RtmpClient::ParseRtmpPacket( INVOKE : onMakeCall ) \n");
+			if( mpRtmpClientListener != NULL ) {
+				mpRtmpClientListener->OnHangup(this, channelId, cause);
 			}
 		}
 
 	}break;
 	default:{
 //		printf("# RtmpClient::ParseRtmpPacket( UNKNOW ) \n");
+		LogManager::GetLogManager()->Log(
+				LOG_STAT,
+				"RtmpClient::ParseRtmpPacket( "
+				"tid : %d, "
+				"[UNKNOW], "
+				"index : '%d' "
+				")",
+				(int)syscall(SYS_gettid),
+				mIndex
+				);
 		break;
 	}
 	}
@@ -1012,14 +1328,35 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 }
 
 void RtmpClient::DumpRtmpPacket(RtmpPacket* packet) {
-	printf("# RtmpClient::DumpRtmpPacket( \n"
-			"Format : %u \n"
-			"Chunk Stream ID : %u \n"
-			"Timestamp : %u \n"
-			"Body Size : %u \n"
-			"Type ID : 0x%02x \n"
-			"Stream ID : %u \n"
-			") \n",
+//	printf("# RtmpClient::DumpRtmpPacket( \n"
+//			"Format : %u \n"
+//			"Chunk Stream ID : %u \n"
+//			"Timestamp : %u \n"
+//			"Body Size : %u \n"
+//			"Type ID : 0x%02x \n"
+//			"Stream ID : %u \n"
+//			") \n",
+//			packet->baseHeader.GetChunkType(),
+//			packet->baseHeader.GetChunkId(),
+//			packet->messageHeader.GetTimestamp(),
+//			packet->messageHeader.GetBodySize(),
+//			packet->messageHeader.GetType(),
+//			packet->messageHeader.GetStreamId()
+//			);
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"RtmpClient::DumpRtmpPacket( "
+			"tid : %d, "
+			"index : '%d', "
+			"Format : %u, "
+			"Chunk Stream ID : %u, "
+			"Timestamp : %u, "
+			"Body Size : %u, "
+			"Type ID : 0x%02x, "
+			"Stream ID : %u "
+			")",
+			(int)syscall(SYS_gettid),
+			mIndex,
 			packet->baseHeader.GetChunkType(),
 			packet->baseHeader.GetChunkId(),
 			packet->messageHeader.GetTimestamp(),

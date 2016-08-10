@@ -16,12 +16,12 @@ CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable
-CXXFLAGS +=	-I.
+CXXFLAGS +=	-I. -I../
 
 LIBS =		-L. \
 			-Wl,-Bdynamic -ldl -lz -lpthread
 	
-COMMON  	=	common/LogFile.o common/KThread.o common/IAutoLock.o common/CommonFunc.o
+COMMON  	= ../common/KThread.o ../common/IAutoLock.o ../common/CommonFunc.o
 		
 OBJS	+= $(COMMON)	
 OBJS 	+=	system_test.o

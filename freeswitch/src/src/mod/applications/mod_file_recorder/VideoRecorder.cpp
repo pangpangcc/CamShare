@@ -542,48 +542,55 @@ void VideoRecorder::RecordVideoFrame2FileProc()
 //					, "mod_file_recorder: RecordVideoFrame2FileProc() write finish, inuseSize:%d, bFreak:%d, mcH264Path:%s\n"
 //					, inuseSize, bFreak, mcH264Path);
 
-			// handle i-frame
 			bool isDestroyBuffer = true;
-			if (!bFreak
-				&& inuseSize > 7
-				&& (dataBuffer[currBufferOffset + 6] & 0x80) == 0x80
-				&& ((dataBuffer[currBufferOffset + 7] & 0x1f) == 0x1f
-					|| (dataBuffer[currBufferOffset + 7] & 0x15) == 0x15)	// nalu type IDR
-				)
+			if (!bFreak)
 			{
-				// 传到截图buffer & 不释放
-				if (NULL != mpPicThread) {
-					RenewPicBuffer(buffer);
-					isDestroyBuffer = false;
+				// handle i-frame
+				bool isIFrame = IsIFrame(dataBuffer + currBufferOffset, inuseSize);
+				if (isIFrame)
+				{
+					// 传到截图buffer & 不释放
+					if (NULL != mpPicThread) {
+						RenewPicBuffer(buffer);
+						isDestroyBuffer = false;
+					}
 				}
 
-				// log for test
-//				uint8_t* frameData = dataBuffer + currBufferOffset;
-//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: RecordVideoFrame2FileProc()"
-//					  " inuseSize:%d, bFreak:%d\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					, inuseSize, bFreak
-//					, frameData[0], frameData[1], frameData[2], frameData[3], frameData[4], frameData[5], frameData[6], frameData[7]
-//					, frameData[8], frameData[9], frameData[10], frameData[11], frameData[12], frameData[13], frameData[14], frameData[15]
-//					, frameData[16], frameData[17], frameData[18], frameData[19], frameData[20], frameData[21], frameData[22], frameData[23]);
-			}
-
-			// log for test
-			{
-//				uint8_t* frameData = dataBuffer + currBufferOffset;
-//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: RecordVideoFrame2FileProc()"
-//					  " inuseSize:%d, bFreak:%d\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					  "0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x\n"
-//					, inuseSize, bFreak
-//					, frameData[0], frameData[1], frameData[2], frameData[3], frameData[4], frameData[5], frameData[6], frameData[7]
-//					, frameData[8], frameData[9], frameData[10], frameData[11], frameData[12], frameData[13], frameData[14], frameData[15]
-//					, frameData[16], frameData[17], frameData[18], frameData[19], frameData[20], frameData[21], frameData[22], frameData[23]);
+//				if (!isDestroyBuffer)
+//				{
+//					// log for test
+//					uint8_t* frameData = dataBuffer + currBufferOffset;
+//
+//					const int logBufferSize = H264_BUFFER_SIZE;
+//					char logBuffer[logBufferSize] = {0};
+//					char logItemBuffer[32] = {0};
+//					const int maxPrintSize = 64;
+//					int theMaxPrintSize = (inuseSize > maxPrintSize ? maxPrintSize : inuseSize);
+//					for (int i = 0; i < theMaxPrintSize; i++)
+//					{
+//						snprintf(logItemBuffer, sizeof(logItemBuffer)
+//								, "0x%02x"
+//								, frameData[i]);
+//
+//						strcat(logBuffer, logItemBuffer);
+//
+//						if (7 == i % 8
+//							|| theMaxPrintSize == i + 1)
+//						{
+//							strcat(logBuffer, "\n");
+//						}
+//						else {
+//							strcat(logBuffer, ", ");
+//						}
+//					}
+//
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: RecordVideoFrame2FileProc()"
+//						  " inuseSize:%d, bFreak:%d, isDestroyBuffer:%d, isIFrame:%d, mpPicBuffer:%p\n"
+//						  "%s"
+//						, inuseSize, bFreak, isDestroyBuffer, isIFrame, mpPicBuffer
+//						, logBuffer);
+//				}
 			}
 
 			if (isDestroyBuffer)
@@ -669,13 +676,106 @@ void VideoRecorder::RecordPicture2FileProc()
 		// 等下一个周期
 		while (mbRunning && getCurrentTime() < endTime)
 		{
-			usleep(1000 * 1000);
+			usleep(200 * 1000);
 		}
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //			, "mod_file_recorder: RecordPicture2FileProc() stop, handle:%p\n"
 //			, mpHandle);
+}
+
+// 判断是否i帧
+bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
+{
+	bool isIFrame = false;
+	static const unsigned char nalHead[] = {0x00, 0x00, 0x00, 0x01};
+	static const int nalHeadSize = sizeof(nalHead);
+
+	static const int nalSpsSize = 45;
+	static const int nalPpsSize = 4;
+	static const int nalTypeSize = 1;
+
+	static const unsigned char nalIdcBit = 0x60;
+	static const unsigned char nalIdcBitOff = 5;
+	static const unsigned char nalTypeBit = 0x1F;
+
+	int currNalOffset = 0;
+	unsigned char nalTypeCount = 0;
+	unsigned char nalType = 0;
+
+	if (inuse > nalHeadSize)
+	{
+		if (0 == memcmp(nalHead, data, nalHeadSize))
+		{
+			nalTypeCount = data[currNalOffset + 4] & nalIdcBit;
+			nalTypeCount = nalTypeCount >> 5;
+		}
+		else {
+//			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//				, "mod_file_recorder: IsIFrame() memcmp() false\n");
+		}
+
+		unsigned char i = 0;
+		for (i = 0; i < nalTypeCount; i++)
+		{
+			if (inuse < currNalOffset + nalHeadSize + nalTypeSize) {
+				// end
+				break;
+			}
+
+			if (0 == memcmp(nalHead, data + currNalOffset, nalHeadSize))
+			{
+				nalType = data[currNalOffset + nalHeadSize] & nalTypeBit;
+				if (5 == nalType) {
+					// IDR (i frame)
+					isIFrame = true;
+
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: IsIFrame() nalType:%d, isIFrame:%d\n"
+//						, nalType, isIFrame);
+					break;
+				}
+				else if (7 == nalType) {
+					// SPS set it i frame
+					isIFrame = true;
+					break;
+
+					// SPS (offset SPS size + nal head size)
+//					currNalOffset += nalHeadSize + nalSpsSize;
+//
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: IsIFrame() nalType:%d, nalHeadSize:%d, nalSpsSize:%d, currNalOffset:%d\n"
+//						, nalType, nalHeadSize, nalSpsSize, currNalOffset);
+				}
+				else if (8 == nalType) {
+					// PPS (offset PPS size + nal head size)
+					currNalOffset += nalHeadSize + nalPpsSize;
+
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: IsIFrame() nalType:%d, nalHeadSize:%d, nalPpsSize:%d, currNalOffset:%d\n"
+//						, nalType, nalHeadSize, nalPpsSize, currNalOffset);
+				}
+				else {
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//						, "mod_file_recorder: IsIFrame() nalType:%d, currNalOffset:%d\n"
+//						, nalType, currNalOffset);
+				}
+			}
+			else {
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: IsIFrame() memcmp() false, currNalOffset:%d, nalHeadSize:%d\n"
+//					, currNalOffset, nalHeadSize);
+			}
+		}
+	}
+	else {
+//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: IsIFrame() inuse > nalHeadSize false, inuse:%d, nalHeadSize:%d\n"
+//			, inuse, nalHeadSize);
+	}
+
+	return isIFrame;
 }
 
 switch_status_t VideoRecorder::buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* nalu_buffer, switch_bool_t& nalu_28_start)
@@ -806,8 +906,8 @@ void VideoRecorder::RunCloseShell()
 		// build shell处理文件
 		// shell h264Path mp4Path jpgPath userId siteId startTime
 		char cmd[MAX_PATH_LENGTH] = {0};
-		snprintf(cmd, sizeof(cmd), "%s '%s' '%s' '%s' '%s' '%s' '%s'"
-				, mcCloseShell, mcH264Path, mp4Path, mcPicPath
+		snprintf(cmd, sizeof(cmd), "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s'"
+				, mcCloseShell, mcH264Path, mp4Path, mcPicPath, mcPicH264Path
 				, userId, siteId, startStandardTime);
 
 		// log for test
@@ -1180,6 +1280,12 @@ bool VideoRecorder::BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffe
 						, mcPicH264Path);
 		}
 	}
+
+	// error
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+		, "mod_file_recorder: BuildPicH264File() result:%d, path:%s\n"
+		, result, mcPicH264Path);
+
 	return result;
 }
 

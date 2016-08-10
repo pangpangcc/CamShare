@@ -18,7 +18,11 @@ DBHandler::~DBHandler() {
 }
 
 bool DBHandler::Init() {
-	return (mSqliteManager.Init() && CreateTable());
+	return (
+			mSqliteManager.Init("local.db") &&
+			mSqliteManagerError.Init("local_error.db") &&
+			CreateTable()
+			);
 }
 
 bool DBHandler::CreateTable() {
@@ -51,9 +55,37 @@ bool DBHandler::CreateTable() {
 		return false;
 	}
 
+	sprintf(sql,
+			"CREATE TABLE IF NOT EXISTS record_error("
+						"ID INTEGER PRIMARY KEY AUTOINCREMENT,"
+						"conference TEXT,"
+						"siteid TEXT,"
+						"filepath TEXT,"
+						"starttime TEXT,"
+						"endtime TEXT,"
+						"errorcode TEXT"
+						");"
+	);
+
+	if( !mSqliteManagerError.ExecSQL(sql) ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::CreateTable( "
+				"tid : %d, "
+				"[创建录制完成上传失败记录表, 失败]"
+				"sql : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				sql
+				);
+
+		return false;
+	}
+
 	return true;
 }
 
+/***************************** 录制完成记录 **************************************/
 bool DBHandler::InsertRecord(const Record& record) {
 	char sql[2048] = {0};
 	snprintf(sql, sizeof(sql) - 1,
@@ -154,8 +186,19 @@ bool DBHandler::RemoveRecord(const Record& record) {
 	bool bResult = false;
 	char sql[2048] = {'\0'};
 
-	sprintf(sql, "DELETE FROM record WHERE conference = '%s' AND siteid = '%s';", record.conference.c_str(), record.siteId.c_str());
+	sprintf(sql, "DELETE FROM record WHERE id = '%s';", record.id.c_str());
 	bResult = mSqliteManager.ExecSQL(sql);
+
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"DBHandler::RemoveRecord( "
+			"tid : %d, "
+			"[删除录制完成记录]"
+			"sql : %s "
+			")",
+			(int)syscall(SYS_gettid),
+			sql
+			);
 
 	if( !bResult ) {
 		LogManager::GetLogManager()->Log(
@@ -236,4 +279,46 @@ bool DBHandler::GetRecordsCount(unsigned int& getSize) {
 	}
 
 	return bResult;
+}
+/***************************** 录制完成记录 end **************************************/
+
+bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode) {
+	char sql[2048] = {0};
+	snprintf(sql, sizeof(sql) - 1,
+			"REPLACE INTO record_error(`conference`, `siteid`, `filepath`, `starttime`, `endtime`, 'errorcode') VALUES('%s', '%s', '%s', '%s', '%s', '%s')",
+			record.conference.c_str(),
+			record.siteId.c_str(),
+			record.filePath.c_str(),
+			record.startTime.c_str(),
+			record.endTime.c_str(),
+			errorCode.c_str()
+			);
+
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"DBHandler::InsertErrorRecord( "
+			"tid : %d, "
+			"[插入录制完成上传失败记录], "
+			"sql : %s "
+			")",
+			(int)syscall(SYS_gettid),
+			sql
+			);
+
+	if( !mSqliteManagerError.ExecSQL(sql) ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::InsertErrorRecord( "
+				"tid : %d, "
+				"[插入录制完成上传失败记录, 失败]"
+				"sql : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				sql
+				);
+
+		return false;
+	}
+
+	return true;
 }

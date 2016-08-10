@@ -70,6 +70,8 @@ public:
 	 * 初始化
 	 */
 	bool Init();
+
+	/***************************** 录制完成记录 **************************************/
 	/**
 	 * 插入录制完成记录
 	 */
@@ -90,6 +92,14 @@ public:
 	 * 获取录制完成记录剩余数量
 	 */
 	bool GetRecordsCount(unsigned int& getSize);
+	/***************************** 录制完成记录 end **************************************/
+
+	/**
+	 * 插入录制完成上传失败记录
+	 * @param	record		记录
+	 * @param	errorCode	错误码
+	 */
+	bool InsertErrorRecord(const Record& record, const string& errorCode);
 
 private:
 	/**
@@ -97,7 +107,15 @@ private:
 	 */
 	bool CreateTable();
 
+	/**
+	 * 录制完成记录库
+	 */
 	SqliteManager mSqliteManager;
+
+	/**
+	 * 录制完成上传失败记录库
+	 */
+	SqliteManager mSqliteManagerError;
 };
 
 #endif /* DBHANDLER_H_ */

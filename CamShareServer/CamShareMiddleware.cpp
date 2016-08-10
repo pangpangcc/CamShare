@@ -943,6 +943,7 @@ void CamShareMiddleware::UploadRecordsHandle() {
 	HttpClient client;
 	bool success = false;
 	bool errorRecord = false;
+	string errorCode = "";
 	bool bFlag = false;
 
 	while( IsRunning() ) {
@@ -952,18 +953,22 @@ void CamShareMiddleware::UploadRecordsHandle() {
 		if( getSize > 0 ) {
 			for(int i = 0; i < getSize; i++) {
 				// 发送记录到服务器
-				bFlag = SendRecordFinish(&client, records[i], success, errorRecord);
+				bFlag = SendRecordFinish(&client, records[i], success, errorRecord, errorCode);
 
 				// 删除本地记录
 				mDBHandler.RemoveRecord(records[i]);
 
 				if( bFlag ) {
 					// 发送成功
-					break;
+					if( !success ) {
+						// 服务器返回失败
+						mDBHandler.InsertErrorRecord(records[i], errorCode);
+					}
 
 				} else {
 					// 发送失败
 					if( !errorRecord ) {
+						// 不是本地参数错误
 						// 有效记录, 插回本地库
 						mDBHandler.InsertRecord(records[i]);
 					}
@@ -1903,11 +1908,13 @@ bool CamShareMiddleware::SendRecordFinish(
 		HttpClient* client,
 		const Record& record,
 		bool &success,
-		bool &errorRecord
+		bool &errorRecord,
+		string& errorCode
 		) {
 	bool bFlag = false;
 	success = false;
 	errorRecord = false;
+	errorCode = "";
 
 	const char* respond = NULL;
 	int respondSize = 0;
@@ -1979,9 +1986,20 @@ bool CamShareMiddleware::SendRecordFinish(
 			Json::Value root;
 			Json::Reader reader;
 			if( reader.parse(respond, root, false) ) {
-				if( root["result"].isInt() && root["result"].asInt() == 1 ) {
-					// 上传成功
-					success = true;
+				if( root["result"].isInt() ) {
+					int result = root["result"].asInt();
+					switch(result) {
+					case 0:{
+						// 上传失败
+						if( root["errno"].isString() ) {
+							errorCode = root["errno"].asString();
+						}
+					}break;
+					case 1:{
+						// 上传成功
+						success = true;
+					}break;
+					}
 				}
 			}
 		}

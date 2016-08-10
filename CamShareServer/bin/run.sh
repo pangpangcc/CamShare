@@ -6,10 +6,10 @@
 #chmod +x /usr/local/freeswitch/bin/fs_cli
 
 # 停止程序
-./stop.sh
+/usr/local/CamShareServer/stop.sh
 
 # 开放权限
-./ulimit.sh
+/usr/local/CamShareServer/ulimit.sh
 
 # 运行camshare-middlewarecd
 cd /usr/local/CamShareServer/ && nohup ./camshare-middleware -f ./camshare-middleware.config 2>&1>/dev/null &

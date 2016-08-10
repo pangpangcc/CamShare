@@ -371,6 +371,7 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Socket Accept Error [%s]\n", strerror(errno));
 					} else {
 						rtmp_session_t *rsession = NULL;
+						int32_t ret = 0;
 
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Setting socket\n");
 
@@ -382,24 +383,39 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't disable Nagle.\n");
 						}
 
-						if (switch_socket_opt_set(newsocket, SWITCH_SO_KEEPALIVE, 1)) {
-							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPALIVE.\n");
+						ret = switch_socket_opt_set(newsocket, SWITCH_SO_KEEPALIVE, 1);
+						if (ret != 0) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPALIVE, ret:%d.\n", ret);
 						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "set socket KEEPALIVE success.\n");
+//						}
 
 						// 间隔idle秒没有数据包，则发送keepalive包；若对端回复，则等idle秒再发keepalive包
-						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPIDLE, 60)) {
-							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPIDLE.\n");
+						ret = switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPIDLE, 60);
+						if (ret != 0) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPIDLE, ret:%d.\n", ret);
 						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "set socket KEEPIDLE success.\n");
+//						}
 
 						// 若发送keepalive对端没有回复，则间隔intvl秒再发送keepalive包
-						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPINTVL, 20)) {
-							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPINTVL.\n");
+						ret = switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPINTVL, 20);
+						if (ret != 0) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPINTVL, ret:%d.\n", ret);
 						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "set socket KEEPINTVL success.\n");
+//						}
 
 						// 若发送keepalive包，超过keepcnt次没有回复就认为断线
 						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPCNT, 3)) {
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket KEEPCNT.\n");
 						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "set socket KEEPCNT success.\n");
+//						}
 
 						if (rtmp_session_request(io->base.profile, &rsession) != SWITCH_STATUS_SUCCESS) {
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "RTMP session request failed\n");
@@ -512,16 +528,16 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 						rsession->handle_count++;
 						switch_queue_push(io->handle_queue, (void*)rsession);
 						// print log
-						if (NULL == rsession->account || NULL == rsession->account->user) {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Push to handle queue, uuid:%s, handle_count:%d\n"
-									, rsession->uuid, rsession->handle_count);
-						}
-						else {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Push to handle queue, uuid:%s, user:%s, handle_count:%d\n"
-									, rsession->uuid, rsession->account->user, rsession->handle_count);
-						}
+//						if (NULL == rsession->account || NULL == rsession->account->user) {
+//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//									, "Push to handle queue, uuid:%s, handle_count:%d\n"
+//									, rsession->uuid, rsession->handle_count);
+//						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//									, "Push to handle queue, uuid:%s, user:%s, handle_count:%d\n"
+//									, rsession->uuid, rsession->account->user, rsession->handle_count);
+//						}
 					}
 					switch_mutex_unlock(rsession->handle_count_mutex);
 				}
@@ -647,16 +663,16 @@ void *SWITCH_THREAD_FUNC rtmp_handle_thread(switch_thread_t *thread, void *obj)
 			switch_mutex_lock(rsession->handle_count_mutex);
 			rsession->handle_count--;
 			// print log
-			if (NULL == rsession->account || NULL == rsession->account->user) {
-				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-						, "Pop queue and handle finish, uuid:%s, handle_count:%d\n"
-						, rsession->uuid, rsession->handle_count);
-			}
-			else {
-				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-						, "Pop queue and handle finish, uuid:%s, user:%s, handle_count:%d\n"
-						, rsession->uuid, rsession->account->user, rsession->handle_count);
-			}
+//			if (NULL == rsession->account || NULL == rsession->account->user) {
+//				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//						, "Pop queue and handle finish, uuid:%s, handle_count:%d\n"
+//						, rsession->uuid, rsession->handle_count);
+//			}
+//			else {
+//				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//						, "Pop queue and handle finish, uuid:%s, user:%s, handle_count:%d\n"
+//						, rsession->uuid, rsession->account->user, rsession->handle_count);
+//			}
 			switch_mutex_unlock(rsession->handle_count_mutex);
 		}
 	}

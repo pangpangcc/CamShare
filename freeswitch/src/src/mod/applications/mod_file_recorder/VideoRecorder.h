@@ -49,6 +49,8 @@ private:
 	void RecycleFreeBuffer(switch_buffer_t* buffer);
 	// 释放空闲队列里所有buffer及空闲队列
 	void DestroyFreeBufferQueue();
+	// 判断是否i帧
+	bool IsIFrame(const uint8_t* data, switch_size_t inuse);
 
 	// ----- 视频录制处理函数 -----
 	// 解析h264，并组为h264带分隔符帧数据包

@@ -26,6 +26,7 @@ typedef enum STAND_INVOKE_TYPE {
 	STAND_INVOKE_TYPE_CONNECT,
 	STAND_INVOKE_TYPE_PUBLISH,
 	STAND_INVOKE_TYPE_PLAY,
+	STAND_INVOKE_TYPE_UNKNOW
 } STAND_INVOKE_TYPE;
 typedef KSafeMap<unsigned int, STAND_INVOKE_TYPE> StandInvokeMap;
 
@@ -46,7 +47,8 @@ public:
 	virtual void OnConnect(RtmpClient* client, const string& sessionId) = 0;
 	virtual void OnDisconnect(RtmpClient* client) = 0;
 	virtual void OnLogin(RtmpClient* client, bool bSuccess) = 0;
-	virtual void OnMakeCall(RtmpClient* client, bool bSuccess) = 0;
+	virtual void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) = 0;
+	virtual void OnHangup(RtmpClient* client, const string& channelId, const string& cause) = 0;
 	virtual void OnCreatePublishStream(RtmpClient* client) = 0;
 };
 
@@ -57,6 +59,8 @@ public:
 
 	int GetIndex();
 	void SetIndex(int i);
+	const string& GetUser();
+	bool IsConnected();
 
 	void SetRtmpClientListener(RtmpClientListener *listener);
 	bool Connect(const string& hostName);
@@ -68,8 +72,6 @@ public:
 
 	bool RecvRtmpPacket(RtmpPacket* packet);
 	RTMP_PACKET_TYPE ParseRtmpPacket(RtmpPacket* packet);
-
-	int mIndex;
 
 private:
 	void DumpRtmpPacket(RtmpPacket* packet);
@@ -104,6 +106,10 @@ private:
 	unsigned short port;
 	string hostname;
 	string app;
+
+	int mIndex;
+	string mUser;
+	string mDest;
 
 	bool mbConnected;
 	string mSession;

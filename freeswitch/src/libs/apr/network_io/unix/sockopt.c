@@ -152,26 +152,29 @@ apr_status_t apr_socket_opt_set(apr_socket_t *sock,
             apr_set_option(sock, APR_SO_REUSEADDR, on);
         }
         break;
+    // add by samson 2016-07-28
     case APR_SO_TCP_KEEPIDLE:
 #if defined(TCP_KEEPIDLE)
-       if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPIDLE, (void *)&on, sizeof(int)) == -1) {
+       if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPIDLE, (void *)&on, sizeof(int)) < 0) {
 			return errno;
 		}
 #endif
     	break;
     case APR_SO_TCP_KEEPINTVL:
 #if defined(TCP_KEEPINTVL)
-        if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPINTVL, (void *)&on, sizeof(int)) == -1) {
+        if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPINTVL, (void *)&on, sizeof(int)) < 0) {
  			return errno;
  		}
 #endif
     	break;
     case APR_SO_TCP_KEEPCNT:
 #if defined(TCP_KEEPCNT)
-        if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPCNT, (void *)&on, sizeof(int)) == -1) {
+        if (setsockopt(sock->socketdes, SOL_TCP, TCP_KEEPCNT, (void *)&on, sizeof(int)) < 0) {
  			return errno;
  		}
 #endif
+        break;
+    // end
     case APR_SO_SNDBUF:
 #ifdef SO_SNDBUF
         if (setsockopt(sock->socketdes, SOL_SOCKET, SO_SNDBUF, (void *)&on, sizeof(int)) == -1) {
