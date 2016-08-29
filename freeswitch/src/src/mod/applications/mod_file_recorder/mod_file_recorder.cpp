@@ -8,33 +8,19 @@
 
 #include <switch.h>
 #include "VideoRecorder.h"
+#include "VideoRecordManager.h"
 
 //static const char modname[] = "mod_file_record";
 static char *supported_formats[SWITCH_MAX_CODECS] = { 0 };
 
-struct video_record {
-	char mp4dir[MAX_PATH_LENGTH];
-	char closeshell[MAX_PATH_LENGTH];
-};
-typedef struct video_record video_record_t;
+// 视频录制管理器
+static VideoRecordManager g_videoRecordMgr;
 
-struct pic_record {
-	int picinterval;
-	char pich264dir[MAX_PATH_LENGTH];
-	char picdir[MAX_PATH_LENGTH];
-	char picshell[MAX_PATH_LENGTH];
-};
-typedef struct pic_record pic_record_t;
-
+// 初始化global参数
 struct record {
 	switch_file_interface_t* file_interface;
-	switch_memory_pool_t* pool;
-	switch_queue_t* free_recorder_queue;
-	video_record_t video;
-	pic_record_t pic;
 };
 typedef struct record record_t;
-
 static record_t record_globals;
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load);
@@ -74,9 +60,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load)
 //	switch_application_interface_t *app_interface;
 	int i = 0;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: load()\n");
-
-	memset(&record_globals, 0, sizeof(record_globals));
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: load()\n");
 
 //	supported_formats[i++] = "av";
 //	supported_formats[i++] = "rtmp";
@@ -101,17 +85,14 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load)
 	record_globals.file_interface->file_set_string = record_file_set_string;
 	record_globals.file_interface->file_get_string = record_file_get_string;
 
-	// 变量赋值
-	record_globals.pool = pool;
-
-	// 生成VideoRecorder可用队列
-	switch_queue_create(&record_globals.free_recorder_queue, SWITCH_CORE_QUEUE_LEN, record_globals.pool);
-
 	// 添加到api
 	SWITCH_ADD_API(api_interface, "file_recorder", "custom file recorder", file_recorder_api_function, "");
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: load() finish, pool:%p\n"
-			, pool);
+	// 初始化VideoRecordManager
+	g_videoRecordMgr.Init(pool);
+
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: load() finish, pool:%p\n"
+//			, pool);
 
 	return SWITCH_STATUS_SUCCESS;
 }
@@ -125,6 +106,18 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_file_recorder_shutdown)
 bool LoadConfig()
 {
 	bool result = false;
+
+	// 视频处理参数
+	char mp4Dir[MAX_PATH_LENGTH] = {0};
+	char closeShell[MAX_PATH_LENGTH] = {0};
+	int videoThreadCount = 0;
+	int videoCloseThreadCount = 1;
+	// 监控图片处理参数
+	char picH264Dir[MAX_PATH_LENGTH] = {0};
+	char picDir[MAX_PATH_LENGTH] = {0};
+	char picShell[MAX_PATH_LENGTH] = {0};
+	int picInterval = 0;
+	int picThreadCount = 0;
 
 	const char *cf = "file_recorder.conf";
 	switch_xml_t cfg, xml, settings, param;
@@ -141,36 +134,49 @@ bool LoadConfig()
 //						, "mod_file_recorder: name:%s, value:%s\n", var, val);
 
 				if (strcmp(var, "mp4-dir") == 0) {
-					strcpy(record_globals.video.mp4dir, val);
+					strcpy(mp4Dir, val);
 				}
 				else if (strcmp(var, "close-shell") == 0) {
-					strcpy(record_globals.video.closeshell, val);
+					strcpy(closeShell, val);
+				}
+				else if (strcmp(var, "video-thread") == 0) {
+					videoThreadCount = atoi(val);
+				}
+				else if (strcmp(var, "video-close-thread") == 0) {
+					videoCloseThreadCount = atoi(val);
 				}
 				else if (strcmp(var, "pic-interval") == 0) {
-					record_globals.pic.picinterval = atoi(val);
+					picInterval = atoi(val);
 				}
 				else if (strcmp(var, "pic-h264-dir") == 0) {
-					strcpy(record_globals.pic.pich264dir, val);
+					strcpy(picH264Dir, val);
 				}
 				else if (strcmp(var, "pic-dir") == 0) {
-					strcpy(record_globals.pic.picdir, val);
+					strcpy(picDir, val);
 				}
 				else if (strcmp(var, "pic-shell") == 0) {
-					strcpy(record_globals.pic.picshell, val);
+					strcpy(picShell, val);
+				}
+				else if (strcmp(var, "pic-thread") == 0) {
+					picThreadCount = atoi(val);
 				}
 			}
 		}
 		switch_xml_free(xml);
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-				, "mod_file_recorder: LoadConfig() mp4dir:%s, closeshell:%s"
-				  ", picinterval:%d, pich264dir:%s, picdir:%s, picshell:%s\n"
-				, record_globals.video.mp4dir, record_globals.video.closeshell
-				, record_globals.pic.picinterval, record_globals.pic.pich264dir, record_globals.pic.picdir, record_globals.pic.picshell);
+	result = g_videoRecordMgr.InitConfigure(mp4Dir, closeShell, videoThreadCount, videoCloseThreadCount
+				, picH264Dir, picDir, picShell, picInterval, picThreadCount);
 
-	result = (strlen(record_globals.video.mp4dir) > 0
-			&& strlen(record_globals.video.closeshell) > 0);
+	if (!result) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+					, "mod_file_recorder: LoadConfig() fail, mp4dir:%s, closeshell:%s, videothread:%d, videoCloseThread:%d"
+					  ", picthread:%d, picinterval:%d, pich264dir:%s, picdir:%s, picshell:%s"
+					  ", result:%d\n"
+					, mp4Dir, closeShell, videoThreadCount, videoCloseThreadCount
+					, picThreadCount, picInterval, picH264Dir, picDir, picShell
+					, result);
+	}
 
 	return result;
 }
@@ -189,27 +195,31 @@ static switch_status_t record_file_open(switch_file_handle_t *handle, const char
 {
 	switch_status_t status = SWITCH_STATUS_FALSE;
 
-	VideoRecorder* recorder = GetVideoRecorder();
-	if( NULL != recorder ) {
-		handle->private_info = (void *)recorder;
-		if( LoadConfig()
-			&& recorder->StartRecord(handle, path, record_globals.video.mp4dir, record_globals.video.closeshell
-					, record_globals.pic.pich264dir, record_globals.pic.picdir
-					, record_globals.pic.picshell, record_globals.pic.picinterval) )
-		{
-			/**
-			 * 增加支持视频
-			 */
-			switch_set_flag(handle, SWITCH_FILE_FLAG_VIDEO);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: open() handle:%p, path:%s\n"
+//					, handle, path);
 
-			// 创建文件成功
-			status = SWITCH_STATUS_SUCCESS;
-		}
+	// 开始录制
+	if( LoadConfig()
+		&& g_videoRecordMgr.StartRecord(handle, path) )
+	{
+		/**
+		 * 增加支持视频
+		 */
+		switch_set_flag(handle, SWITCH_FILE_FLAG_VIDEO);
+
+		// 创建文件成功
+		status = SWITCH_STATUS_SUCCESS;
+	}
+	else {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+						, "mod_file_recorder: open() fail, handle:%p, path:%s\n"
+						, handle, path);
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-					, "mod_file_recorder: open() handle:%p, status:%d\n"
-					, handle, status);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: open() handle:%p, status:%d\n"
+//					, handle, status);
 
 	return status;
 }
@@ -218,16 +228,12 @@ static switch_status_t record_file_close(switch_file_handle_t *handle)
 {
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-					, "mod_file_recorder: close() recorder:%p\n"
-					, handle->private_info);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: close() handle:%p\n"
+//					, handle);
 
-	VideoRecorder* recorder = (VideoRecorder *)handle->private_info;
-	if( recorder ) {
-		recorder->StopRecord();
-		RecycleVideoRecorder(recorder);
-	}
-	handle->private_info = NULL;
+	// 停止录制
+	g_videoRecordMgr.StopRecord(handle);
 
 	return status;
 }
@@ -256,11 +262,17 @@ static switch_status_t record_file_write_video(switch_file_handle_t *handle, swi
 {
 	switch_status_t status = SWITCH_STATUS_FALSE;
 
-	VideoRecorder* recorder = (VideoRecorder *)handle->private_info;
-	if( recorder ) {
-		if( recorder->RecordVideoFrame(frame) ) {
-			status = SWITCH_STATUS_SUCCESS;
-		}
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: write_video() handle:%p, frame:%p\n"
+//					, handle, frame);
+
+	if( g_videoRecordMgr.RecordVideoFrame(handle, frame) ) {
+		status = SWITCH_STATUS_SUCCESS;
+	}
+	else {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+						, "mod_file_recorder: write_video() fail, handle:%p\n"
+						, handle);
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -283,20 +295,4 @@ static switch_status_t record_file_set_string(switch_file_handle_t *handle, swit
 static switch_status_t record_file_get_string(switch_file_handle_t *handle, switch_audio_col_t col, const char **string)
 {
 	return SWITCH_STATUS_SUCCESS;
-}
-
-static VideoRecorder* GetVideoRecorder()
-{
-	VideoRecorder* recorder = NULL;
-	if (SWITCH_STATUS_SUCCESS != switch_queue_trypop(record_globals.free_recorder_queue, (void**)&recorder)) {
-		recorder = new VideoRecorder;
-	}
-	return recorder;
-}
-
-static void RecycleVideoRecorder(VideoRecorder* recorder)
-{
-	if (NULL != recorder) {
-		switch_queue_trypush(record_globals.free_recorder_queue, (void*)recorder);
-	}
 }

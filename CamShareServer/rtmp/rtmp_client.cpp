@@ -11,6 +11,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
+#include <stdlib.h>
 
 #include <string>
 using namespace std;
@@ -21,7 +23,10 @@ using namespace std;
 
 #define VERSION_STRING "1.0.0"
 
-#define MAX_CLIENT 100
+#define SERVER_IP "192.168.88.152"
+#define MAX_CLIENT 130
+#define RECONN_MAX_TIME_MS (20*1000*1000)
+#define RECONN_CHECK_INTERVAL (200*1000)
 
 unsigned char frame0[] = {
 		0x17,0x00,0x00,0x00,0x00,0x01,0x42,0x00,0x1f,0xff,0xe1,0x00,0x19,0x67,0x42,0x80,
@@ -287,6 +292,7 @@ unsigned int timestamps[] = {
 		298,
 };
 
+bool gStart = false;
 void SignalFunc(int sign_no);
 
 RtmpClient client[MAX_CLIENT];
@@ -375,16 +381,23 @@ public:
 	}
 protected:
 	void onRun() {
-		while( true ) {
-			if( mContainer->Connect("192.168.88.152") ) {
+		while( gStart ) {
+			if( mContainer->Connect(SERVER_IP) ) {
+				printf("Connected, index:%d\n", mContainer->GetIndex());
 				RtmpPacket recvPacket;
 				while( mContainer->RecvRtmpPacket(&recvPacket) ) {
 					RTMP_PACKET_TYPE type = mContainer->ParseRtmpPacket(&recvPacket);
 					recvPacket.FreeBody();
 				}
-				break;
 			}
-			usleep(500 * 1000);
+			printf("Disconnect, index:%d, start:%d\n", mContainer->GetIndex(), gStart);
+
+			int randtime = rand() % RECONN_MAX_TIME_MS;
+			while (randtime > 0 && gStart) {
+				int waittime = (randtime > RECONN_CHECK_INTERVAL ? RECONN_CHECK_INTERVAL : randtime);
+				randtime -= waittime;
+				usleep(waittime);
+			}
 		}
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
@@ -420,7 +433,7 @@ public:
 				);
 
 		char temp[1024];
-		sprintf(temp, "WW%d@192.168.88.152", client->GetIndex());
+		sprintf(temp, "WW%d@%s", client->GetIndex(), SERVER_IP);
 		client->Login(temp, "123456", "1", "sid=SESSION123456&userType=1");
 	}
 
@@ -516,7 +529,12 @@ public:
 				cause.c_str(),
 				client
 				);
-		client->Close();
+//		client->Close();
+
+		// retry MakeCall
+		char temp[1024];
+		sprintf(temp, "WW%d|||PC0|||1", client->GetIndex());
+		client->MakeCall(temp);
 	}
 
 private:
@@ -558,12 +576,33 @@ int main(int argc, char *argv[]) {
 	LogManager::GetLogManager()->Start(LOG_MSG, "log");
 	LogManager::GetLogManager()->SetDebugMode(true);
 
+	gStart = true;
 	for(int i = 0; i < MAX_CLIENT; i++) {
 		client[i].SetRtmpClientListener(&gRtmpClientListenerImp);
 		client[i].SetIndex(i);
 		ClientRunnable* runnable = new ClientRunnable(&(client[i]));
 		clientThreads[i] = new KThread();
 		clientThreads[i]->start(runnable);
+
+		usleep(100 * 1000);
+	}
+
+	// test reconnect
+	bool testReconnect = true;
+	if (testReconnect) {
+		sleep(30);
+                srand(time(NULL));
+		while (gStart) {
+			for (int i = 0; i < MAX_CLIENT && gStart; i++) {
+				int randtime = rand() % RECONN_MAX_TIME_MS;
+				while (randtime > 0 && gStart) {
+					int waittime = (randtime > RECONN_CHECK_INTERVAL ? RECONN_CHECK_INTERVAL : randtime);
+					randtime -= waittime;
+					usleep(waittime);
+				}
+				client[i].Close();
+			}
+		}
 	}
 
 	for(int i = 0; i < MAX_CLIENT; i++) {
@@ -582,6 +621,7 @@ void SignalFunc(int sign_no) {
 	LogManager::GetLogManager()->Log(LOG_ERR_SYS, "main( Get signal : %d )", sign_no);
 	LogManager::GetLogManager()->LogFlushMem2File();
 
+	gStart = false;
 	switch(sign_no) {
 	default:{
 		for(int i = 0; i < MAX_CLIENT; i++) {

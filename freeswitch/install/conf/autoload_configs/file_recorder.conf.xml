@@ -10,6 +10,14 @@
     <!-- 视频录制结束执行的脚本路径 -->
     <param name="close-shell" value="/usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh"/>
     
+    <!-- video handle thread -->
+    <!-- 录制视频处理线程数 -->
+    <param name="video-thread" value="4"/>
+    
+    <!-- video record over handle(video transcode) thread -->
+    <!-- 录制结束处理线程数(转码) -->        
+    <param name="video-close-thread" value="1"/>
+    
     <!-- ===== cut picture setting ===== -->
     <!-- picture source directory -->
     <!--  生成i帧h264文件的路径 -->
@@ -26,6 +34,10 @@
     <!-- cut picture interval(millisecond) -->
     <!-- 生成i帧jpeg文件的时间间隔(毫秒) -->
     <param name="pic-interval" value="1000"/>
+    
+    <!-- picture handle thread -->
+    <!-- 生成监控图处理线程数 -->
+    <param name="pic-thread" value="2"/>
     
   </settings>
 </configuration>

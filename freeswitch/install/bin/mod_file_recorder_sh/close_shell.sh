@@ -59,7 +59,7 @@ fi
 # -- build mp4 file 
 mp4filename=$userid'_'$starttime'-'$endtime'.mp4'
 mp4filepath=$mp4filedir$mp4filename
-tranvideo_cmd="ffmpeg -i $h264path -y -vcodec copy -map 0 -movflags faststart $mp4filepath"
+tranvideo_cmd="/usr/local/bin/ffmpeg -i $h264path -y -vcodec copy -map 0 -movflags faststart $mp4filepath"
 tranvideo_log=`$tranvideo_cmd 2>&1`
 #PrintLog "$mp4filepath"
 #PrintLog "build mp4 file finish"

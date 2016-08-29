@@ -25,21 +25,23 @@ chmod +x $updatedir/update.sh
 
 # ---- copy freeswitch files
 # copy all ./lib & ./mod files
-mkdir -p $updatefiledir/mod
-cp -f /usr/local/freeswitch/mod/* $updatefiledir/mod/
-mkdir -p $updatefiledir/lib
-cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
+#mkdir -p $updatefiledir/mod
+#cp -f /usr/local/freeswitch/mod/* $updatefiledir/mod/
+#mkdir -p $updatefiledir/lib
+#cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
 
 # copy shell
 cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiledir/
+cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh $updatefiledir/
 
 # copy mod_file_recorder files
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $upatefiledir/
 
 # copy mod_rtmp files
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
 
 # copy freeswitch scripts
 #cp -f ./freeswitch/install/scripts/* $updatefiledir/
@@ -70,8 +72,8 @@ cp -f ./CamShareServer/camshare-middleware $updatefiledir/
 #fi
 
 # copy camshare shell
-#cp -f ./CamShareServer/bin/run.sh $updatefiledir/
-#cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
+cp -f ./CamShareServer/bin/run.sh $updatefiledir/
+cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
 #cp -f ./CamShareServer/bin/check_run.sh $updatefiledir/
 
 # build package

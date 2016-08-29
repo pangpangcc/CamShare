@@ -19,6 +19,7 @@ public:
 	VideoRecorder();
 	virtual ~VideoRecorder();
 
+// 对外接口函数
 public:
 	// 开始录制
 	bool StartRecord(switch_file_handle_t *handle
@@ -26,18 +27,28 @@ public:
 			, const char* pich264dir, const char* picdir, const char* picshell, int picinterval);
 	// 停止录制
 	void StopRecord();
+	// 是否正在视频录制
+	bool IsRecord();
+	// 设置视频是否正在处理
+	void SetVideoHandling(bool isHandling);
+	// 设置监控截图是否正在处理
+	void SetPicHandling(bool isHandling);
+
 	// 录制视频frame
 	bool RecordVideoFrame(switch_frame_t *frame);
-	// 是否正在运行
-	bool IsRunning();
 
-private:
-	// 视频录制线程
-	static void* SWITCH_THREAD_FUNC RecordVideoFrame2FileThread(switch_thread_t* thread, void* obj);
-	void RecordVideoFrame2FileProc();
-	// 监控截图线程
-	static void* SWITCH_THREAD_FUNC RecordPicture2FileThread(switch_thread_t* thread, void* obj);
-	void RecordPicture2FileProc();
+	// 判断是否可Reset
+	bool CanReset();
+	// 重置(包括重置参数及执行close_shell)
+	void Reset();
+
+// 外部线程调用函数
+public:
+	// 视频录制处理函数
+	bool RecordVideoFrame2FileProc();
+	void PutVideoBuffer2FileProc();
+	// 监控截图处理函数
+	bool RecordPicture2FileProc();
 
 private:
 	// ----- 公共处理函数 -----
@@ -87,6 +98,8 @@ private:
 	bool BuildPicFilePath(const char* srcPath, const char* dir);
 	// 重建pic缓冲
 	bool RenewPicBuffer(switch_buffer_t* buffer);
+	// pop出pic缓冲
+	switch_buffer_t* PopPicBuffer();
 	// 生成截图
 	bool BuildPicture(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen);
 	// 生成截图的H264文件
@@ -95,9 +108,6 @@ private:
 	bool RunPictureShell();
 
 private:
-	bool mbRunning;
-	switch_mutex_t*		mpMutex;
-
 	char mcH264Path[2048];
 	char mcMp4Dir[2048];
 	char mcCloseShell[2048];
@@ -105,21 +115,34 @@ private:
 	switch_file_handle_t*	mpHandle;
 	FILE*	mpFile;
 
+	// 视频录制处理
+	bool mIsRecord;							// 是否启动视频录制
+	bool mHasStartRecord;					// 是否曾经启动视频录制
+	bool mIsVideoHandling;					// 是否视频正在处理中
+//	switch_mutex_t*		mpVideoMutex;		// 视频录制锁
 	switch_queue_t*		mpVideoQueue;		// 完成组h264包的buffer队列
-	switch_thread_t*	mpVideoThread;		// 视频录制线程
 	switch_queue_t*		mpFreeBufferQueue;	// 空闲buffer队列
 
-	switch_memory_pool_t*	mpMemoryPool;
-	switch_bool_t 		mbNaluStart;
-	switch_buffer_t*	mpNaluBuffer;
+	switch_memory_pool_t*	mpMemoryPool;	// 内存池
+	switch_bool_t 		mbNaluStart;		//
+	switch_buffer_t*	mpNaluBuffer;		// 帧buffer
+	uint8_t* 			mpVideoDataBuffer;	// 视频文件缓存
+	uint32_t			miVideoDataBufferSize;	// 视频文件缓存size
+	uint32_t			miVideoDataBufferLen;	// 视频文件缓存使用长度
+	// for test
+	uint32_t			miCreateBufferCount;	// 创建buffer统计
 
+	// 监控图片生成
+	bool mIsPicHandling;					// 是否监控截图正在处理中
+	switch_mutex_t*		mpPicMutex;			// 监控截图处理锁
 	char mcPicH264Path[2048];
 	char mcPicPath[2048];
 	char mcPicShell[2048];
-	switch_thread_t*	mpPicThread;
 	int					miPicInterval;
-	switch_buffer_t*	mpPicBuffer;
-	switch_mutex_t*		mpPicMutex;
+	switch_buffer_t*	mpPicBuffer;		// 待生成图片的视频帧buffer
+	long long			mlPicBuildTime;		// 生成图片时间
+	uint8_t* 			mpPicDataBuffer;	// 监控图片h264数据缓存
+	uint32_t			miPicDataBufferSize;	// 监控图片h264数据缓存size
 };
 
 #endif /* SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDER_H_ */

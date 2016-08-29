@@ -52,8 +52,20 @@ cp ./CamShareServer/package/* ./package/camshare/
 chmod +x install.sh
 cp ./install.sh ./package/camshare/
 
-# package all
+# enter package folder
 cd package
-tar zcvf camshare_$env.tar.gz camshare
+
+# build package release folder
+releasedir="../package_release"
+mkdir -p $releasedir
+
+# define release package path
+pkgpath="$releasedir/camshare_$env.tar.gz"
+
+# remove old release package file
+rm $pkgpath
+
+# package all
+tar zcvf $pkgpath camshare
 rm -rf camshare
 cd ..

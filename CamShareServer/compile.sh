@@ -8,5 +8,5 @@ chmod +x ./bin/*
 
 # compile
 chmod +x ./configure
-./configure
+./configure &&
 make

@@ -14,8 +14,6 @@
 # 运行camshare-middlewarecd
 cd /usr/local/CamShareServer/ && nohup ./camshare-middleware -f ./camshare-middleware.config 2>&1>/dev/null &
 
-sleep 5;
-
 # 运行freeswitch
 cd /usr/local/freeswitch/bin && ./freeswitch -nc
 

@@ -685,7 +685,8 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 {
 	char *szport;
 	switch_sockaddr_t *sa;
-	switch_threadattr_t *thd_attr = NULL;
+	switch_threadattr_t *thd_handle_attr = NULL;
+	switch_threadattr_t *thd_timeout_attr = NULL;
 	rtmp_io_tcp_t *io_tcp;
 
 	io_tcp = (rtmp_io_tcp_t*)switch_core_alloc(pool, sizeof(rtmp_io_tcp_t));
@@ -759,10 +760,11 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 	switch_list_create(&io_tcp->timeout_list, pool);
 	// ------------------------
 
-	switch_threadattr_create(&thd_attr, pool);
-	switch_threadattr_detach_set(thd_attr, 1);
-	switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
-	switch_thread_create(&io_tcp->thread, thd_attr, rtmp_io_tcp_thread, *new_io, pool);
+	switch_threadattr_create(&thd_handle_attr, pool);
+	switch_threadattr_detach_set(thd_handle_attr, 1);
+	switch_threadattr_stacksize_set(thd_handle_attr, SWITCH_THREAD_STACKSIZE);
+	switch_threadattr_priority_set(thd_handle_attr, SWITCH_PRI_IMPORTANT);
+	switch_thread_create(&io_tcp->thread, thd_handle_attr, rtmp_io_tcp_thread, *new_io, pool);
 
 	// add by Samson 2016-05-18
 	// create handle threads
@@ -771,7 +773,7 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 		io_tcp->handle_thread = (switch_thread_t**)switch_core_alloc(pool, profile->handle_thread * sizeof(switch_thread_t*));
 		for (i = 0; i < profile->handle_thread; i++)
 		{
-			switch_thread_create(&io_tcp->handle_thread[i], thd_attr, rtmp_handle_thread, *new_io, pool);
+			switch_thread_create(&io_tcp->handle_thread[i], thd_handle_attr, rtmp_handle_thread, *new_io, pool);
 		}
 	}
 
@@ -780,7 +782,11 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 
 	// add by Samson 2016-05-28
 	// create timeout thread
-	switch_thread_create(&(io_tcp->timeout_thread), thd_attr, check_timeout_thread, *new_io, pool);
+	switch_threadattr_create(&thd_timeout_attr, pool);
+	switch_threadattr_detach_set(thd_timeout_attr, 1);
+	switch_threadattr_stacksize_set(thd_timeout_attr, SWITCH_THREAD_STACKSIZE);
+	switch_threadattr_priority_set(thd_timeout_attr, SWITCH_PRI_LOW);
+	switch_thread_create(&(io_tcp->timeout_thread), thd_timeout_attr, check_timeout_thread, *new_io, pool);
 	// ------------------------
 
 	return SWITCH_STATUS_SUCCESS;
