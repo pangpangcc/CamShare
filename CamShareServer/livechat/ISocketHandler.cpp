@@ -302,11 +302,11 @@ public:
 			if ( IsBlock() )
 			{
 				// blocking send
-				int total = 0;
+				unsigned int total = 0;
 				while (true) {
 					int iSent = send(m_socket, (const char*)data, dataLen, 0);
 					if (iSent > 0) {
-						total += iSent;
+						total += (unsigned int)iSent;
 					}
 					else {
 						break;

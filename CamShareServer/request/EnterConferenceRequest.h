@@ -13,6 +13,11 @@
 #include <FreeswitchClient.h>
 #include <livechat/ILiveChatClient.h>
 
+typedef enum EnterConferenceRequestCheckType {
+	Timer = 0,
+	Active,
+} EnterConferenceRequestCheckType;
+
 class EnterConferenceRequest : public BaseRequest {
 public:
 	EnterConferenceRequest();
@@ -28,10 +33,18 @@ public:
 			const string& fromId,
 			const string& toId,
 			MemberType type,
-			const string& key
+			EnterConferenceRequestCheckType checkType
 			);
 
 	MemberType GetMemberType();
+
+	string GetKey();
+
+	static string GetIdentify(
+			const string& fromId,
+			const string& toId,
+			const string& key
+			);
 
 private:
 	FreeswitchClient* mpFreeswitch;
@@ -42,6 +55,7 @@ private:
 	string mToId;
 	MemberType mType;
 	string mKey;
+	EnterConferenceRequestCheckType mCheckType;
 };
 
 #endif /* ENTERCONFERENCERequest_H_ */

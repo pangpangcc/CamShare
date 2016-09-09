@@ -25,6 +25,7 @@
 
 #include <request/IRequest.h>
 #include <respond/IRespond.h>
+#include <request/EnterConferenceRequest.h>
 
 #include <livechat/ILiveChatClient.h>
 
@@ -32,7 +33,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.5"
+#define VERSION_STRING "1.0.6"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -67,6 +68,7 @@ typedef KSafeMap<ILiveChatClient*, Session*> LiveChat2SessionMap;
 class StateRunnable;
 class ConnectLiveChatRunnable;
 class ConnectFreeswitchRunnable;
+class CheckConferenceRunnable;
 class UploadRecordsRunnable;
 class HttpClient;
 
@@ -107,6 +109,11 @@ public:
 	 * 连接Freeswitch
 	 */
 	void ConnectFreeswitchHandle();
+
+	/**
+	 *	验证会议室用户权限
+	 */
+	void CheckConferenceHandle();
 
 	/**
 	 * 同步本地录制完成记录
@@ -155,7 +162,7 @@ public:
 	void OnConnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnDisconnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
-	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
+	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvKickUserFromConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
 	/***************************** 外部服务(LiveChat), 任务回调 end **************************************/
 
@@ -194,7 +201,8 @@ private:
 			const string& fromId,
 			const string& toId,
 			MemberType type,
-			const string& serverId
+			const string& serverId,
+			EnterConferenceRequestCheckType checkType = Timer
 			);
 
 	/**
@@ -325,11 +333,6 @@ private:
 	 */
 	string mLivechatName;
 
-	/**
-	 * Livechat连接成功是否重新验所有证会议室用户
-	 */
-	bool mAuthorization;
-
 	/***************************** Livechat参数 end **************************************/
 
 	/***************************** Freeswitch参数 **************************************/
@@ -363,6 +366,11 @@ private:
 	 */
 	string mFreeswitchRecordingPath;
 
+	/**
+	 * Freeswitch定时验证会议室所有用户时间间隔(秒)
+	 */
+	unsigned int mAuthorizationTime;
+
 	/***************************** Freeswitch参数 end **************************************/
 
 	/***************************** 站点参数 **************************************/
@@ -394,11 +402,19 @@ private:
 	 */
 	ConnectLiveChatRunnable* mpConnectLiveChatRunnable;
 	KThread mLiveChatConnectThread;
+
 	/**
 	 * 连接Freeswitch线程
 	 */
 	ConnectFreeswitchRunnable* mpConnectFreeswitchRunnable;
 	KThread mConnectFreeswitchThread;
+
+	/**
+	 * 定时验证会议室用户权限线程
+	 */
+	CheckConferenceRunnable* mpCheckConferenceRunnable;
+	KThread mCheckConferenceThread;
+
 	/**
 	 * 同步本地录制完成记录线程
 	 */
@@ -413,11 +429,6 @@ private:
 	unsigned int mTotal;
 	unsigned int mResponed;
 	KMutex mCountMutex;
-
-	/**
-	 * 发送进入会议室请求数目
-	 */
-	unsigned int miSendEnterConference;
 
 	/**
 	 * 监听线程输出间隔

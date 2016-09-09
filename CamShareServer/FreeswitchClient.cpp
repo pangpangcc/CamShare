@@ -120,9 +120,11 @@ bool FreeswitchClient::Proceed(
 			mpFreeswitchClientListener->OnFreeswitchConnect(this);
 		}
 
+		mCmdMutex.lock();
 		status = esl_events(&mFreeswitch, ESL_EVENT_TYPE_JSON,
 				"CHANNEL_CREATE CHANNEL_DESTROY "
 				"CUSTOM conference::maintenance rtmp::login rtmp::disconnect");
+		mCmdMutex.unlock();
 
 		if( status == ESL_SUCCESS ) {
 			LogManager::GetLogManager()->Log(
@@ -144,30 +146,32 @@ bool FreeswitchClient::Proceed(
 
 			esl_event_t *event = NULL;
 			while( bFlag ) {
+				mCmdMutex.lock();
 				status = esl_recv_event_timed(&mFreeswitch, 100, 1, &event);
 				if( status == ESL_SUCCESS ) {
 					if( event != NULL ) {
 						FreeswitchEventHandle(event);
 						esl_event_safe_destroy(&event);
 					}
+					mCmdMutex.unlock();
 				} else if( status == ESL_BREAK ) {
 					usleep(100 * 1000);
+					mCmdMutex.unlock();
 					continue;
 				} else {
+					LogManager::GetLogManager()->Log(
+							LOG_ERR_USER,
+							"CamShareiddleware::Proceed( "
+							"tid : %d, "
+							"[Freeswitch, 连接断开] "
+							")",
+							(int)syscall(SYS_gettid)
+							);
+					esl_disconnect(&mFreeswitch);
+					mCmdMutex.unlock();
 					break;
 				}
 			}
-
-			LogManager::GetLogManager()->Log(
-					LOG_ERR_USER,
-					"CamShareiddleware::Proceed( "
-					"tid : %d, "
-					"[Freeswitch, 连接断开] "
-					")",
-					(int)syscall(SYS_gettid)
-					);
-
-			esl_disconnect(&mFreeswitch);
 
 			// 清空通话
 			mRtmpChannel2UserMap.Lock();
@@ -412,15 +416,17 @@ string FreeswitchClient::GetUserBySession(const string& session) {
 			session.c_str()
 			);
 
-	mRtmpSessionMap.Lock();
-	RtmpUserMap::iterator itr = mRtmpUserMap.Find(session);
-	if( itr != mRtmpUserMap.End() ) {
-		user = itr->second;
-	}
-	mRtmpSessionMap.Unlock();
+	if( session.length() > 0 ) {
+		mRtmpSessionMap.Lock();
+		RtmpUserMap::iterator itr = mRtmpUserMap.Find(session);
+		if( itr != mRtmpUserMap.End() ) {
+			user = itr->second;
+		}
+		mRtmpSessionMap.Unlock();
 
-	if( user.length() == 0 ) {
-		user = GetUserBySessionDirect(session);
+		if( user.length() == 0 ) {
+			user = GetUserBySessionDirect(session);
+		}
 	}
 
 	LogManager::GetLogManager()->Log(
@@ -553,65 +559,40 @@ bool FreeswitchClient::SendCommandGetResult(const string& command, string& resul
 			command.c_str()
 			);
 
-	if( mFreeswitch.connected == 1 ) {
-		esl_event_t* event = NULL;
-		esl_status_t status = esl_send_recv(&mFreeswitch, command.c_str());
-		if( status == ESL_SUCCESS ) {
-			bFlag = true;
-			LogManager::GetLogManager()->Log(
-					LOG_STAT,
-					"FreeswitchClient::SendCommandGetResult( "
-					"tid : %d, "
-					"[Freeswitch, 发送命令, 成功] "
-					")",
-					(int)syscall(SYS_gettid)
-					);
+	mCmdMutex.lock();
+	esl_event_t* event = NULL;
+	esl_status_t status = esl_send_recv(&mFreeswitch, command.c_str());
+	if( status == ESL_SUCCESS ) {
+		bFlag = true;
+		LogManager::GetLogManager()->Log(
+				LOG_STAT,
+				"FreeswitchClient::SendCommandGetResult( "
+				"tid : %d, "
+				"[Freeswitch, 发送命令, 成功] "
+				")",
+				(int)syscall(SYS_gettid)
+				);
 
-			event = mFreeswitch.last_sr_event;
-			if( event != NULL && event->body != NULL ) {
-				result = event->body;
-			} else if( mFreeswitch.last_sr_reply != NULL ){
-				result = mFreeswitch.last_sr_reply;
-			}
-
-//			if( event != NULL && event->body != NULL ) {
-//				LogManager::GetLogManager()->Log(
-//						LOG_STAT,
-//						"FreeswitchClient::SendCommandGetResult( "
-//						"tid : %d, "
-//						"[Freeswitch, 发送命令, 命令返回], "
-//						"mFreeswitch.last_sr_event->body : \n%s\n"
-//						")",
-//						(int)syscall(SYS_gettid),
-//						mFreeswitch.last_sr_event->body
-//						);
-//			}
-//			if( mFreeswitch.last_sr_reply != NULL ){
-//				LogManager::GetLogManager()->Log(
-//						LOG_STAT,
-//						"FreeswitchClient::SendCommandGetResult( "
-//						"tid : %d, "
-//						"[Freeswitch, 发送命令, 命令返回], "
-//						"mFreeswitch.last_sr_reply : \n%s\n"
-//						")",
-//						(int)syscall(SYS_gettid),
-//						mFreeswitch.last_sr_reply
-//						);
-//			}
-
-			LogManager::GetLogManager()->Log(
-					LOG_STAT,
-					"FreeswitchClient::SendCommandGetResult( "
-					"tid : %d, "
-					"[Freeswitch, 发送命令, 命令返回], "
-					"result : \n%s\n"
-					")",
-					(int)syscall(SYS_gettid),
-					result.c_str()
-					);
-
+		event = mFreeswitch.last_sr_event;
+		if( event != NULL && event->body != NULL ) {
+			result = event->body;
+		} else if( mFreeswitch.last_sr_reply != NULL ){
+			result = mFreeswitch.last_sr_reply;
 		}
+
+		LogManager::GetLogManager()->Log(
+				LOG_STAT,
+				"FreeswitchClient::SendCommandGetResult( "
+				"tid : %d, "
+				"[Freeswitch, 发送命令, 命令返回], "
+				"result : \n%s\n"
+				")",
+				(int)syscall(SYS_gettid),
+				result.c_str()
+				);
+
 	}
+	mCmdMutex.unlock();
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
@@ -913,7 +894,7 @@ bool FreeswitchClient::AuthorizationAllConference() {
 
 			TiXmlHandle handle( &doc );
 			while ( true ) {
-				TiXmlHandle conferenceHandle = handle.FirstChild( "conferences" ).Child( "conference", i );
+				TiXmlHandle conferenceHandle = handle.FirstChild( "conferences" ).Child( "conference", i++ );
 				if ( conferenceHandle.ToNode() == NULL ) {
 					// 没有更多会议室
 					LogManager::GetLogManager()->Log(
@@ -945,11 +926,11 @@ bool FreeswitchClient::AuthorizationAllConference() {
 					string uuId = "";
 					string user = "";
 					string memberId = "";
-					MemberType type = Member;
+					MemberType memberType = Member;
 					int j = 0;
 
 					while( true ) {
-						TiXmlHandle memberHandle = conferenceHandle.FirstChild( "members" ).Child( "member", j );
+						TiXmlHandle memberHandle = conferenceHandle.FirstChild( "members" ).Child( "member", j++ );
 						if ( memberHandle.ToNode() == NULL ) {
 							// 没有更多会员
 							LogManager::GetLogManager()->Log(
@@ -965,47 +946,61 @@ bool FreeswitchClient::AuthorizationAllConference() {
 							break;
 						}
 
-						TiXmlElement* uuidElement = memberHandle.FirstChild("uuid").ToElement();
-						if( uuidElement ) {
-							uuId = uuidElement->GetText();
-							sessionId = GetSessionIdByUUID(uuId);
-							user = GetUserBySession(sessionId);
-						}
+						const char* type = memberHandle.ToElement()->Attribute("type");
+						LogManager::GetLogManager()->Log(
+								LOG_STAT,
+								"FreeswitchClient::AuthorizationAllConference( "
+								"tid : %d, "
+								"[Freeswitch, 重新验证当前所有会议室用户, 获取到会员], "
+								"conferenceName : %s, "
+								"type : %s "
+								")",
+								(int)syscall(SYS_gettid),
+								conferenceName.c_str(),
+								type
+								);
 
-						TiXmlElement* memberIdElement = memberHandle.FirstChild("id").ToElement();
-						if( memberIdElement ) {
-							memberId = memberIdElement->GetText();
-						}
+						if( strcmp(type, "caller") == 0 ) {
+							TiXmlElement* uuidElement = memberHandle.FirstChild("uuid").ToElement();
+							if( uuidElement ) {
+								uuId = uuidElement->GetText();
+								sessionId = GetSessionIdByUUID(uuId);
+								user = GetUserBySession(sessionId);
+							}
 
-						TiXmlElement* moderatorElement = memberHandle.FirstChild("flags").FirstChild("is_moderator").ToElement();
-						if( moderatorElement ) {
-							if( strcmp(moderatorElement->GetText(), "true") == 0 ) {
-								type = Moderator;
+							TiXmlElement* memberIdElement = memberHandle.FirstChild("id").ToElement();
+							if( memberIdElement ) {
+								memberId = memberIdElement->GetText();
+							}
+
+							TiXmlElement* moderatorElement = memberHandle.FirstChild("flags").FirstChild("is_moderator").ToElement();
+							if( moderatorElement ) {
+								if( strcmp(moderatorElement->GetText(), "true") == 0 ) {
+									memberType = Moderator;
+								}
+							}
+
+							if( user.length() > 0 && conferenceName.length() > 0 ) {
+								string serverId = GetChannelParam(uuId, "serverId");
+								string siteId = GetChannelParam(uuId, "siteId");
+
+								// 插入channel
+								Channel channel(user, conferenceName, memberType, memberId, serverId, siteId);
+							    CreateChannel(uuId, channel);
+
+							    // 回调重新验证聊天室用户
+								if( mpFreeswitchClientListener ) {
+									mpFreeswitchClientListener->OnFreeswitchEventConferenceAuthorizationMember(this, &channel);
+								}
 							}
 						}
 
-						if( user.length() > 0 && conferenceName.length() > 0 ) {
-							string serverId = GetChannelParam(uuId, "serverId");
-							string siteId = GetChannelParam(uuId, "siteId");
-
-							// 插入channel
-							Channel channel(user, conferenceName, type, memberId, serverId, siteId);
-						    CreateChannel(uuId, channel);
-
-						    // 回调重新验证聊天室用户
-							if( mpFreeswitchClientListener ) {
-								mpFreeswitchClientListener->OnFreeswitchEventConferenceAuthorizationMember(this, &channel);
-							}
-						}
-
-						j++;
 					}
+					// 获取会议室成员结束
 				}
-
-				i++;
 			}
+			// 获取会议室结束
 		}
-
 	}
 
 	if( !bFlag ) {

@@ -31,43 +31,6 @@
  */
 
 #include "mod_rtmp.h"
-// add by Samson 2016-05-18
-#include "switch_list.h"
-// ------------------------
-
-/* Locally-extended version of rtmp_io_t */
-struct rtmp_io_tcp {
-	rtmp_io_t base;
-
-	switch_pollset_t *pollset;
-	switch_pollfd_t *listen_pollfd;
-	switch_socket_t *listen_socket;
-	const char *ip;
-	switch_port_t port;
-	switch_thread_t *thread;
-	switch_mutex_t *mutex;
-
-	// add by Samson 2016-05-18
-	// multi thread to process rtmp logic
-	switch_thread_t** handle_thread;
-	switch_queue_t* handle_queue;
-	// ------------------------
-
-	// add by Samson 2016-05-28
-	// check connection timeout(client is connected but not to send any data for long time)
-	switch_thread_t* timeout_thread;
-	switch_list_t* timeout_list;
-	// ------------------------
-};
-
-typedef struct rtmp_io_tcp rtmp_io_tcp_t;
-
-struct rtmp_tcp_io_private {
-	switch_pollfd_t *pollfd;
-	switch_socket_t *socket;
-};
-
-typedef struct rtmp_tcp_io_private rtmp_tcp_io_private_t;
 
 // add by Samson 2016-05-30
 #include <sys/time.h>
@@ -297,7 +260,6 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 	rtmp_io_tcp_t *io = (rtmp_io_tcp_t*)obj;
 	switch_list_node_t* node = NULL;
 	rtmp_session_t *rsession = NULL;
-	rtmp_tcp_io_private_t *io_pvt = NULL;
 	long long nowTime = 0;
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s: Check Connection Timeout Thread starting\n", io->base.profile->name);
@@ -315,8 +277,7 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "check_timeout_thread() shutdown, node:%p\n"
 							, (void*)node);
 
-					io_pvt = (rtmp_tcp_io_private_t*)rsession->io_private;
-					switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
+					rtmp_session_shutdown(&rsession);
 				}
 				else {
 					break;
@@ -508,16 +469,16 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 					}
 					else {
 						// print log
-						if (NULL == rsession->account || NULL == rsession->account->user) {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Wait to close socket, uuid:%s, handle_count:%d\n"
-									, rsession->uuid, handle_count);
-						}
-						else {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Wait to close socket, uuid:%s, user:%s, handle_count:%d\n"
-									, rsession->uuid, rsession->account->user, handle_count);
-						}
+//						if (NULL == rsession->account || NULL == rsession->account->user) {
+//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//									, "Wait to close socket, uuid:%s, handle_count:%d\n"
+//									, rsession->uuid, handle_count);
+//						}
+//						else {
+//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+//									, "Wait to close socket, uuid:%s, user:%s, handle_count:%d\n"
+//									, rsession->uuid, rsession->account->user, handle_count);
+//						}
 					}
 				}
 				else if (fds[i].rtnevents & SWITCH_POLLIN) {
@@ -625,8 +586,7 @@ void rtmp_handle_proc(rtmp_session_t *rsession)
 	result = rtmp_handle_data(rsession);
 	if (result != SWITCH_STATUS_SUCCESS)
 	{
-		rtmp_tcp_io_private_t *io_pvt = (rtmp_tcp_io_private_t*)rsession->io_private;
-		switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
+		rtmp_session_shutdown(&rsession);
 
 		if (NULL == rsession->account || NULL == rsession->account->user) {
 			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG

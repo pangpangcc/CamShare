@@ -875,6 +875,17 @@ RTMP_INVOKE_FUNCTION(rtmp_i_log)
 	return SWITCH_STATUS_SUCCESS;
 }
 
+// Add by Max 4 Heart beat
+RTMP_INVOKE_FUNCTION(rtmp_i_setActive)
+{
+	rtmp_send_invoke_free(rsession, 3, 0, 0,
+		amf0_str("onActive"),
+		amf0_number_new(0),
+		amf0_null_new(),
+		NULL);
+
+	return SWITCH_STATUS_SUCCESS;
+}
 /* For Emacs:
  * Local Variables:
  * mode:c

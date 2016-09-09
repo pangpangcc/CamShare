@@ -7,8 +7,8 @@
 
 #include "SessionManager.h"
 
-#define SEQ_TYPE		"seq"
-#define CUSTOM_TYPE		"custom"
+#define SEQ_TYPE		"SEQ"
+#define CUSTOM_TYPE		"CUSTOM"
 
 SessionManager::SessionManager() {
 	// TODO Auto-generated constructor stub

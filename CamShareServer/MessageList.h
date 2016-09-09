@@ -26,7 +26,7 @@ using namespace std;
 typedef enum MessageType {
 	MessageTypeRecv,
 	MessageTypeSend
-};
+} MessageType;
 
 typedef struct Message {
 	int		fd;

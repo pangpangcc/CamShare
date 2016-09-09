@@ -455,6 +455,8 @@ bool TcpServer::Start(int maxConnection, int port, int maxThreadHandle) {
 
 	/* create watchers */
 	for(int i = 0 ; i < 2 * maxConnection; i++) {
+		mpHandlingMessageCount[i] = 0;
+
 		ev_io *w = (ev_io *)malloc(sizeof(ev_io));
 		if( w != NULL ) {
 			mWatcherList.PushBack(w);
@@ -1226,9 +1228,7 @@ void TcpServer::OnDisconnect(int fd, Message *m) {
 						"close ok "
 						")",
 						(int)syscall(SYS_gettid),
-						fd,
-						fd,
-						mpHandlingMessageCount[fd]
+						fd
 						);
 
 		bClose = true;

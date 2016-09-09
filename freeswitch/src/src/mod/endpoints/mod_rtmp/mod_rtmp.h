@@ -32,6 +32,9 @@
 #ifndef MOD_RTMP_H
 #define MOD_RTMP_H
 #include <switch.h>
+// add by Samson 2016-05-18
+#include "switch_list.h"
+// ------------------------
 
 /* AMF */
 #include "amf0.h"
@@ -454,6 +457,7 @@ struct rtmp_session {
 	void *io_private;
 
 	rtmp_session_state_t state;
+	switch_bool_t wait_destroy;
 	int parse_state;
 	uint16_t parse_remain; /* < Remaining bytes required before changing parse state */
 
@@ -593,6 +597,40 @@ struct rtmp_private {
 	switch_media_handle_t *media_handle;
 };
 
+/* Locally-extended version of rtmp_io_t */
+struct rtmp_io_tcp {
+	rtmp_io_t base;
+
+	switch_pollset_t *pollset;
+	switch_pollfd_t *listen_pollfd;
+	switch_socket_t *listen_socket;
+	const char *ip;
+	switch_port_t port;
+	switch_thread_t *thread;
+	switch_mutex_t *mutex;
+
+	// add by Samson 2016-05-18
+	// multi thread to process rtmp logic
+	switch_thread_t** handle_thread;
+	switch_queue_t* handle_queue;
+	// ------------------------
+
+	// add by Samson 2016-05-28
+	// check connection timeout(client is connected but not to send any data for long time)
+	switch_thread_t* timeout_thread;
+	switch_list_t* timeout_list;
+	// ------------------------
+};
+
+typedef struct rtmp_io_tcp rtmp_io_tcp_t;
+
+struct rtmp_tcp_io_private {
+	switch_pollfd_t *pollfd;
+	switch_socket_t *socket;
+};
+
+typedef struct rtmp_tcp_io_private rtmp_tcp_io_private_t;
+
 struct rtmp_reg;
 typedef struct rtmp_reg rtmp_reg_t;
 
@@ -633,6 +671,8 @@ RTMP_INVOKE_FUNCTION(rtmp_i_sendevent);
 RTMP_INVOKE_FUNCTION(rtmp_i_receiveaudio);
 RTMP_INVOKE_FUNCTION(rtmp_i_receivevideo);
 RTMP_INVOKE_FUNCTION(rtmp_i_log);
+// Add by Max 4 Heart beat
+RTMP_INVOKE_FUNCTION(rtmp_i_setActive);
 
 /*** RTMP Sessions ***/
 rtmp_session_t *rtmp_session_locate(const char *uuid);
@@ -679,6 +719,7 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 switch_status_t rtmp_tcp_release(rtmp_profile_t *profile);	// add by Samson 2016-06-01
 switch_status_t rtmp_session_request(rtmp_profile_t *profile, rtmp_session_t **newsession);
 switch_status_t rtmp_session_destroy(rtmp_session_t **session);
+switch_status_t rtmp_session_shutdown(rtmp_session_t **rsession); // add by Samson 2016-09-06
 switch_status_t rtmp_real_session_destroy(rtmp_session_t **session);
 
 /**** Protocol ****/

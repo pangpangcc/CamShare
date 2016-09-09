@@ -55,7 +55,7 @@ pthread_t KThread::start(KRunnable *runnable){
 	return m_pthread_t;
 }
 
-void KThread::stop() {
+KRunnable* KThread::stop() {
 	if(isRunning()) {
 		if(0 != pthread_join(m_pthread_t, NULL)){
 		}
@@ -63,7 +63,10 @@ void KThread::stop() {
 		}
 	}
 
+	KRunnable* pRunnable = m_pKRunnable;
+	m_pKRunnable = NULL;
 	m_pthread_t = 0;
+	return pRunnable;
 }
 
 void KThread::sleep(uint32_t msec){

@@ -355,8 +355,8 @@ void CLiveChatClient::HearbeatProc()
 {
 	FileLog("LiveChatClient", "CLiveChatClient::HearbeatProc() begin");
 
-	const unsigned long nSleepStep = 200;	// ms
-	const unsigned long nSendStep = 30 * 1000; // ms
+	const long long nSleepStep = 200;	// ms
+	const long long nSendStep = 30 * 1000; // ms
 
 	long long preTime = getCurrentTime();
 	long long curTime = getCurrentTime();

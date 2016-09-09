@@ -25,7 +25,7 @@ using namespace std;
 typedef enum MemberType {
 	Member,
 	Moderator
-};
+} MemberType;
 
 typedef struct Channel {
 	Channel() {
@@ -376,6 +376,11 @@ private:
 	 * 录制视频目录
 	 */
 	string mRecordingPath;
+
+	/**
+	 * 命令锁
+	 */
+	KMutex mCmdMutex;
 };
 
 #endif /* FREESWITCHCLIENT_H_ */

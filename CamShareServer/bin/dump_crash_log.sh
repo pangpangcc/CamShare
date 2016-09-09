@@ -5,5 +5,5 @@ if [ "-$1" = "-" ]; then
 else
 #  echo "ok"
   rm -f /tmp/*-bt.txt
-  ./backtrace-from-core $1 /usr/local/freeswitch/bin
+  /usr/local/CamShareServer/backtrace-from-core $1 /usr/local/freeswitch/bin/freeswitch
 fi

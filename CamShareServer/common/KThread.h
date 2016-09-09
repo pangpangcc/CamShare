@@ -31,7 +31,7 @@ public:
 	KThread(KRunnable *runnable);
 	virtual ~KThread();
 	pthread_t start(KRunnable *runnable = NULL);
-	void stop();
+	KRunnable* stop();
 	void sleep(uint32_t msec);
 	bool isRunning() const;
 	pthread_t getThreadId() const;

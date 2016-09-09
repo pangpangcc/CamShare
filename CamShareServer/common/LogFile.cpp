@@ -232,7 +232,7 @@ bool CFileCtrl::IsEnd()
 void CFileCtrl::Mem2File()
 {
     if (m_pLogFile && m_pBuffer && (m_nBufferUse > 0)){
-        (int)fwrite(m_pBuffer, sizeof(char), m_nBufferUse, m_pLogFile);
+        fwrite(m_pBuffer, sizeof(char), m_nBufferUse, m_pLogFile);
         m_nBufferUse = 0;
         fflush(m_pLogFile);
     }

@@ -14,6 +14,7 @@
 #include <list>
 using namespace std;
 
+#include <common/KMutex.h>
 #include <common/KSafeMap.h>
 #include "RtmpPacket.h"
 
@@ -50,6 +51,7 @@ public:
 	virtual void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) = 0;
 	virtual void OnHangup(RtmpClient* client, const string& channelId, const string& cause) = 0;
 	virtual void OnCreatePublishStream(RtmpClient* client) = 0;
+	virtual void OnHeartBeat(RtmpClient* client) = 0;
 };
 
 class RtmpClient {
@@ -64,11 +66,13 @@ public:
 
 	void SetRtmpClientListener(RtmpClientListener *listener);
 	bool Connect(const string& hostName);
+	void Shutdown();
 	void Close();
 	bool Login(const string& user, const string& password, const string& site, const string& custom);
 	bool MakeCall(const string& dest);
 	bool CreatePublishStream();
 	bool SendVideoData(const char* data, unsigned int len, unsigned int timestamp);
+	bool SendHeartBeat();
 
 	bool RecvRtmpPacket(RtmpPacket* packet);
 	RTMP_PACKET_TYPE ParseRtmpPacket(RtmpPacket* packet);
@@ -95,7 +99,11 @@ private:
 	 */
 	bool SendLoginPacket(const string& user, const string& auth, const string& site, const string& custom);
 	bool SendMakeCallPacket(const string& dest);
+	bool SendActivePacket();
 
+	/**
+	 * GetCurrentTime
+	 */
 	unsigned int GetTime();
 
 	/**
@@ -112,6 +120,7 @@ private:
 	string mDest;
 
 	bool mbConnected;
+	bool mbShutdown;
 	string mSession;
 	unsigned int miNumberInvokes;
 	unsigned int m_outChunkSize;
@@ -138,6 +147,16 @@ private:
 	 *	Stand Invoke Packet Seq
 	 */
 	StandInvokeMap mpStandInvokeMap;
+
+	/**
+	 * 收包锁
+	 */
+	KMutex mRecvMutex;
+
+	/**
+	 * 发包锁
+	 */
+	KMutex mSendMutex;
 
 	unsigned int mPublishStreamId;
 	unsigned int mPlayStreamId;

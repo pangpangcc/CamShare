@@ -13,6 +13,7 @@
 RecvEnterConferenceTask::RecvEnterConferenceTask(void) {
 	mFromId = "";
 	mToId = "";
+	mKey = "";
 	mbAuth = false;
 }
 
@@ -45,7 +46,13 @@ bool RecvEnterConferenceTask::Handle(const TransportProtocol* tp) {
 			mbAuth = true;
 		}
 
-		if( mFromId.length() > 0 && mToId.length() > 0 ) {
+		// mKey
+		amf_object_handle keyObject = root->get_child("key");
+		if ( !keyObject.isnull() && keyObject->type == DT_STRING ) {
+			mKey = keyObject->strValue;
+		}
+
+		if( mFromId.length() > 0 && mToId.length() > 0 && mKey.length() > 0 ) {
 			result = true;
 			m_errType = LCC_ERR_SUCCESS;
 		}
@@ -79,17 +86,19 @@ bool RecvEnterConferenceTask::Handle(const TransportProtocol* tp) {
 			"errMsg:%s, "
 			"mFromId:%s, "
 			"mToId:%s, "
-			"mbAuth:%s",
+			"mbAuth:%s, "
+			"mKey:%s",
 			m_errType,
 			m_errMsg.c_str(),
 			mFromId.c_str(),
 			mToId.c_str(),
-			mbAuth?"true":"false"
+			mbAuth?"true":"false",
+			mKey.c_str()
 			);
 
 	// 通知listener
 	if ( NULL != m_listener ) {
-		m_listener->OnRecvEnterConference(m_client, GetSeq(), mFromId, mToId, mbAuth, m_errType, m_errMsg);
+		m_listener->OnRecvEnterConference(m_client, GetSeq(), mFromId, mToId, mKey, mbAuth, m_errType, m_errMsg);
 	}
 	
 	return result;

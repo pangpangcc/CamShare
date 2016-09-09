@@ -26,7 +26,7 @@ void SignalFunc(int sign_no);
 int main(int argc, char *argv[]) {
 	printf("############## CamShare Middleware ############## \n");
 	printf("# Version : %s \n", VERSION_STRING);
-	printf("# Build date : %s %s \n", __DATE__, __TIME__ );
+	printf("# Build date : %s %s \n", __DATE__, __TIME__);
 	srand(time(0));
 
 	/* Ignore */

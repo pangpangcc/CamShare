@@ -35,5 +35,6 @@ public:
 private:
 	string			mFromId;	// 发送用户Id（对方）
 	string			mToId;
+	string 			mKey;
 	bool			mbAuth;
 };

@@ -3,7 +3,7 @@
 # 端口
 PORT=9200
 # 最大连接数
-MAXCLIENT=100
+MAXCLIENT=10000
 # 处理线程数目, 一般为cpu内核数目
 MAXHANDLETHREAD=4
 # 单核每秒处理请求数目
@@ -33,8 +33,6 @@ IP=58.64.141.117
 # 服务器对本应用唯一标识,不能重复
 NAME=CAM007
 #NAME=CAMDEMO
-# 连接成功是否重新验所有证会议室用户
-AUTHORIZATION_ALL_CONFERENCE=1
 
 # Freeswitch服务器配置
 [FREESWITCH]
@@ -50,6 +48,8 @@ PASSWORD=ClueCon
 ISRECORDING=1
 # 录制视频目录
 RECORDINGPATH=/usr/local/freeswitch/recordings/video_h264
+# 定时验证会议室所有用户时间间隔(秒)
+AUTHORIZATION_TIME=60
 
 # 站点配置
 [SITE]

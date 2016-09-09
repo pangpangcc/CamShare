@@ -7,6 +7,9 @@
 
 #include "EnterConferenceRequest.h"
 
+#define ACTIVE_KEY "ACTIVE"
+#define TIMER_KEY "TIMER"
+
 EnterConferenceRequest::EnterConferenceRequest() {
 	// TODO Auto-generated constructor stub
 	mpFreeswitch = NULL;
@@ -16,7 +19,7 @@ EnterConferenceRequest::EnterConferenceRequest() {
 	mFromId = "";
 	mToId = "";
 	mType = Member;
-	mKey = "";
+	mCheckType = Timer;
 }
 
 EnterConferenceRequest::~EnterConferenceRequest() {
@@ -25,14 +28,18 @@ EnterConferenceRequest::~EnterConferenceRequest() {
 
 bool EnterConferenceRequest::StartRequest() {
 	// 向LiveChat client发送进入聊天室内请求
-	return mpLivechat->SendEnterConference(mSeq, mServerId, mFromId, mToId, mKey);
+	string key = GetKey();
+	return mpLivechat->SendEnterConference(mSeq, mServerId, mFromId, mToId, key);
 }
 
 void EnterConferenceRequest::FinisRequest(bool bSuccess) {
 	if( !bSuccess ) {
 		// 任务处理失败
-		// 断开用户
-		mpFreeswitch->KickUserFromConference(mFromId, mToId, "");
+		if( mCheckType != Timer ) {
+			// 不是定时检测
+			// 踢出用户
+			mpFreeswitch->KickUserFromConference(mFromId, mToId, "");
+		}
 	}
 }
 
@@ -44,7 +51,7 @@ void EnterConferenceRequest::SetParam(
 		const string& fromId,
 		const string& toId,
 		MemberType type,
-		const string& key
+		EnterConferenceRequestCheckType checkType
 		) {
 	mpFreeswitch = freeswitch;
 	mpLivechat = livechat;
@@ -53,9 +60,33 @@ void EnterConferenceRequest::SetParam(
 	mFromId = fromId;
 	mToId = toId;
 	mType = type;
-	mKey = key;
+	mCheckType = checkType;
 }
 
 MemberType EnterConferenceRequest::GetMemberType() {
 	return mType;
+}
+
+string EnterConferenceRequest::GetKey() {
+	string key = TIMER_KEY;
+	switch( mCheckType ) {
+	case Timer:{
+		key = TIMER_KEY;
+	}break;
+	case Active:{
+		key = ACTIVE_KEY;
+	}break;
+	default:break;
+	}
+	return key;
+}
+
+string EnterConferenceRequest::GetIdentify(
+		const string& fromId,
+		const string& toId,
+		const string& key
+		) {
+	char identify[2048] = {'\0'};
+	snprintf(identify, sizeof(identify), "%s_%s_%s", fromId.c_str(), toId.c_str(), key.c_str());
+	return identify;
 }

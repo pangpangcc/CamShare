@@ -107,7 +107,7 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 	if (result) {
 		string hex = "";
 		char temp[4];
-		for(int i = 0; i < dataLen; i++) {
+		for(unsigned int i = 0; i < dataLen; i++) {
 			sprintf(temp, "%02x", ((unsigned char *)data)[i]);
 			hex += temp;
 			hex += " ";

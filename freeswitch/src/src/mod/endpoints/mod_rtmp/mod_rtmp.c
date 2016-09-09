@@ -201,10 +201,16 @@ switch_status_t rtmp_on_init(switch_core_session_t *session)
 	rtmp_private_t *tech_pvt = NULL;
 	rtmp_session_t *rsession = NULL;
 
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_init(), session:%p\n"
+//			, (void*)session);
+
 	tech_pvt = switch_core_session_get_private(session);
 	assert(tech_pvt != NULL);
 
 	rsession = tech_pvt->rtmp_session;
+	rsession->wait_destroy = SWITCH_TRUE;
 
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
@@ -223,9 +229,6 @@ switch_status_t rtmp_on_init(switch_core_session_t *session)
 	rsession->active_sessions++;
 	switch_mutex_unlock(rsession->count_mutex);
 
-	// add by samson for test
-//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "rtmp on init\n");
-
 	return SWITCH_STATUS_SUCCESS;
 }
 
@@ -233,6 +236,11 @@ switch_status_t rtmp_on_routing(switch_core_session_t *session)
 {
 	switch_channel_t *channel = NULL;
 	rtmp_private_t *tech_pvt = NULL;
+
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_routing(), session:%p\n"
+//			, (void*)session);
 
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
@@ -252,6 +260,11 @@ switch_status_t rtmp_on_execute(switch_core_session_t *session)
 	switch_channel_t *channel = NULL;
 	rtmp_private_t *tech_pvt = NULL;
 
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_execute(), session:%p\n"
+//			, (void*)session);
+
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
 
@@ -269,16 +282,22 @@ switch_status_t rtmp_on_destroy(switch_core_session_t *session)
 {
 	switch_channel_t *channel = NULL;
 	rtmp_private_t *tech_pvt = NULL;
+	rtmp_session_t *rsession = NULL;
+
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_destroy(), session:%p\n"
+//			, (void*)session);
 
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
 
 	tech_pvt = switch_core_session_get_private(session);
 
-	// add by samson for test
-//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "rtmp on destroy\n");
-
 	if (tech_pvt) {
+		rsession = tech_pvt->rtmp_session;
+		rsession->wait_destroy = SWITCH_FALSE;
+
 		if (switch_core_codec_ready(&tech_pvt->read_codec)) {
 			switch_core_codec_destroy(&tech_pvt->read_codec);
 		}
@@ -301,6 +320,11 @@ switch_status_t rtmp_on_hangup(switch_core_session_t *session)
 	switch_channel_t *channel = NULL;
 	rtmp_private_t *tech_pvt = NULL;
 	rtmp_session_t *rsession = NULL;
+
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_hangup(), session:%p\n"
+//			, (void*)session);
 
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
@@ -406,6 +430,11 @@ switch_status_t rtmp_kill_channel(switch_core_session_t *session, int sig)
 
 switch_status_t rtmp_on_exchange_media(switch_core_session_t *session)
 {
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_exchange_media(), session:%p\n"
+//			, (void*)session);
+
 	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "CHANNEL LOOPBACK\n");
 	rtmp_notify_call_state(session);
 	return SWITCH_STATUS_SUCCESS;
@@ -413,6 +442,11 @@ switch_status_t rtmp_on_exchange_media(switch_core_session_t *session)
 
 switch_status_t rtmp_on_soft_execute(switch_core_session_t *session)
 {
+	// add by samson for test
+//	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG
+//			, "mod_rtmp: rtmp_on_soft_execute(), session:%p\n"
+//			, (void*)session);
+
 	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "CHANNEL TRANSMIT\n");
 	rtmp_notify_call_state(session);
 	return SWITCH_STATUS_SUCCESS;
@@ -919,6 +953,7 @@ switch_status_t rtmp_session_request(rtmp_profile_t *profile, rtmp_session_t **n
 	(*newsession)->next_streamid = 1;
 	(*newsession)->io_private = NULL;
 	(*newsession)->dropped_video_frame = 0;
+	(*newsession)->wait_destroy = SWITCH_FALSE;
 
 	switch_uuid_get(&uuid);
 	switch_uuid_format((*newsession)->uuid, &uuid);
@@ -991,7 +1026,9 @@ static void rtmp_garbage_colletor(void)
 		switch_core_hash_this(hi, &key, &keylen, &val);
 		rsession = (rtmp_session_t *) val;
 
-		if (rsession->state == RS_DESTROY) {
+		if (rsession->state == RS_DESTROY
+			&& rsession->wait_destroy == SWITCH_FALSE)
+		{
 			if (rtmp_real_session_destroy(&rsession) == SWITCH_STATUS_SUCCESS) {
 				goto top;
 			}
@@ -1014,6 +1051,17 @@ switch_status_t rtmp_session_destroy(rtmp_session_t **rsession)
 	}
 	switch_mutex_unlock(rtmp_globals.mutex);
 
+	return status;
+}
+
+switch_status_t rtmp_session_shutdown(rtmp_session_t **rsession)
+{
+	switch_status_t status = SWITCH_STATUS_FALSE;
+	if (rsession && *rsession) {
+		rtmp_tcp_io_private_t *io_pvt = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
+		switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
+		status = SWITCH_STATUS_SUCCESS;
+	}
 	return status;
 }
 
@@ -1931,8 +1979,8 @@ SWITCH_STANDARD_API(rtmp_function)
 				stream->write_function(stream, "-ERR I need user@domain\n");
 			}
 		} else 	if (!strcmp(argv[2], "kill")) {
-			rtmp_session_rwunlock(rsession);
-			rtmp_session_destroy(&rsession);
+//			rtmp_session_rwunlock(rsession);
+			rtmp_session_shutdown(&rsession);
 			stream->write_function(stream, "+OK\n");
 		} else if (!strcmp(argv[2], "call")) {
 			switch_core_session_t *newsession = NULL;
@@ -2111,6 +2159,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_rtmp_load)
 	rtmp_register_invoke_function("receiveAudio", rtmp_i_receiveaudio);
 	rtmp_register_invoke_function("receiveVideo", rtmp_i_receivevideo);
 	rtmp_register_invoke_function("log", rtmp_i_log);
+	// Add by Max 4 Heart beat
+	rtmp_register_invoke_function("setActive", rtmp_i_setActive);
 
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 	rtmp_globals.rtmp_endpoint_interface = switch_loadable_module_create_interface(*module_interface, SWITCH_ENDPOINT_INTERFACE);

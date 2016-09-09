@@ -15,7 +15,7 @@ else
 CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
 endif
 
-CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable
+CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
 CXXFLAGS +=	-I. -Iinclude -Ilibev -Iesl/include -Isqlite -Icurl/include
 
 LIBS =		-L. \

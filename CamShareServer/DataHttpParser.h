@@ -30,7 +30,7 @@ typedef enum HttpType {
 	GET,
 	POST,
 	UNKNOW,
-};
+} HttpType;
 
 class DataHttpParser : public DataParser {
 public:

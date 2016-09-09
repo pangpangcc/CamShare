@@ -24,7 +24,7 @@ public:
 	virtual void OnDisconnect(ILiveChatClient* client, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnSendEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	// 服务器主动请求
-	virtual void OnRecvEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, bool bAuth, LCC_ERR_TYPE err, const string& errmsg) = 0;
+	virtual void OnRecvEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnRecvKickUserFromConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
 };
 

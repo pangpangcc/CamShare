@@ -14,7 +14,6 @@
 
 #include <httpclient/HttpClient.h>
 
-#include <request/EnterConferenceRequest.h>
 #include <request/SendMsgEnterConferenceRequest.h>
 #include <request/SendMsgExitConferenceRequest.h>
 
@@ -81,6 +80,25 @@ private:
 };
 
 /**
+ * 定时验证会议室用户权限线程
+ */
+class CheckConferenceRunnable : public KRunnable {
+public:
+	CheckConferenceRunnable(CamShareMiddleware *container) {
+		mContainer = container;
+	}
+	virtual ~CheckConferenceRunnable() {
+		mContainer = NULL;
+	}
+protected:
+	void onRun() {
+		mContainer->CheckConferenceHandle();
+	}
+private:
+	CamShareMiddleware *mContainer;
+};
+
+/**
  * 同步本地录制完成记录线程
  */
 class UploadRecordsRunnable : public KRunnable {
@@ -106,6 +124,7 @@ CamShareMiddleware::CamShareMiddleware() {
 	mpStateRunnable = new StateRunnable(this);
 	mpConnectLiveChatRunnable = new ConnectLiveChatRunnable(this);
 	mpConnectFreeswitchRunnable = new ConnectFreeswitchRunnable(this);
+	mpCheckConferenceRunnable = new CheckConferenceRunnable(this);
 	mpUploadRecordsRunnable = new UploadRecordsRunnable(this);
 
 	// 基本参数
@@ -124,7 +143,6 @@ CamShareMiddleware::CamShareMiddleware() {
 	// Livechat服务器参数
 	miLivechatPort = 0;
 	mLivechatIp = "";
-	mAuthorization = false;
 	mLivechatName = "";
 
 	// Freeswitch服务器参数
@@ -134,6 +152,7 @@ CamShareMiddleware::CamShareMiddleware() {
 	mFreeswitchPassword = "";
 	mFreeswitchRecordingPath = "";
 	mbFreeswitchIsRecording = false;
+	mAuthorizationTime = 0;
 
 	// 站点参数
 	miSiteCount = 0;
@@ -143,7 +162,6 @@ CamShareMiddleware::CamShareMiddleware() {
 	// 统计参数
 	mResponed = 0;
 	mTotal = 0;
-	miSendEnterConference = 0;
 
 	// 其他
 	mIsRunning = false;
@@ -154,6 +172,31 @@ CamShareMiddleware::CamShareMiddleware() {
 CamShareMiddleware::~CamShareMiddleware() {
 	// TODO Auto-generated destructor stub
 	Stop();
+
+	if( mpConnectLiveChatRunnable ) {
+		delete mpConnectLiveChatRunnable;
+		mpConnectLiveChatRunnable = NULL;
+	}
+
+	if( mpConnectFreeswitchRunnable ) {
+		delete mpConnectFreeswitchRunnable;
+		mpConnectFreeswitchRunnable = NULL;
+	}
+
+	if( mpCheckConferenceRunnable ) {
+		delete mpCheckConferenceRunnable;
+		mpCheckConferenceRunnable = NULL;
+	}
+
+	if( mpUploadRecordsRunnable ) {
+		delete mpUploadRecordsRunnable;
+		mpUploadRecordsRunnable = NULL;
+	}
+
+	if( mpStateRunnable ) {
+		delete mpStateRunnable;
+		mpStateRunnable = NULL;
+	}
 }
 
 bool CamShareMiddleware::Run(const string& config) {
@@ -196,6 +239,15 @@ bool CamShareMiddleware::Run() {
 			VERSION_STRING
 			);
 
+	LogManager::GetLogManager()->Log(
+			LOG_ERR_SYS,
+			"CamShareMiddleware::Run( "
+			"Build date : %s %s "
+			")",
+			__DATE__,
+			__TIME__
+			);
+
 	// 基本参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
@@ -236,12 +288,10 @@ bool CamShareMiddleware::Run() {
 			"CamShareMiddleware::Run( "
 			"miLivechatPort : %d, "
 			"mLivechatIp : %s, "
-			"mAuthorization : %d "
 			"mLivechatName : %s "
 			")",
 			miLivechatPort,
 			mLivechatIp.c_str(),
-			mAuthorization,
 			mLivechatName.c_str()
 			);
 
@@ -254,14 +304,16 @@ bool CamShareMiddleware::Run() {
 			"mFreeswitchUser : %s, "
 			"mFreeswitchPassword : %s, "
 			"mbFreeswitchIsRecording : %d, "
-			"mFreeswitchRecordingPath : %s "
+			"mFreeswitchRecordingPath : %s, "
+			"mAuthorizationTime : %lu "
 			")",
 			miFreeswitchPort,
 			mFreeswitchIp.c_str(),
 			mFreeswitchUser.c_str(),
 			mFreeswitchPassword.c_str(),
 			mbFreeswitchIsRecording,
-			mFreeswitchRecordingPath.c_str()
+			mFreeswitchRecordingPath.c_str(),
+			mAuthorizationTime
 			);
 
 	// 站点参数
@@ -362,18 +414,27 @@ bool CamShareMiddleware::Run() {
 
 	// 开始状态监视线程
 	if( mStateThread.start(mpStateRunnable) != 0 ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始状态监视线程] )");
 	}
 
 	// 开始LiveChat连接线程
 	if( mLiveChatConnectThread.start(mpConnectLiveChatRunnable) != 0 ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始LiveChat连接线程] )");
 	}
 
 	// 开始Freeswitch连接线程
 	if( mConnectFreeswitchThread.start(mpConnectFreeswitchRunnable) != 0 ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始Freeswitch连接线程] )");
+	}
+
+	// 开始定时验证会议室用户权限线程
+	if( mCheckConferenceThread.start(mpCheckConferenceRunnable) != 0 ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始定时验证会议室用户权限线程] )");
 	}
 
 	// 开始同步本地录制完成记录线程
 	if( mUploadRecordsThread.start(mpUploadRecordsRunnable) != 0 ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始同步本地录制完成记录线程] )");
 	}
 
 	// 服务启动成功
@@ -399,7 +460,6 @@ bool CamShareMiddleware::LoadConfig() {
 			miFlashTimeout = atoi(conf.GetPrivate("BASE", "FLASH_TIMEOUT", "5").c_str());
 			miStateTime = atoi(conf.GetPrivate("BASE", "STATETIME", "30").c_str());
 
-
 			mClientTcpServer.SetHandleSize(miTimeout * miMaxQueryPerThread);
 
 			// 日志参数
@@ -410,7 +470,6 @@ bool CamShareMiddleware::LoadConfig() {
 			// Livechat参数
 			miLivechatPort = atoi(conf.GetPrivate("LIVECHAT", "PORT", "9877").c_str());
 			mLivechatIp = conf.GetPrivate("LIVECHAT", "IP", "127.0.0.1");
-			mAuthorization = atoi(conf.GetPrivate("LIVECHAT", "AUTHORIZATION_ALL_CONFERENCE", "0").c_str());
 			mLivechatName = conf.GetPrivate("LIVECHAT", "NAME", "CAM");
 
 			// Freeswitch参数
@@ -420,6 +479,7 @@ bool CamShareMiddleware::LoadConfig() {
 			mFreeswitchPassword = conf.GetPrivate("FREESWITCH", "PASSWORD", "ClueCon");
 			mbFreeswitchIsRecording = atoi(conf.GetPrivate("FREESWITCH", "ISRECORDING", "0").c_str());
 			mFreeswitchRecordingPath = conf.GetPrivate("FREESWITCH", "RECORDINGPATH", "/usr/local/freeswitch/recordings");
+			mAuthorizationTime = atoi(conf.GetPrivate("FREESWITCH", "AUTHORIZATION_TIME", "60").c_str());
 
 			// 站点参数
 			miSiteCount = atoi(conf.GetPrivate("SITE", "SITE_COUNT", "0").c_str());
@@ -481,28 +541,10 @@ bool CamShareMiddleware::Stop() {
 	mIsRunning = false;
 
 	mLiveChatConnectThread.stop();
-	if( mpConnectLiveChatRunnable ) {
-		delete mpConnectLiveChatRunnable;
-		mpConnectLiveChatRunnable = NULL;
-	}
-
 	mConnectFreeswitchThread.stop();
-	if( mpConnectFreeswitchRunnable ) {
-		delete mpConnectFreeswitchRunnable;
-		mpConnectFreeswitchRunnable = NULL;
-	}
-
+	mCheckConferenceThread.stop();
 	mUploadRecordsThread.stop();
-	if( mpUploadRecordsRunnable ) {
-		delete mpUploadRecordsRunnable;
-		mpUploadRecordsRunnable = NULL;
-	}
-
 	mStateThread.stop();
-	if( mpStateRunnable ) {
-		delete mpStateRunnable;
-		mpStateRunnable = NULL;
-	}
 
 	if( mpSiteConfig ) {
 		delete[] mpSiteConfig;
@@ -936,6 +978,33 @@ void CamShareMiddleware::ConnectFreeswitchHandle() {
 	}
 }
 
+void CamShareMiddleware::CheckConferenceHandle() {
+	int count = 0;
+	while( IsRunning() ) {
+		if( mAuthorizationTime > 0 ) {
+			if( count % mAuthorizationTime == 0 ) {
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"CamShareMiddleware::CheckConferenceHandle( "
+						"tid : %d, "
+						"[内部服务(Freeswitch), 重新验证所有会议室用户] "
+						")",
+						(int)syscall(SYS_gettid)
+						);
+
+				// 内部服务(Freeswitch), 重新验证所有会议室用户
+				mFreeswitch.AuthorizationAllConference();
+
+				// 复位
+				count = 0;
+			}
+
+			count++;
+		}
+		sleep(1);
+	}
+}
+
 void CamShareMiddleware::UploadRecordsHandle() {
 	static int selectCount = 60;
 	Record records[selectCount];
@@ -1253,7 +1322,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAuthorizationMember(
 		mLiveChatClientMap.Unlock();
 
 		// 发送进入聊天室认证命令
-		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId) ) {
+		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Timer) ) {
 			// 断开指定用户视频
 			freeswitch->KickUserFromConference(channel->user, channel->conference, "");
 		}
@@ -1312,7 +1381,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 		mLiveChatClientMap.Unlock();
 
 		// 发送进入聊天室认证命令
-		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId) ) {
+		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active) ) {
 			// 断开指定用户视频
 			freeswitch->KickUserFromConference(channel->user, channel->conference, "");
 		}
@@ -1396,10 +1465,10 @@ void CamShareMiddleware::OnConnect(
 				livechat->GetSiteId().c_str()
 				);
 
-		if( mAuthorization ) {
-			// 重新验证所有用户
-			mFreeswitch.AuthorizationAllConference();
-		}
+//		if( mAuthorization ) {
+//			// 重新验证所有会议室用户
+//			mFreeswitch.AuthorizationAllConference();
+//		}
 
 	} else {
 		LogManager::GetLogManager()->Log(
@@ -1511,13 +1580,15 @@ void CamShareMiddleware::OnRecvEnterConference(
 		int seq,
 		const string& fromId,
 		const string& toId,
+		const string& key,
 		bool bAuth,
 		LCC_ERR_TYPE err,
 		const string& errmsg
 		) {
 
 	// 结束会话任务
-	IRequest* request = mSessionManager.FinishSessionByCustomIdentify(livechat, fromId + toId);
+	string identify = EnterConferenceRequest::GetIdentify(fromId, toId, key);
+	IRequest* request = mSessionManager.FinishSessionByCustomIdentify(livechat, identify);
 
 	if( err == LCC_ERR_SUCCESS && bAuth && request ) {
 		LogManager::GetLogManager()->Log(
@@ -1529,14 +1600,18 @@ void CamShareMiddleware::OnRecvEnterConference(
 				"siteId : '%s', "
 				"seq : '%d', "
 				"fromId : '%s', "
-				"toId : '%s' "
+				"toId : '%s', "
+				"key : '%s', "
+				"bAuth : '%s' "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
 				livechat->GetSiteId().c_str(),
 				seq,
 				fromId.c_str(),
-				toId.c_str()
+				toId.c_str(),
+				key.c_str(),
+				bAuth?"true":"false"
 				);
 
 		// 开放成员视频
@@ -1553,6 +1628,7 @@ void CamShareMiddleware::OnRecvEnterConference(
 				"seq : '%d', "
 				"fromId : '%s', "
 				"toId : '%s', "
+				"key : '%s', "
 				"bAuth : '%s', "
 				"err : '%d', "
 				"errmsg : '%s' "
@@ -1563,6 +1639,7 @@ void CamShareMiddleware::OnRecvEnterConference(
 				seq,
 				fromId.c_str(),
 				toId.c_str(),
+				key.c_str(),
 				bAuth?"true":"false",
 				err,
 				errmsg.c_str()
@@ -1650,7 +1727,8 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 		const string& fromId,
 		const string& toId,
 		MemberType type,
-		const string& serverId
+		const string& serverId,
+		EnterConferenceRequestCheckType checkType
 		) {
 	bool bFlag = true;
 
@@ -1689,12 +1767,12 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 
 		// 处理是否需要记录请求
 		EnterConferenceRequest* request = new EnterConferenceRequest();
-		char key[32] = {'\0'};
-		sprintf(key, "%u", miSendEnterConference++);
-		request->SetParam(&mFreeswitch, livechat, seq, serverId, fromId, toId, type, key);
+		request->SetParam(&mFreeswitch, livechat, seq, serverId, fromId, toId, type, checkType);
 
 		// 生成会话
-		if( mSessionManager.StartSessionByCustomIdentify(livechat, request, fromId + toId) ) {
+		string key = request->GetKey();
+		string identify = EnterConferenceRequest::GetIdentify(fromId, toId, key);
+		if( mSessionManager.StartSessionByCustomIdentify(livechat, request, identify) ) {
 			// 发送请求成功
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
@@ -1718,7 +1796,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 					toId.c_str(),
 					type,
 					serverId.c_str(),
-					key
+					key.c_str()
 					);
 			bFlag = true;
 

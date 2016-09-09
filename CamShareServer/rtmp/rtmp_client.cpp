@@ -23,8 +23,9 @@ using namespace std;
 
 #define VERSION_STRING "1.0.0"
 
-#define SERVER_IP "192.168.88.152"
-#define MAX_CLIENT 130
+#define SERVER_IP "127.0.0.1"
+//#define SERVER_IP "192.168.88.152"
+#define MAX_CLIENT 100
 #define RECONN_MAX_TIME_MS (20*1000*1000)
 #define RECONN_CHECK_INTERVAL (200*1000)
 
@@ -298,6 +299,46 @@ void SignalFunc(int sign_no);
 RtmpClient client[MAX_CLIENT];
 KThread* clientThreads[MAX_CLIENT];
 
+KThread sendVideoThread[MAX_CLIENT];
+KThread heartBeatThread[MAX_CLIENT];
+
+class SendHeartBeatRunnable : public KRunnable {
+public:
+	SendHeartBeatRunnable(RtmpClient *container) {
+		mContainer = container;
+	}
+	virtual ~SendHeartBeatRunnable() {
+		mContainer = NULL;
+	}
+protected:
+	void onRun() {
+		unsigned int timestamp = 0;
+		unsigned int start = 0, end = 0;
+
+		while( mContainer->IsConnected() ) {
+			if( !mContainer->SendHeartBeat() ) {
+				break;
+			}
+
+			sleep(10);
+		}
+
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"SendHeartBeatRunnable::onRun( "
+				"tid : %d, "
+				"[Disconnected], "
+				"index : '%d' "
+				")",
+				(int)syscall(SYS_gettid),
+				mContainer->GetIndex()
+				);
+		mContainer->Close();
+	}
+private:
+	RtmpClient *mContainer;
+};
+
 class SendVideoRunnable : public KRunnable {
 public:
 	SendVideoRunnable(RtmpClient *container) {
@@ -356,16 +397,16 @@ protected:
 		}
 
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"SendVideoRunnable::onRun( "
 				"tid : %d, "
-				"[Send Fail, Disconnected], "
+				"[Disconnected], "
 				"index : '%d' "
 				")",
 				(int)syscall(SYS_gettid),
 				mContainer->GetIndex()
 				);
-
+		mContainer->Close();
 	}
 private:
 	RtmpClient *mContainer;
@@ -383,14 +424,43 @@ protected:
 	void onRun() {
 		while( gStart ) {
 			if( mContainer->Connect(SERVER_IP) ) {
-				printf("Connected, index:%d\n", mContainer->GetIndex());
+				// 开始心跳线程
+				SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(client);
+				heartBeatThread[client->GetIndex()].start(pHeartBeatRunable);
+
 				RtmpPacket recvPacket;
 				while( mContainer->RecvRtmpPacket(&recvPacket) ) {
 					RTMP_PACKET_TYPE type = mContainer->ParseRtmpPacket(&recvPacket);
 					recvPacket.FreeBody();
 				}
+
+				// 停止发送视频线程
+				KRunnable* pRunable = sendVideoThread[mContainer->GetIndex()].stop();
+				if( pRunable ) {
+					delete pRunable;
+				}
+
+				// 停止心跳线程
+				pRunable = heartBeatThread[mContainer->GetIndex()].stop();
+				if( pRunable ) {
+					delete pRunable;
+				}
+
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"ClientRunnable::onRun( "
+						"tid : %d, "
+						"[Disconnect], "
+						"index : '%d' "
+						")",
+						(int)syscall(SYS_gettid),
+						mContainer->GetIndex()
+						);
+
+			} else {
+				// 连接失败
+				client->Close();
 			}
-			printf("Disconnect, index:%d, start:%d\n", mContainer->GetIndex(), gStart);
 
 			int randtime = rand() % RECONN_MAX_TIME_MS;
 			while (randtime > 0 && gStart) {
@@ -399,16 +469,7 @@ protected:
 				usleep(waittime);
 			}
 		}
-		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
-				"ClientRunnable::onRun( "
-				"tid : %d, "
-				"[Disconnect], "
-				"index : '%d' "
-				")",
-				(int)syscall(SYS_gettid),
-				mContainer->GetIndex()
-				);
+
 	}
 
 private:
@@ -509,7 +570,7 @@ public:
 				client
 				);
 
-		sendThread[client->GetIndex()].start(new SendVideoRunnable(client));
+		sendVideoThread[client->GetIndex()].start(new SendVideoRunnable(client));
 	}
 
 	void OnHangup(RtmpClient* client, const string& channelId, const string& cause) {
@@ -529,7 +590,12 @@ public:
 				cause.c_str(),
 				client
 				);
-//		client->Close();
+
+		// 停止发送视频
+		KRunnable* pSendVideoRunable = sendVideoThread[client->GetIndex()].stop();
+		if( pSendVideoRunable ) {
+			delete pSendVideoRunable;
+		}
 
 		// retry MakeCall
 		char temp[1024];
@@ -537,8 +603,17 @@ public:
 		client->MakeCall(temp);
 	}
 
-private:
-	KThread sendThread[MAX_CLIENT];
+	void OnHeartBeat(RtmpClient* client) {
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"RtmpClientListenerImp::OnHeartBeat( "
+				"tid : %d, "
+				"index : '%d' "
+				")",
+				(int)syscall(SYS_gettid),
+				client->GetIndex()
+				);
+	}
 };
 RtmpClientListenerImp gRtmpClientListenerImp;
 
@@ -573,7 +648,7 @@ int main(int argc, char *argv[]) {
 	sigaction(SIGXCPU, &sa, 0);
 	sigaction(SIGXFSZ, &sa, 0);
 
-	LogManager::GetLogManager()->Start(LOG_MSG, "log");
+	LogManager::GetLogManager()->Start(LOG_WARNING, "log");
 	LogManager::GetLogManager()->SetDebugMode(true);
 
 	gStart = true;
@@ -625,10 +700,16 @@ void SignalFunc(int sign_no) {
 	switch(sign_no) {
 	default:{
 		for(int i = 0; i < MAX_CLIENT; i++) {
-			client[i].Close();
+			client[i].Shutdown();
 		}
 
-//		exit(EXIT_SUCCESS);
+		for(int i = 0; i < MAX_CLIENT; i++) {
+			clientThreads[i]->stop();
+		}
+
+		printf("# All threads exit \n");
+
+		exit(EXIT_SUCCESS);
 	}break;
 	}
 }
