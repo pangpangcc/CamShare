@@ -16,7 +16,9 @@ updatepackagedir="./update_package"
 updatepackagepath="$updatepackagedir/camshare_update_$env.tar.gz"
 
 # ---- clean dir & make dir
-rm -f freeswitch_update.tar.gz
+if [ -e $updatepackagepath ]; then
+  rm -f $updatepackagepath
+fi
 rm -rf $updatefiledir/*
 mkdir -p $updatedir/file
 
@@ -31,13 +33,13 @@ chmod +x $updatedir/update.sh
 #cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
 
 # copy shell
-cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiledir/
-cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh $updatefiledir/
+#cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiledir/
+#cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh $updatefiledir/
 
 # copy mod_file_recorder files
-cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
-cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $upatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+#cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $upatefiledir/
 
 # copy mod_rtmp files
 cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
@@ -63,18 +65,19 @@ cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
 cp -f ./CamShareServer/camshare-middleware $updatefiledir/
 
 # copy configure file
-#if [ "$env" == "develop" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.develop $updatefiledir/camshare-middleware.config
-#elif [ "$env" == "demo" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.demo $updatefiledir/camshare-middleware.config
-#elif [ "$env" == "operating" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.operating $updatefiledir/camshare-middleware.config
-#fi
+if [ "$env" == "develop" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.develop $updatefiledir/camshare-middleware.config
+elif [ "$env" == "demo" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.demo $updatefiledir/camshare-middleware.config
+elif [ "$env" == "operating" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.operating $updatefiledir/camshare-middleware.config
+fi
 
 # copy camshare shell
-cp -f ./CamShareServer/bin/run.sh $updatefiledir/
+#cp -f ./CamShareServer/bin/run.sh $updatefiledir/
 cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
 #cp -f ./CamShareServer/bin/check_run.sh $updatefiledir/
+cp -f ./CamShareServer/bin/dump_crash_log.sh $updatefiledir/
 
 # build package
 mkdir -p $updatepackagedir

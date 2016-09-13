@@ -148,15 +148,14 @@ bool FreeswitchClient::Proceed(
 			while( bFlag ) {
 				mCmdMutex.lock();
 				status = esl_recv_event_timed(&mFreeswitch, 100, 1, &event);
+				mCmdMutex.unlock();
 				if( status == ESL_SUCCESS ) {
 					if( event != NULL ) {
 						FreeswitchEventHandle(event);
 						esl_event_safe_destroy(&event);
 					}
-					mCmdMutex.unlock();
 				} else if( status == ESL_BREAK ) {
 					usleep(100 * 1000);
-					mCmdMutex.unlock();
 					continue;
 				} else {
 					LogManager::GetLogManager()->Log(
@@ -168,7 +167,6 @@ bool FreeswitchClient::Proceed(
 							(int)syscall(SYS_gettid)
 							);
 					esl_disconnect(&mFreeswitch);
-					mCmdMutex.unlock();
 					break;
 				}
 			}

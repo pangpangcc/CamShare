@@ -1,47 +1,57 @@
 #!/bin/sh
 
-# CamShareServer Function
-CS_CMD="$(ps -ef | grep camshare-middleware | grep -v grep | awk '{print $2}')"
+# -- CamShareServer Function
+GetCamSharePID() {
+	CS_PID=`ps -ef | grep camshare-middleware | grep -v grep | awk '{print $2}'`
+}
+
 KillCS() {
-	PID=$CS_CMD
-	if [ -n "$PID" ];then
-		echo "kill camshare-middleware"
-		`kill $PID`
+	GetCamSharePID
+	if [ -n "$CS_PID" ];then
+                KILL_CMD="kill $CS_PID"
+		echo "kill camshare-middleware cmd:'$KILL_CMD'"
+		eval $KILL_CMD
 	fi
 }
 
 Kill9CS() {
-        PID=$CS_CMD
-        if [ -n "$PID" ];then
-                echo "kill -9 camshare-middleware"
-                `kill -9 $PID`
+	GetCamSharePID
+        if [ -n "$CS_PID" ];then
+		KILL_CMD="kill -9 $CS_PID"
+                echo "kill -9 camshare-middleware cmd:'$KILL_CMD'"
+                eval $KILL_CMD
         fi
 }
 
-# Freeswitch Function
-FS_CMD="$(ps -ef | grep freeswitch | grep -v grep | awk -F ' ' '{print $2}')"
+# -- Freeswitch Function
+GetFreeswitchPID() {
+	FS_PID=`ps -ef | grep freeswitch | grep -v grep | awk '{print $2}'`
+}
+
 KillFS() {
-	PID=$FS_CMD
-	if [ -n "$PID" ];then
-		echo "kill freeswitch"
-		`kill $PID`
+	GetFreeswitchPID
+	if [ -n "$FS_PID" ];then
+		KILL_CMD="kill $FS_PID"
+		echo "kill freeswitch cmd:'$KILL_CMD'"
+		eval $KILL_CMD
 	fi
 }
 
 Kill9FS() {
-        PID=$FS_CMD
-        if [ -n "$PID" ];then
-                echo "kill -9 freeswitch"
-                `kill -9 $PID`
+	GetFreeswitchPID
+        if [ -n "$FS_PID" ];then
+		KILL_CMD="kill -9 $FS_PID"
+                echo "kill -9 freeswitch cmd:'$KILL_CMD'"
+                eval $KILL_CMD
         fi
 }
 
-# Check & Wait
+# -- Check & Wait
 CheckAndWait() {
 	for (( i=1; i<5; i++))
 	do
-	        FS_PID=$FS_CMD
-	        CS_PID=$CS_CMD
+	        GetCamSharePID
+		GetFreeswitchPID
 	        if [ -n "$FS_PID" ] || [ -n "$CS_PID" ]; then
                 	sleep 1
         	fi

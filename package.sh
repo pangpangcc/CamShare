@@ -63,7 +63,9 @@ mkdir -p $releasedir
 pkgpath="$releasedir/camshare_$env.tar.gz"
 
 # remove old release package file
-rm $pkgpath
+if [ -e $pkgpath ]; then
+  rm $pkgpath
+fi
 
 # package all
 tar zcvf $pkgpath camshare
