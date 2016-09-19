@@ -338,9 +338,27 @@ void WebSocketServer::ClientHandle(Client* client) {
 
 	// 增加到处理队列
 	switch_queue_push(mpHandleQueue, client);
+
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::ClientHandle( "
+//			"client : %p, "
+//			"handleCount : %d "
+//			") \n",
+//			client,
+//			client->handleCount
+//			);
 }
 
 void WebSocketServer::ClientCloseIfNeed(Client* client) {
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::ClientCloseIfNeed( "
+//			"client : %p, "
+//			"handleCount : %d, "
+//			"disconnected : %d "
+//			") \n",
+//			client,
+//			client->handleCount,
+//			client->disconnected
+//			);
+
 	switch_mutex_lock(client->handleCountMutex);
 	if( client->handleCount == 0 && client->disconnected ) {
 		mpTcpServer->Close(client->socket);
