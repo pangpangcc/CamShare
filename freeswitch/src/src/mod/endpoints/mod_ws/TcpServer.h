@@ -11,27 +11,12 @@
 #include <switch.h>
 #include <switch_apr.h>
 
-typedef struct Socket {
-	Socket() {
-		socket = NULL;
-		pollfd = NULL;
-		ip = NULL;
-		port = 0;
-		data = NULL;
-	};
-	switch_socket_t *socket;
-	switch_pollfd_t *pollfd;
-
-	const char *ip;
-	switch_port_t port;
-
-	void* data;
-} Socket;
+#include "Socket.h"
 
 class TcpServerCallback {
 public:
 	virtual ~TcpServerCallback(){};
-	virtual bool OnAceept(Socket* socket) = 0;
+	virtual bool OnAccept(Socket* socket) = 0;
 	virtual void OnRecvEvent(Socket* socket) = 0;
 	virtual void OnDisconnect(Socket* socket) = 0;
 };
@@ -46,10 +31,12 @@ public:
 	bool Start(switch_memory_pool_t *pool, const char *ip, switch_port_t port);
 	void Stop();
 	bool IsRuning();
-	void Disconnect(const Socket* socket);
-	void Close(const Socket* socket);
+	switch_status_t Read(Socket* socket, const char *data, switch_size_t* len);
+	bool Send(Socket* socket, const char *data, switch_size_t* len);
+	void Disconnect(Socket* socket);
+	void Close(Socket* socket);
 
-	void IOThreadHandle();
+	void IOHandleThread();
 
 private:
 	TcpServerCallback* mpTcpServerCallback;

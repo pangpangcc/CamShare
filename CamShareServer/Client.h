@@ -28,7 +28,7 @@ public:
 	virtual ~ClientCallback(){};
 	virtual void OnClientGetDialplan(
 			Client* client,
-			const string& rtmpSession,
+			const string& caller,
 			const string& channelId,
 			const string& conference,
 			const string& serverId,

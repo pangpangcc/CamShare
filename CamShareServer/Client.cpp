@@ -349,7 +349,7 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 	if( pDataHttpParser->GetPath() == "/GETDIALPLAN" ) {
 		// 进入会议室
 		if( mpClientCallback != NULL ) {
-			const string rtmpSession = pDataHttpParser->GetParam("rtmpSession");
+			const string caller = pDataHttpParser->GetParam("caller");
 			const string channelId = pDataHttpParser->GetParam("channelId");
 			const string conference = pDataHttpParser->GetParam("conference");
 			const string serverId = pDataHttpParser->GetParam("serverId");
@@ -364,7 +364,7 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 					(int)syscall(SYS_gettid)
 					);
 
-			mpClientCallback->OnClientGetDialplan(this, rtmpSession, channelId, conference, serverId, siteId);
+			mpClientCallback->OnClientGetDialplan(this, caller, channelId, conference, serverId, siteId);
 		}
 	} else if( pDataHttpParser->GetPath() == "/RECORDFINISH" ) {
 		// 录制文件成功

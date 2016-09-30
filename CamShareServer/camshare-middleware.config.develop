@@ -63,7 +63,7 @@ UPLOADTIME=60
 # 站点Id
 SITE_ID=0
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.88.136:81/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136:80/livechat/setstatus.php?action=savecamsharevideo
 
 # 站点配置(IDA)
 [SITE_1]
@@ -77,11 +77,11 @@ SITE_HTTP_RECORD_URL=http://192.168.88.136:81/livechat/setstatus.php?action=save
 # 站点Id
 SITE_ID=4
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.88.136:81/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136:91/livechat/setstatus.php?action=savecamsharevideo
 
 # 站点配置(LD)
 [SITE_3]
 # 站点Id
 SITE_ID=5
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.88.136:81/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136:93/livechat/setstatus.php?action=savecamsharevideo

@@ -33,7 +33,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.6"
+#define VERSION_STRING "1.0.7"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -124,7 +124,7 @@ public:
 	/***************************** 内部服务(HTTP), 命令回调 **************************************/
 	void OnClientGetDialplan(
 			Client* client,
-			const string& rtmpSession,
+			const string& caller,
 			const string& channelId,
 			const string& conference,
 			const string& serverId,

@@ -1,0 +1,85 @@
+<html>
+<head>
+<title>h264 Live Video Stream Example</title>
+</head>
+
+<script src="jquery.min.js"></script>
+<script src="Player/Decoder.js"></script>
+<script src="Player/YUVCanvas.js"></script>
+<script src="Player/Player.js"></script>
+<script>
+
+function play() {
+	$('#video').html('');
+	
+	/* 下载到本地播放mpg */
+	/*
+	var player = new MP4Player(new Stream('test.mpg'), false, '', 'auto');
+	player.play();
+	$('#video').append(player.canvas);
+	*/
+	
+	/* 流播放mpg */
+	/*
+	var canvas = document.createElement('canvas');
+	$('#video').html('');
+	$('#video').append(canvas);
+	var client = new WebSocket('ws://192.168.88.152:9092/');
+	var player = new jsmpeg(client, {canvas:canvas, autoplay: true});
+	*/
+		
+	/* 流播放mp4(h264) */
+	
+	var player = new Player({
+		useWorker: false,
+		reuseMemory: true,
+		webgl: "auto",
+		size: {
+			width: 512,
+			height: 386
+		}
+	});
+	$('#video').append(player.canvas);
+	
+	var url = 'ws://172.16.172.129:8080/MM0/172.16.172.129/WW1|||PC0|||1';
+	var client = new WebSocket(url);
+	client.binaryType = 'arraybuffer';
+	client.onopen = function(e) {
+		console.log(url + " connected : " + e);
+//		var bytes = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]);
+		client.send("make call");
+//		client.send(bytes.buffer);
+//		client.send(bytes.buffer);
+//		client.send(bytes.buffer);
+//		client.send(bytes.buffer);
+    };
+	client.onmessage = function(e) {
+		// ArrayBuffer object if binary
+		var messageData = new Uint8Array(e.data);
+		console.log(messageData.byteLength);
+		player.decode(messageData);
+//		setTimeout(
+//				function() {
+//					player.decode(messageData);
+//				},
+//				10000
+//		)
+	};
+	client.onerror = function(e) {  
+		console.log(url + " error : " + e);  
+	}
+	client.onclose = function(e) {  
+		console.log(url + " closed : " + e);  
+	}
+	
+};
+</script>
+
+<body onload="play()">
+<p><div id="video"></div></p>
+
+<div id="logtxt" style="margin:50px 0 0;height:300px; width:500px;overflow:scroll;">
+
+</div>
+</body>
+</html>

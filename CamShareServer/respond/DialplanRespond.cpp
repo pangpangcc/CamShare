@@ -9,7 +9,7 @@
 
 DialplanRespond::DialplanRespond() {
 	// TODO Auto-generated constructor stub
-	mUser = "";
+	mRet = false;
 }
 
 DialplanRespond::~DialplanRespond() {
@@ -20,11 +20,11 @@ int DialplanRespond::GetData(char* buffer, int len, bool &more) {
 	int ret = 0;
 	more = false;
 
-	snprintf(buffer, len, "{\"caller\":\"%s\"}", mUser.c_str());
+	snprintf(buffer, len, "{\"ret\":%d}", mRet);
 	ret = strlen(buffer);
 	return ret;
 }
 
-void DialplanRespond::SetParam(const string& user) {
-	mUser = user;
+void DialplanRespond::SetParam(bool ret) {
+	mRet = ret;
 }

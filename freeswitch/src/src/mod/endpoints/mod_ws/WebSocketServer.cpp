@@ -1,376 +1,950 @@
 /*
  * WebSocketServer.cpp
  *
- *  Created on: 2016年9月13日
- *      Author: Max.Chiu
+ *  Created on: 2016年9月14日
+ *      Author: max
  */
 
 #include "WebSocketServer.h"
+#include "WSClientParser.h"
 
-#define READ_BUFFER_SIZE 1024
-#define CLIENT_BUFFER_SIZE 1024 * 1024
+#ifndef INT32_MAX
+#define INT32_MAX 0x7fffffffL
+#endif
 
-typedef struct Client {
-	Client() {
-		pool = NULL;
+/***************************** 频道路由和状态接口 **************************************/
+switch_status_t ws_on_init(switch_core_session_t *session);
+switch_status_t ws_on_hangup(switch_core_session_t *session);
+switch_status_t ws_on_destroy(switch_core_session_t *session);
 
-		mutex = NULL;
-		buffer = NULL;
+switch_state_handler_table_t ws_state_handlers = {
+	/*.on_init */ ws_on_init,
+	/*.on_routing */ NULL,
+	/*.on_execute */ NULL,
+	/*.on_hangup */ ws_on_hangup,
+	/*.on_exchange_media */ NULL,
+	/*.on_soft_execute */ NULL,
+	/*.on_consume_media */ NULL,
+	/*.on_hibernate */ NULL,
+	/*.on_reset */ NULL,
+	/*.on_park */ NULL,
+	/*.on_reporting */ NULL,
+	/*.on_destroy */ ws_on_destroy
+};
+/***************************** 频道路由和状态接口 end **************************************/
 
-		socket = NULL;
-		disconnected = 0;
+/***************************** 音视频读写接口 **************************************/
+switch_call_cause_t ws_outgoing_channel(
+		switch_core_session_t *session,
+		switch_event_t *var_event,
+		switch_caller_profile_t *outbound_profile,
+		switch_core_session_t **newsession,
+		switch_memory_pool_t **inpool,
+		switch_originate_flag_t flags,
+		switch_call_cause_t *cancel_cause
+		);
+switch_status_t ws_receive_message(switch_core_session_t *session, switch_core_session_message_t *msg);
+switch_status_t ws_read_frame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id);
+switch_status_t ws_write_frame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id);
+switch_status_t ws_read_video_frame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id);
+switch_status_t ws_write_video_frame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id);
 
-		handleCountMutex = NULL;
-		handleCount = 0;
-	}
+switch_io_routines_t ws_io_routines = {
+	/*.outgoing_channel */ ws_outgoing_channel,
+	/*.read_frame */ ws_read_frame,
+	/*.write_frame */ ws_write_frame,
+	/*.kill_channel */ NULL,
+	/*.send_dtmf */ NULL,
+	/*.receive_message */ ws_receive_message,
+	/*.receive_event */ NULL,
+	/*.state_change*/ NULL,
+	/*.ws_read_vid_frame */ ws_read_video_frame,
+	/*.ws_write_vid_frame */ ws_write_video_frame
+};
+/***************************** 音视频读写接口 end **************************************/
 
-	void Create(switch_memory_pool_t* pool) {
-		this->pool = pool;
-
-		if( !mutex ) {
-			switch_mutex_init(&mutex, SWITCH_MUTEX_NESTED, pool);
-		}
-		if( !buffer ) {
-			switch_buffer_create(pool, &buffer, CLIENT_BUFFER_SIZE);
-		}
-		if( !handleCountMutex ) {
-			switch_mutex_init(&handleCountMutex, SWITCH_MUTEX_NESTED, pool);
-		}
-		handleCount = 0;
-	}
-
-	void Destroy() {
-		switch_log_printf(
-				SWITCH_CHANNEL_LOG,
-				SWITCH_LOG_INFO,
-				"WebSocketServer::Destroy( "
-				"client : %p, "
-				"socket : %p "
-				") \n",
-				this,
-				this->socket
-				);
-		if( buffer ) {
-			switch_buffer_destroy(&buffer);
-			buffer = NULL;
-		}
-		if( mutex ) {
-			switch_mutex_destroy(mutex);
-		}
-		if( handleCountMutex ) {
-			switch_mutex_destroy(handleCountMutex);
-		}
-	}
-
-	bool CheckBufferEnough() {
-		bool bFlag = true;
-		switch_buffer_lock(buffer);
-		bFlag = switch_buffer_inuse(buffer) < CLIENT_BUFFER_SIZE - READ_BUFFER_SIZE;
-		switch_buffer_unlock(buffer);
-		return bFlag;
-	}
-
-	void Read(char *buf, switch_size_t len) {
-		switch_buffer_lock(buffer);
-		switch_buffer_write(buffer, buf, len);
-		switch_buffer_unlock(buffer);
-	}
-
-	void Handle() {
-		switch_buffer_lock(buffer);
-		char temp[1024];
-		switch_size_t size = switch_buffer_read(buffer, temp, sizeof(temp));
-		if( size > 0 ) {
-			switch_log_printf(
-					SWITCH_CHANNEL_LOG,
-					SWITCH_LOG_INFO,
-					"WebSocketServer::Handle( "
-					"tid : %lld, "
-					"client : %p, "
-					"socket : %p, "
-					"buffer : %s"
-					") \n",
-					switch_thread_self(),
-					this,
-					this->socket,
-					temp
-					);
-		}
-		switch_buffer_unlock(buffer);
-	}
-
-	/**
-	 * 内存池
-	 */
-	switch_memory_pool_t *pool;
-
-	/**
-	 *	接收到的数据
-	 */
-	switch_mutex_t *mutex;
-	switch_buffer_t *buffer;
-
-	/**
-	 * socket
-	 */
-	Socket *socket;
-
-	/**
-	 * 是否已经断开连接
-	 */
-	bool disconnected;
-
-	/**
-	 * 处理队列中数量
-	 */
-	switch_mutex_t *handleCountMutex;
-	int handleCount;
-
-} Client;
-
-static void *SWITCH_THREAD_FUNC ws_handle_thread(switch_thread_t *thread, void *obj) {
-	WebSocketServer* server = (WebSocketServer*)obj;
-	server->HandleThreadHandle();
+/***************************** 频道路由和状态接口 **************************************/
+switch_status_t ws_on_init(switch_core_session_t *session)
+{
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "ws_on_init() session : %p \n", (void *)session);
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSOnInit(session);
 }
+
+switch_status_t ws_on_hangup(switch_core_session_t *session)
+{
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "ws_on_hangup() session : %p \n", (void *)session);
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSOnHangup(session);
+}
+
+switch_status_t ws_on_destroy(switch_core_session_t *session)
+{
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "ws_on_destroy() session : %p \n", (void *)session);
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSOnDestroy(session);
+}
+
+/***************************** 频道路由和状态接口 end **************************************/
+
+/***************************** 音视频读写接口 **************************************/
+switch_call_cause_t ws_outgoing_channel(
+		switch_core_session_t *session,
+		switch_event_t *var_event,
+		switch_caller_profile_t *outbound_profile,
+		switch_core_session_t **newsession,
+		switch_memory_pool_t **inpool,
+		switch_originate_flag_t flags,
+		switch_call_cause_t *cancel_cause
+		)
+{
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "ws_outgoing_channel() session : %p \n", (void *)session);
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSOutgoingChannel(session, var_event, outbound_profile, newsession, inpool, flags, cancel_cause);
+}
+
+switch_status_t ws_receive_message(switch_core_session_t *session, switch_core_session_message_t *msg)
+{
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSReceiveMessage(session, msg);
+}
+
+switch_status_t ws_read_frame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSReadFrame(session, frame, flags, stream_id);
+}
+
+switch_status_t ws_write_frame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSWriteFrame(session, frame, flags, stream_id);
+}
+
+switch_status_t ws_read_video_frame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSReadVideoFrame(session, frame, flags, stream_id);
+}
+
+switch_status_t ws_write_video_frame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
+	WebSocketServer* server = (WebSocketServer *)switch_core_session_get_private(session);
+	return server->WSWriteVideoFrame(session, frame, flags, stream_id);
+}
+/***************************** 音视频读写接口 end **************************************/
 
 WebSocketServer::WebSocketServer() {
 	// TODO Auto-generated constructor stub
-	mRunning = false;
-
-	mpPool = NULL;
-
-	mpClientHash = NULL;
-
-	mpHandleQueue = NULL;
-	mThreadCount = 4;
-	mpHandleThreads = NULL;
-
-	mpTcpServer = new TcpServer();
-	mpTcpServer->SetTcpServerCallback(this);
+	ws_endpoint_interface = NULL;
+	mpChannelHash = NULL;
+	mpHashrwlock = NULL;
+	mAsyncIOServer.SetAsyncIOServerCallback(this);
 }
 
 WebSocketServer::~WebSocketServer() {
 	// TODO Auto-generated destructor stub
-	Shutdown();
-
-	if( mpTcpServer ) {
-		delete mpTcpServer;
-		mpTcpServer = NULL;
-	}
 }
 
-bool WebSocketServer::Load(switch_memory_pool_t *pool) {
+bool WebSocketServer::Load(switch_memory_pool_t *pool, switch_loadable_module_interface_t* module_interface) {
 	bool bFlag = false;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::Load() \n");
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Load() \n");
 
-	// 读取配置
-	bFlag = LoadConfig();
+	mRunning = true;
+
+	if( module_interface ) {
+		// 创建终端接口
+		ws_endpoint_interface = (switch_endpoint_interface_t *) switch_loadable_module_create_interface(module_interface, SWITCH_ENDPOINT_INTERFACE);
+		ws_endpoint_interface->interface_name = "ws";
+		ws_endpoint_interface->io_routines = &ws_io_routines;
+		ws_endpoint_interface->state_handler = &ws_state_handlers;
+		bFlag = true;
+	}
 
 	if( bFlag ) {
-		mRunning = true;
+		// 读取配置
+		bFlag = LoadConfig();
+	}
 
-		// 创建处理队列
-		switch_queue_create(&mpHandleQueue, SWITCH_CORE_QUEUE_LEN, pool);
+	if( bFlag ) {
+		// 启动服务
+		char address[256] = {'\0'};
+		strncpy(address, (const char*)mProfile.bind_address, sizeof(address) - 1);
 
-		// 创建处理线程
-		switch_threadattr_t *thd_handle_attr = NULL;
-		switch_threadattr_create(&thd_handle_attr, pool);
-		switch_threadattr_detach_set(thd_handle_attr, 1);
-		switch_threadattr_stacksize_set(thd_handle_attr, SWITCH_THREAD_STACKSIZE);
-		switch_threadattr_priority_set(thd_handle_attr, SWITCH_PRI_IMPORTANT);
+		switch_port_t port = 8080;
 
-		mpHandleThreads = (switch_thread_t**)switch_core_alloc(pool, mThreadCount * sizeof(switch_thread_t*));
-		for(int i = 0; i < mThreadCount; i++) {
-			switch_thread_create(&mpHandleThreads[i], thd_handle_attr, ws_handle_thread, this, pool);
+		char *szport;
+		if ((szport = strchr(address, ':'))) {
+			*szport++ = '\0';
+			port = atoi(szport);
 		}
 
-		// 开始监听socket
-		bFlag = mpTcpServer->Start(pool, "0.0.0.0", 8080);
-
+		bFlag = mAsyncIOServer.Start(pool, mProfile.handle_thread, address, port);
 	}
 
 	if( bFlag ) {
-		// 创建在线列表
-		switch_core_hash_init(&mpClientHash);
+		// 创建会话列表
+		switch_core_hash_init(&mpChannelHash);
+		switch_thread_rwlock_create(&mpHashrwlock, pool);
 	}
 
 	if( bFlag ) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::Load( Success ) \n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Load( success ) \n");
 	} else {
 		Shutdown();
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::Load( Fail ) \n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Load( fail ) \n");
 	}
 
 	return bFlag;
 }
 
 void WebSocketServer::Shutdown() {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::Shutdown() \n");
-	mRunning = false;
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Shutdown() \n");
 
 	// 停止监听socket
-	mpTcpServer->Stop();
+	mAsyncIOServer.Stop();
 
-	// 停止处理线程
-	if( mpHandleThreads != NULL ) {
-		for(int i = 0; i < mThreadCount; i++) {
-			switch_status_t retval;
-			switch_thread_join(&retval, mpHandleThreads[i]);
-		}
+	// 销毁会话列表
+	if( mpChannelHash ) {
+		switch_core_hash_destroy(&mpChannelHash);
 	}
 
-	// 销毁处理队列
-	unsigned int size;
-	void* pop = NULL;
-	while(true) {
-		size = switch_queue_size(mpHandleQueue);
-		if( size == 0 ) {
-			break;
-		} else {
-			switch_queue_pop(mpHandleQueue, &pop);
-		}
-	}
+	mRunning = false;
 
-	// 销毁在线列表
-	switch_core_hash_destroy(&mpClientHash);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Shutdown( finish ) \n");
 }
 
 bool WebSocketServer::IsRuning() {
 	return mRunning;
 }
 
-void WebSocketServer::HandleThreadHandle() {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::HandleThreadHandle( start ) \n");
+void WebSocketServer::OnAccept(Client *client) {
+	WSClientParser* parser = new WSClientParser();
+	parser->SetWSClientParserCallback(this);
+	parser->SetClient(client);
+	client->parser = parser;
 
-	switch_interval_time_t timeout = 200000;
-	void* pop = NULL;
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::OnAccept( "
+			"client : %p, "
+			"parser : %p "
+			") \n",
+			client,
+			parser
+			);
+}
 
-	while( mRunning ) {
-		if ( SWITCH_STATUS_SUCCESS == switch_queue_pop_timeout(mpHandleQueue, &pop, timeout) ) {
-			Client* client = (Client *)pop;
-			// 客户端处理
-			client->Handle();
+void WebSocketServer::OnDisconnect(Client* client) {
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::OnDisconnect( "
+			"client : %p, "
+			"parser : %p "
+			") \n",
+			client,
+			client->parser
+			);
 
-			// 减少处理数
-			switch_mutex_lock(client->handleCountMutex);
-			client->handleCount--;
-			switch_mutex_unlock(client->handleCountMutex);
-			// 如果已经断开连接关闭socket
-			ClientCloseIfNeed(client);
+	WSClientParser* parser = (WSClientParser *)client->parser;
+	if( parser ) {
+		// Hang up if make call already
+		parser->Lock();
+		switch_core_session_t* session = parser->DestroyChannel(true);
+		parser->Disconnected();
+		parser->Unlock();
+
+		if( !session ) {
+			// 会话不存在
+			switch_log_printf(
+					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::OnDisconnect( "
+					"Real delete parser, "
+					"client : %p, "
+					"parser : %p "
+					") \n",
+					client,
+					client->parser
+					);
+
+			// 释放内存
+			delete parser;
+			client->parser = NULL;
+
+		} else {
+			// 存在会话
+			switch_log_printf(
+					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::OnDisconnect( "
+					"Waiting for session destroy, "
+					"client : %p, "
+					"parser : %p, "
+					"session : %p "
+					") \n",
+					client,
+					client->parser,
+					session
+					);
 		}
-	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::HandleThreadHandle( exit ) \n");
-}
-
-bool WebSocketServer::OnAceept(Socket* socket) {
-	switch_memory_pool_t *pool;
-	switch_core_new_memory_pool(&pool);
-
-	Client* client = (Client *)switch_core_alloc(pool, sizeof(Client));
-	client->socket = socket;
-	socket->data = client;
-
-	client->Create(pool);
-
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::OnAceept( client : %p, socket : %p ) \n", client, socket);
-
-	return true;
-}
-
-void WebSocketServer::OnRecvEvent(Socket* socket) {
-	Client* client = (Client *)(socket->data);
-
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::OnRecvEvent( client : %p, socket : %p ) \n", client, socket);
-
-	if( client != NULL ) {
-		// 尝试读取数据
-		char buf[READ_BUFFER_SIZE];
-		switch_size_t len = sizeof(buf);
-		switch_status_t status = SWITCH_STATUS_SUCCESS;
-
-		if( client->CheckBufferEnough() ) {
-			while (true) {
-				status = switch_socket_recv(socket->socket, (char *)buf, &len);
-				if( status == SWITCH_STATUS_SUCCESS ) {
-					// 读取数据成功
-					client->Read(buf, len);
-
-					// 放到处理队列
-					ClientHandle(client);
-
-				} else if( SWITCH_STATUS_IS_BREAK(status) ) {
-					// 没有数据可读超时返回, 不处理
-					break;
-				} else {
-					// 断开
-					client->disconnected = true;
-					ClientCloseIfNeed(client);
-					break;
-				}
-			}
-		}
 	}
 }
 
-void WebSocketServer::OnDisconnect(Socket* socket) {
-	Client* client = (Client *)(socket->data);
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::OnDisconnect( client : %p, socket : %p ) \n", client, socket);
+void WebSocketServer::OnWSClientParserHandshake(WSClientParser* parser) {
+	Client* client = (Client *)parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::OnWSClientParserHandshake( "
+			"parser : %p "
+			") \n",
+			parser
+			);
 
-	if( client != NULL ) {
-		client->disconnected = true;
+	// HankShake respond
+	char* buffer = NULL;
+	int datalen = 0;
+
+	parser->Lock();
+	parser->GetHandShakeRespond(&buffer, datalen);
+	parser->Unlock();
+
+	if( buffer != NULL && datalen > 0 ) {
+		const char* data = (const char*)buffer;
+		switch_size_t len = datalen;
+		mAsyncIOServer.Send(client, data, &len);
 	}
+
+	// Make call
+	parser->Lock();
+	CreateCall(parser/*, "WW0|||PC0|||1"*/);
+	parser->Unlock();
+}
+
+void WebSocketServer::OnWSClientParserData(WSClientParser* parser, const char* buffer, int len) {
+	Client* client = (Client *)parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::OnWSClientParserData( "
+			"parser : %p, "
+			"len : %d "
+			") \n",
+			parser,
+			len
+			);
+}
+
+void WebSocketServer::OnWSClientDisconected(WSClientParser* parser) {
+	Client* client = (Client *)parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::OnWSClientDisconected( "
+			"parser : %p "
+			") \n",
+			parser
+			);
+
+	mAsyncIOServer.Disconnect(client);
 }
 
 bool WebSocketServer::LoadConfig() {
 	bool bFlag = true;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::LoadConfig() \n");
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::LoadConfig() \n");
+
+	const char *file = "ws.conf";
+	switch_xml_t cfg, xml, x_profiles, x_profile;
+
+	if (!(xml = switch_xml_open_cfg(file, &cfg, NULL))) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "WebSocketServer::LoadConfig( Could not open : %s ) \n", file);
+		bFlag = false;
+	}
+
+	if( bFlag ) {
+		if (!(x_profiles = switch_xml_child(cfg, "profiles"))) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "WebSocketServer::LoadConfig( Could not load profiles ) \n");
+			bFlag = false;
+		}
+	}
+
+	if( bFlag ) {
+		bFlag = false;
+		for (x_profile = switch_xml_child(x_profiles, "profile"); x_profile; x_profile = x_profile->next) {
+			const char *name = switch_xml_attr_soft(x_profile, "name");
+			memset(&mProfile, 0, sizeof(mProfile));
+			strncpy(mProfile.name, name, sizeof(mProfile.name) - 1);
+			if( LoadProfile(&mProfile, &x_profile) ) {
+				bFlag = true;
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::LoadConfig( load profile : %s ) \n", name);
+				break;
+			} else {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "WebSocketServer::LoadConfig( Could not load profile : %s ) \n", name);
+			}
+		}
+	}
+
+	if( bFlag ) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::LoadConfig( success ) \n");
+	} else {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::LoadConfig( fail ) \n");
+	}
+
+	if (xml) {
+		switch_xml_free(xml);
+	}
 
 	return bFlag;
 }
 
-void WebSocketServer::ClientHandle(Client* client) {
-	switch_mutex_lock(client->handleCountMutex);
-	client->handleCount++;
-	switch_mutex_unlock(client->handleCountMutex);
+bool WebSocketServer::LoadProfile(WSProfile* profile, switch_xml_t* x_profile, switch_bool_t reload) {
+	bool bFlag = true;
+	switch_xml_t x_settings;
+	switch_event_t *event = NULL;
 
-	// 增加到处理队列
-	switch_queue_push(mpHandleQueue, client);
-
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::ClientHandle( "
-//			"client : %p, "
-//			"handleCount : %d "
-//			") \n",
-//			client,
-//			client->handleCount
-//			);
-}
-
-void WebSocketServer::ClientCloseIfNeed(Client* client) {
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "WebSocketServer::ClientCloseIfNeed( "
-//			"client : %p, "
-//			"handleCount : %d, "
-//			"disconnected : %d "
-//			") \n",
-//			client,
-//			client->handleCount,
-//			client->disconnected
-//			);
-
-	switch_mutex_lock(client->handleCountMutex);
-	if( client->handleCount == 0 && client->disconnected ) {
-		mpTcpServer->Close(client->socket);
-		// 移除在线列表
-
-		// 销毁客户端
-		client->Destroy();
-
-		// 释放内存池
-		switch_core_destroy_memory_pool(&client->pool);
-
-		client = NULL;
+	if (!(x_settings = switch_xml_child(*x_profile, "settings"))) {
+		bFlag = false;
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "WebSocketServer::LoadProfile( Could not load settings ) \n");
 	}
-	switch_mutex_unlock(client->handleCountMutex);
+
+	if( bFlag ) {
+		int count = switch_event_import_xml(switch_xml_child(x_settings, "param"), "name", "value", &event);
+
+		static switch_xml_config_int_options_t opt_bufferlen = {
+			SWITCH_TRUE,
+			0,
+			SWITCH_TRUE,
+			INT32_MAX
+		};
+
+		const char* context = NULL;
+		const char* dialplan = NULL;
+		const char* bind_address = NULL;
+
+		switch_xml_config_item_t instructions[] = {
+			/* parameter name        type                 reloadable   pointer                         default value     options structure */
+			SWITCH_CONFIG_ITEM("context", SWITCH_CONFIG_STRING, CONFIG_RELOADABLE, &context, "public", &switch_config_string_strdup,
+							   "", "The dialplan context to use for inbound calls"),
+			SWITCH_CONFIG_ITEM("dialplan", SWITCH_CONFIG_STRING, CONFIG_RELOADABLE, &dialplan, "LUA", &switch_config_string_strdup,
+							   "", "The dialplan to use for inbound calls"),
+			SWITCH_CONFIG_ITEM("bind-address", SWITCH_CONFIG_STRING, CONFIG_REQUIRED, &bind_address, "0.0.0.0:8080", &switch_config_string_strdup,
+							   "ip:port", "IP and port to bind"),
+			SWITCH_CONFIG_ITEM("buffer-len", SWITCH_CONFIG_INT, CONFIG_REQUIRED, &profile->buffer_len, 500, &opt_bufferlen, "", "Length of the receiving buffer to be used by the ws clients, in miliseconds"),
+			SWITCH_CONFIG_ITEM("handle-thread", SWITCH_CONFIG_INT, CONFIG_REQUIRED, &profile->handle_thread, 4, &opt_bufferlen, "", "Numbers of handle thread"),
+			SWITCH_CONFIG_ITEM("connection-timeout", SWITCH_CONFIG_INT, CONFIG_RELOADABLE, &profile->connection_timeout, 5000, &opt_bufferlen, "", "Millisecond of connection timeout time without sending data"),
+			// ------------------------
+			SWITCH_CONFIG_ITEM_END()
+		};
+
+		switch_status_t status = switch_xml_config_parse_event(event, count, reload, instructions);
+		bFlag = (status == SWITCH_STATUS_SUCCESS);
+
+		if( context ) {
+			strncpy(profile->context, context, sizeof(profile->context) - 1);
+		}
+		if( dialplan ) {
+			strncpy(profile->dialplan, dialplan, sizeof(profile->dialplan) - 1);
+		}
+		if( bind_address ) {
+			strncpy(profile->bind_address, bind_address, sizeof(profile->bind_address) - 1);
+		}
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::LoadProfile( "
+				"context : %s, "
+				"dialplan : %s, "
+				"bind_address : %s, "
+				"buffer_len : %d, "
+				"handle_thread : %d, "
+				"connection_timeout : %d "
+				") \n",
+				profile->context,
+				profile->dialplan,
+				profile->bind_address,
+				profile->buffer_len,
+				profile->handle_thread,
+				profile->connection_timeout
+				);
+	}
+
+	if (event) {
+		switch_event_destroy(&event);
+	}
+
+	return bFlag;
 }
+
+bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/) {
+	bool bFlag = false;
+
+	Client* client = (Client *)parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::CreateCall( "
+			"parser : %p "
+			/*"number : %s "*/
+			") \n",
+			parser
+			/*number*/
+			);
+
+	switch_core_session_t *newsession = NULL;
+	switch_channel_t* channel = NULL;
+	WSChannel* wsChannel = NULL;
+
+	if ( client != NULL &&
+			/*number != NULL &&*/
+			(newsession = switch_core_session_request(ws_endpoint_interface, SWITCH_CALL_DIRECTION_INBOUND, SOF_NONE, NULL))
+			) {
+		bFlag = true;
+	}
+
+	// 创建会话
+	if( bFlag ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_LOG_NOTICE,
+				"WebSocketServer::CreateCall( "
+				"New FreeSWITCH session created : %s "
+				") \n",
+				switch_core_session_get_uuid(newsession)
+				);
+		switch_core_session_set_private(newsession, (void *)this);
+
+		// 创建频道
+		wsChannel = parser->CreateCall(
+				newsession,
+				mProfile.name,
+//				number,
+				mProfile.context,
+				mProfile.dialplan,
+				client->socket->ip
+				);
+
+		if( wsChannel != NULL ) {
+			bFlag = true;
+		}
+	}
+
+	// 启动会话线程
+	if( bFlag ) {
+		if (switch_core_session_thread_launch(newsession) == SWITCH_STATUS_FALSE) {
+			switch_log_printf(
+					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_LOG_ERROR,
+					"WebSocketServer::CreateCall( "
+					"Couldn't spawn thread "
+					")\n"
+					);
+			bFlag = false;
+		}
+	}
+
+	// 插入会话列表
+	if( bFlag ) {
+		switch_core_hash_insert_wrlock(mpChannelHash, switch_core_session_get_uuid(newsession), wsChannel, mpHashrwlock);
+	}
+
+	// 创建会话失败
+	if( !bFlag ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_LOG_ERROR,
+				"WebSocketServer::CreateCall( "
+				"fail "
+				") \n"
+				);
+
+		if (!switch_core_session_running(newsession) && !switch_core_session_started(newsession)) {
+			switch_core_session_destroy(&newsession);
+		}
+	} else {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_LOG_NOTICE,
+				"WebSocketServer::CreateCall( "
+				"success, "
+				"parser : %p, "
+				"wsChannel : %p"
+				") \n",
+				parser,
+				wsChannel
+				);
+	}
+
+	return bFlag;
+}
+
+/***************************** 频道路由和状态接口 **************************************/
+switch_status_t WebSocketServer::WSOnInit(switch_core_session_t *session) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::WSOnInit( "
+			"parser : %p, "
+			"wsChannel : %p, "
+			"session : %p "
+			") \n",
+			wsChannel->parser,
+			wsChannel,
+			session
+			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+	switch_channel_set_flag(channel, CF_CNG_PLC);
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSOnHangup(switch_core_session_t *session) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::WSOnHangup( "
+			"parser : %p, "
+			"wsChannel : %p, "
+			"session : %p "
+			") \n",
+			wsChannel->parser,
+			wsChannel,
+			session
+			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSOnDestroy(switch_core_session_t *session) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::WSOnDestroy( "
+			"parser : %p, "
+			"wsChannel : %p, "
+			"session : %p "
+			") \n",
+			wsChannel->parser,
+			wsChannel,
+			session
+			);
+
+//	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	// 从会话列表删除
+	switch_thread_rwlock_wrlock(mpHashrwlock);
+	switch_core_hash_delete(mpChannelHash, switch_core_session_get_uuid(session));
+	switch_thread_rwlock_unlock(mpHashrwlock);
+
+	WSClientParser* parser = (WSClientParser *)wsChannel->parser;
+	if( parser ) {
+		parser->Lock();
+
+		// 销毁频道
+		parser->DestroyChannel(wsChannel, false);
+		if( !parser->IsConnected() ) {
+			parser->Unlock();
+
+			// 连接已经断开
+			switch_log_printf(
+					SWITCH_CHANNEL_SESSION_LOG(session),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::WSOnDestroy( "
+					"Real delete parser, "
+					"client : %p, "
+					"parser : %p "
+					") \n",
+					client,
+					parser
+					);
+
+			// 释放内存
+			delete parser;
+
+		} else {
+			// 连接还没断开
+			switch_log_printf(
+					SWITCH_CHANNEL_SESSION_LOG(session),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::WSOnDestroy( "
+					"Disconnect for hangup, "
+					"client : %p, "
+					"parser : %p "
+					") \n",
+					client,
+					parser
+					);
+			mAsyncIOServer.Disconnect(client);
+			parser->Unlock();
+		}
+	}
+
+	return SWITCH_STATUS_SUCCESS;
+}
+/***************************** 频道路由和状态接口 end **************************************/
+
+/***************************** 音视频读写接口 **************************************/
+switch_call_cause_t WebSocketServer::WSOutgoingChannel(
+		switch_core_session_t *session,
+		switch_event_t *var_event,
+		switch_caller_profile_t *outbound_profile,
+		switch_core_session_t **newsession,
+		switch_memory_pool_t **inpool,
+		switch_originate_flag_t flags,
+		switch_call_cause_t *cancel_cause
+		) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::WSOutgoingChannel( "
+			"parser : %p, "
+			"wsChannel : %p, "
+			"session : %p "
+			") \n",
+			wsChannel->parser,
+			wsChannel,
+			session
+			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	return SWITCH_CAUSE_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSReceiveMessage(switch_core_session_t *session, switch_core_session_message_t *msg) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_DEBUG,
+			"WebSocketServer::WSReceiveMessage( "
+			"parser : %p, "
+			"wsChannel : %p, "
+			"session : %p, "
+			"msg->message_id : %d "
+			") \n",
+			wsChannel->parser,
+			wsChannel,
+			session,
+			msg->message_id
+			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	switch (msg->message_id) {
+	case SWITCH_MESSAGE_INDICATE_ANSWER:
+		switch_channel_mark_answered(channel);
+		break;
+	case SWITCH_MESSAGE_INDICATE_RINGING:
+		switch_channel_mark_ring_ready(channel);
+		break;
+	case SWITCH_MESSAGE_INDICATE_PROGRESS:
+		switch_channel_mark_pre_answered(channel);
+		break;
+	case SWITCH_MESSAGE_INDICATE_HOLD:
+	case SWITCH_MESSAGE_INDICATE_UNHOLD:
+		break;
+	case SWITCH_MESSAGE_INDICATE_BRIDGE:
+		switch_log_printf(
+				SWITCH_CHANNEL_SESSION_LOG(session),
+				SWITCH_LOG_NOTICE,
+				"WebSocketServer::WSReceiveMessage( "
+				"Flushing read buffer "
+				") \n"
+				);
+
+		switch_mutex_lock(wsChannel->video_readbuf_mutex);
+		switch_buffer_zero(wsChannel->video_readbuf);
+		switch_mutex_unlock(wsChannel->video_readbuf_mutex);
+		break;
+	case SWITCH_MESSAGE_INDICATE_DISPLAY:
+		{
+			const char *name = msg->string_array_arg[0], *number = msg->string_array_arg[1];
+			char *arg = NULL;
+			char *argv[2] = { 0 };
+			//int argc;
+
+			if (zstr(name) && !zstr(msg->string_arg)) {
+				arg = strdup(msg->string_arg);
+				switch_assert(arg);
+
+				switch_separate_string(arg, '|', argv, (sizeof(argv) / sizeof(argv[0])));
+				name = argv[0];
+				number = argv[1];
+
+			}
+
+			if (!zstr(name)) {
+				if (zstr(number)) {
+					switch_caller_profile_t *caller_profile = switch_channel_get_caller_profile(channel);
+					number = caller_profile->destination_number;
+				}
+			}
+
+			switch_safe_free(arg);
+		}
+		break;
+	case SWITCH_MESSAGE_INDICATE_DEBUG_MEDIA:
+		break;
+	default:
+		break;
+	}
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSReadFrame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::WSReadFrame( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session
+//			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	wsChannel->read_frame.codec = &wsChannel->read_codec;
+
+	switch_core_timer_next(&wsChannel->timer);
+
+	wsChannel->read_frame.datalen = 2;
+	switch_byte_t* data = (switch_byte_t *)wsChannel->read_frame.data;
+	data[0] = 65;
+	data[1] = 0;
+
+	*frame = &wsChannel->read_frame;
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSWriteFrame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::WSWriteFrame( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session
+//			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSReadVideoFrame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	Client* client = (Client *)wsChannel->parser->GetClient();
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::WSReadVideoFrame( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session
+//			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+
+	wsChannel->video_read_frame.datalen = 0;
+	wsChannel->video_read_frame.flags = SFF_CNG;
+	wsChannel->video_read_frame.codec = &wsChannel->video_read_codec;
+
+	switch_yield(20000);
+
+	*frame = &wsChannel->video_read_frame;
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t WebSocketServer::WSWriteVideoFrame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+	WSClientParser *parser = wsChannel->parser;
+	Client* client = (Client *)wsChannel->parser->GetClient();
+	switch_byte_t *payload = (switch_byte_t *)frame->data;
+	int nalType = payload[0] & 0x1f;
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::WSWriteVideoFrame( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p, "
+//			"frame->datalen : %u, "
+//			"nalType : %u "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session,
+//			frame->datalen,
+//			nalType
+//			);
+
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+	const char* data = NULL;
+	switch_size_t len = 0;
+	switch_size_t dataLen = 0;
+
+	// Get H264 frame
+	if( parser->GetFrame(frame, &data, &dataLen) ) {
+		// Get frame success
+//		switch_log_printf(
+//				SWITCH_CHANNEL_SESSION_LOG(session),
+//				SWITCH_LOG_NOTICE,
+//				"WebSocketServer::WSWriteVideoFrame( "
+//				"parser : %p, "
+//				"wsChannel : %p, "
+//				"session : %p, "
+//				"real datalen : %u "
+//				") \n",
+//				wsChannel->parser,
+//				wsChannel,
+//				session,
+//				dataLen
+//				);
+
+		// Get WebSocket packet
+		char header[WS_HEADER_MAX_LEN] = {0};
+		WSPacket* packet = (WSPacket *)header;
+		parser->GetPacket(packet, dataLen);
+
+		// Send WebSocket header
+		len = packet->GetHeaderLength();
+		if( mAsyncIOServer.Send(client, (const char *)packet, &len) ) {
+			// Send playload
+			mAsyncIOServer.Send(client, data, &dataLen);
+		}
+
+		// Release video buffer
+		parser->DestroyVideoBuffer();
+	}
+
+	return SWITCH_STATUS_SUCCESS;
+}
+/***************************** 音视频读写接口 end **************************************/

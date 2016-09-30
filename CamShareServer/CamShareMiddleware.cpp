@@ -1163,7 +1163,7 @@ bool CamShareMiddleware::SendRespond2Client(
 /***************************** 内部服务(HTTP) 回调处理 **************************************/
 void CamShareMiddleware::OnClientGetDialplan(
 		Client* client,
-		const string& rtmpSession,
+		const string& caller,
 		const string& channelId,
 		const string& conference,
 		const string& serverId,
@@ -1175,7 +1175,7 @@ void CamShareMiddleware::OnClientGetDialplan(
 			"tid : %d, "
 			"[内部服务(HTTP), 收到命令:获取拨号计划], "
 			"fd : [%d], "
-			"rtmpSession : '%s', "
+			"caller : '%s', "
 			"channelId : '%s', "
 			"conference : '%s', "
 			"serverId : '%s', "
@@ -1183,15 +1183,12 @@ void CamShareMiddleware::OnClientGetDialplan(
 			")",
 			(int)syscall(SYS_gettid),
 			client->fd,
-			rtmpSession.c_str(),
+			caller.c_str(),
 			channelId.c_str(),
 			conference.c_str(),
 			serverId.c_str(),
 			siteId.c_str()
 			);
-
-	// 获根据rtmp session获取用户名
-	string caller = mFreeswitch.GetUserBySession(rtmpSession);
 
 	// 插入channel
     Channel channel(caller, conference, serverId, siteId);
@@ -1199,9 +1196,8 @@ void CamShareMiddleware::OnClientGetDialplan(
 
 	// 马上返回数据
 	DialplanRespond* respond = new DialplanRespond();
-	respond->SetParam(caller);
+	respond->SetParam(true);
 	SendRespond2Client(client, respond);
-
 }
 
 void CamShareMiddleware::OnClientRecordFinish(

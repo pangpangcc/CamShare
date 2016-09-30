@@ -19,15 +19,17 @@ function logChannelVar(k, v)
 end
 
 -- 获取会话变量
+source = session:getVariable("source")
 uuid = session:getVariable("uuid")
-rtmp_session = session:getVariable("rtmp_session")
+caller = session:getVariable("caller")
 destination_number = session:getVariable("destination_number")
 domain_name = session:getVariable("domain_name")
 network_addr = session:getVariable("network_addr")
 local_domain_name = freeswitch.getGlobalVariable("domain_name")
 
+logChannelVar("source", source)
 logChannelVar("uuid", uuid)
-logChannelVar("rtmp_session", rtmp_session)
+logChannelVar("caller", caller)
 logChannelVar("destination_number", destination_number)
 logChannelVar("domain_name", domain_name)
 logChannelVar("network_addr", network_addr)
@@ -54,7 +56,7 @@ if( #tables >= 3 ) then
 --  发起http请求, 获取拨号计划
   response = api:execute("curl", "http://".. local_domain_name .. ":9200" .. 
   "/GETDIALPLAN?" .. 
-  "rtmpSession=" .. rtmp_session .. 
+  "caller=" .. caller .. 
   "&channelId=" .. uuid ..
   "&conference=" .. conference .. 
   "&serverId=" .. serverId .. 
@@ -68,9 +70,9 @@ if( #tables >= 3 ) then
     body = json["body"];
     if body ~= nil then
       json = cjson.decode(body);
-      caller = json["caller"];
+      ret = json["ret"];
       
-      if string.len(caller) > 0 then
+      if ret == 1 then
         -- 会议
         ACTIONS = {
             {"set", "hangup_after_bridge=true"},

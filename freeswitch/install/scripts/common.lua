@@ -12,11 +12,11 @@
 
 -- 字符串分隔
 function string_split(str, sep)
-    print("common::string_split(" .. 
-    " str : '" .. str .. "'," ..
-    " sep : '" .. sep .. "'" ..
-    " )"
-    );
+--    print("common::string_split(" .. 
+--    " str : '" .. str .. "'," ..
+--    " sep : '" .. sep .. "'" ..
+--    " )\n"
+--    );
     
     local tables = {};
     local i = 1;

@@ -16,10 +16,10 @@ public:
 	virtual ~DialplanRespond();
 
 	int GetData(char* buffer, int len, bool &more);
-	void SetParam(const string& user);
+	void SetParam(bool ret);
 
 private:
-	string mUser;
+	bool mRet;
 };
 
 #endif /* DIALPLANRESPOND_H_ */

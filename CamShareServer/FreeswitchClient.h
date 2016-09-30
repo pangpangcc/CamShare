@@ -267,9 +267,14 @@ private:
 			);
 
 	/**
-	 * 根据UUID获取rtmp_session
+	 * 根据ChannelId获取用户名
 	 */
-	string GetSessionIdByUUID(const string& uuid);
+	string GetUserByUUID(const string& uuId);
+
+//	/**
+//	 * 根据UUID获取rtmp_session
+//	 */
+//	string GetSessionIdByUUID(const string& uuid);
 
 	/**
 	 * 在聊天室获取用户member_id
@@ -298,13 +303,13 @@ private:
 	 * 开始录制频道视频
 	 * @param	uuid	频道Id
 	 */
-	bool StartRecordChannel(const string& uuid);
+	bool StartRecordChannel(const string& uuId);
 
 	/**
 	 * 获取会话变量
 	 */
 	string GetChannelParam(
-			const string& uuid,
+			const string& uuId,
 			const string& key
 			);
 

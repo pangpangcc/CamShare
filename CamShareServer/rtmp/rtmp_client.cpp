@@ -23,9 +23,10 @@ using namespace std;
 
 #define VERSION_STRING "1.0.0"
 
-//#define SERVER_IP "127.0.0.1"
-#define SERVER_IP "192.168.88.152"
-#define MAX_CLIENT 100
+#define SERVER_IP "127.0.0.1"
+//#define SERVER_IP "192.168.88.152"
+#define MAX_CLIENT 1
+bool testReconnect = false;
 #define RECONN_MAX_TIME_MS (20*1000*1000)
 #define RECONN_CHECK_INTERVAL (200*1000)
 
@@ -663,7 +664,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	// test reconnect
-	bool testReconnect = true;
 	if (testReconnect) {
 		sleep(30);
                 srand(time(NULL));
