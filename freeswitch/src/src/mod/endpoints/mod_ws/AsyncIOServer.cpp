@@ -231,7 +231,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 						// 没有足够的缓存空间
 						switch_log_printf(
 								SWITCH_CHANNEL_UUID_LOG(client->uuid),
-								SWITCH_LOG_DEBUG,
+								SWITCH_LOG_INFO,
 								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, write error ) \n",
 								client,
 								socket
@@ -253,7 +253,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 					// 读取数据出错, 断开
 					switch_log_printf(
 							SWITCH_CHANNEL_UUID_LOG(client->uuid),
-							SWITCH_LOG_DEBUG,
+							SWITCH_LOG_INFO,
 							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read error : %d ) \n",
 							client,
 							socket,
@@ -267,7 +267,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 			// 缓存数据过大, 断开
 			switch_log_printf(
 					SWITCH_CHANNEL_UUID_LOG(client->uuid),
-					SWITCH_LOG_DEBUG,
+					SWITCH_LOG_INFO,
 					"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, buffer not enough error ) \n",
 					client,
 					socket
@@ -310,7 +310,14 @@ void AsyncIOServer::OnDisconnect(Socket* socket) {
 				client->recvHandleCount
 				);
 
+		bool bFlag = ClientCloseIfNeed(client);
+
 		switch_mutex_unlock(client->clientMutex);
+
+		if( bFlag ) {
+			// 销毁客户端
+			Client::Destroy(client);
+		}
 	}
 }
 

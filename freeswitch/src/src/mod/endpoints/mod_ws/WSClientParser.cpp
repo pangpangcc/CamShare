@@ -405,16 +405,16 @@ WSChannel* WSClientParser::CreateCall(
 		}
 	}
 
-	switch_log_printf(
-			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_NOTICE,
-			"WSClientParser::CreateCall( "
-			"context : %s, "
-			"dialplan : %s "
-			") \n",
-			context,
-			dialplan
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WSClientParser::CreateCall( "
+//			"context : %s, "
+//			"dialplan : %s "
+//			") \n",
+//			context,
+//			dialplan
+//			);
 
 	// 设置主叫
 	caller_profile = switch_caller_profile_new(

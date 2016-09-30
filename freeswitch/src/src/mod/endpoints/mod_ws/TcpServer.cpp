@@ -37,81 +37,97 @@ void TcpServer::SetTcpServerCallback(TcpServerCallback* callback) {
 bool TcpServer::Start(switch_memory_pool_t *pool, const char *ip, switch_port_t port) {
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "TcpServer::Start( Listening on %s:%u ) \n", ip, port);
 
-	bool bFlag = false;
+	bool bFlag = true;
 	switch_sockaddr_t *sa;
 	switch_threadattr_t *thd_handle_attr = NULL;
 
 	mpPool = pool;
+	mRunning = true;
 
 	mpSocket = Socket::Create();
 	mpSocket->SetAddress(ip, port);
 
-	if (switch_sockaddr_info_get(&sa, mpSocket->ip, SWITCH_INET, mpSocket->port, 0, mpPool)) {
-		return false;
+	if(switch_sockaddr_info_get(&sa, mpSocket->ip, SWITCH_INET, mpSocket->port, 0, mpPool)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_create(&mpSocket->socket, switch_sockaddr_get_family(sa), SOCK_STREAM, SWITCH_PROTO_TCP, mpPool)) {
-		return false;
+	if(switch_socket_create(&mpSocket->socket, switch_sockaddr_get_family(sa), SOCK_STREAM, SWITCH_PROTO_TCP, mpPool)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_opt_set(mpSocket->socket, SWITCH_SO_REUSEADDR, 1)) {
-		return false;
+	if(switch_socket_opt_set(mpSocket->socket, SWITCH_SO_REUSEADDR, 1)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_opt_set(mpSocket->socket, SWITCH_SO_TCP_NODELAY, 1)) {
-		return false;
+	if(switch_socket_opt_set(mpSocket->socket, SWITCH_SO_TCP_NODELAY, 1)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_bind(mpSocket->socket, sa)) {
-		return false;
+	if(switch_socket_bind(mpSocket->socket, sa)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_listen(mpSocket->socket, 10)) {
-		return false;
+	if(switch_socket_listen(mpSocket->socket, 10)) {
+		bFlag = false;
 	}
 
-	if (switch_socket_opt_set(mpSocket->socket, SWITCH_SO_NONBLOCK, TRUE)) {
-		return false;
+	if(switch_socket_opt_set(mpSocket->socket, SWITCH_SO_NONBLOCK, TRUE)) {
+		bFlag = false;
 	}
 
-	if (switch_pollset_create(&mpPollset, 1000 /* max poll fds */, pool, 0) != SWITCH_STATUS_SUCCESS) {
+	if(switch_pollset_create(&mpPollset, 10000 /* max poll fds */, pool, 0) != SWITCH_STATUS_SUCCESS) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_pollset_create failed ) \n");
-		return false;
+		bFlag = false;
 	}
 
-	switch_socket_create_pollfd(&mpPollfd, mpSocket->socket, SWITCH_POLLIN | SWITCH_POLLERR, mpSocket, pool);
+	if(switch_socket_create_pollfd(&mpPollfd, mpSocket->socket, SWITCH_POLLIN | SWITCH_POLLERR, mpSocket, pool) != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_socket_create_pollfd failed ) \n");
+		bFlag = false;
+	}
 
-	if (switch_pollset_add(mpPollset, mpPollfd) != SWITCH_STATUS_SUCCESS) {
+	if(switch_pollset_add(mpPollset, mpPollfd) != SWITCH_STATUS_SUCCESS) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_pollset_add failed ) \n");
-		return false;
+		bFlag = false;
 	}
 
-	switch_threadattr_create(&thd_handle_attr, mpPool);
-	switch_threadattr_detach_set(thd_handle_attr, 1);
-	switch_threadattr_stacksize_set(thd_handle_attr, SWITCH_THREAD_STACKSIZE);
-	switch_threadattr_priority_set(thd_handle_attr, SWITCH_PRI_IMPORTANT);
-	switch_thread_create(&mpIOThread, thd_handle_attr, ws_io_tcp_thread, this, mpPool);
+	if( bFlag ) {
+		switch_threadattr_create(&thd_handle_attr, mpPool);
+		switch_threadattr_detach_set(thd_handle_attr, 1);
+		switch_threadattr_stacksize_set(thd_handle_attr, SWITCH_THREAD_STACKSIZE);
+		switch_threadattr_priority_set(thd_handle_attr, SWITCH_PRI_IMPORTANT);
+		switch_thread_create(&mpIOThread, thd_handle_attr, ws_io_tcp_thread, this, mpPool);
+	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( Listening on %s:%u, success ) \n", mpSocket->ip, mpSocket->port);
-
-	mRunning = true;
+	if( bFlag ) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( Listening on %s:%u, success ) \n", mpSocket->ip, mpSocket->port);
+	} else {
+		Stop();
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( Listening on %s:%u, fail ) \n", mpSocket->ip, mpSocket->port);
+	}
 
 	return true;
 }
 
 void TcpServer::Stop() {
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( %s:%u ) \n", mpSocket->ip, mpSocket->port);
-	mRunning = false;
 
 	// 关掉监听socket
-	Disconnect(mpSocket);
+	if( mpSocket ) {
+		Disconnect(mpSocket);
+	}
+
+	mRunning = false;
 
 	// 停止IO线程
-	switch_status_t retval;
-	switch_thread_join(&retval, mpIOThread);
+	if( mpIOThread ) {
+		switch_status_t retval;
+		switch_thread_join(&retval, mpIOThread);
+	}
 
 	// 关闭监听Socket
-	Close(mpSocket);
+	if( mpSocket ) {
+		Close(mpSocket);
+	}
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( %s:%u, finish ) \n", mpSocket->ip, mpSocket->port);
 }

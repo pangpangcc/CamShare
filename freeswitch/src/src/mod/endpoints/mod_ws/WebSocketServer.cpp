@@ -478,16 +478,16 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 	bool bFlag = false;
 
 	Client* client = (Client *)parser->GetClient();
-	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
-			SWITCH_LOG_NOTICE,
-			"WebSocketServer::CreateCall( "
-			"parser : %p "
-			/*"number : %s "*/
-			") \n",
-			parser
-			/*number*/
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::CreateCall( "
+//			"parser : %p "
+//			/*"number : %s "*/
+//			") \n",
+//			parser
+//			/*number*/
+//			);
 
 	switch_core_session_t *newsession = NULL;
 	switch_channel_t* channel = NULL;
@@ -506,8 +506,10 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 				SWITCH_CHANNEL_UUID_LOG(client->uuid),
 				SWITCH_LOG_NOTICE,
 				"WebSocketServer::CreateCall( "
+				"parser : %p, "
 				"New FreeSWITCH session created : %s "
 				") \n",
+				parser,
 				switch_core_session_get_uuid(newsession)
 				);
 		switch_core_session_set_private(newsession, (void *)this);
@@ -552,8 +554,10 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 				SWITCH_CHANNEL_UUID_LOG(client->uuid),
 				SWITCH_LOG_ERROR,
 				"WebSocketServer::CreateCall( "
+				"parser : %p, "
 				"fail "
-				") \n"
+				") \n",
+				parser
 				);
 
 		if (!switch_core_session_running(newsession) && !switch_core_session_started(newsession)) {
@@ -564,9 +568,9 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 				SWITCH_CHANNEL_UUID_LOG(client->uuid),
 				SWITCH_LOG_NOTICE,
 				"WebSocketServer::CreateCall( "
-				"success, "
 				"parser : %p, "
-				"wsChannel : %p"
+				"wsChannel : %p, "
+				"success "
 				") \n",
 				parser,
 				wsChannel
@@ -723,20 +727,20 @@ switch_call_cause_t WebSocketServer::WSOutgoingChannel(
 switch_status_t WebSocketServer::WSReceiveMessage(switch_core_session_t *session, switch_core_session_message_t *msg) {
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 	Client* client = (Client *)wsChannel->parser->GetClient();
-	switch_log_printf(
-			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_DEBUG,
-			"WebSocketServer::WSReceiveMessage( "
-			"parser : %p, "
-			"wsChannel : %p, "
-			"session : %p, "
-			"msg->message_id : %d "
-			") \n",
-			wsChannel->parser,
-			wsChannel,
-			session,
-			msg->message_id
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_DEBUG,
+//			"WebSocketServer::WSReceiveMessage( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p, "
+//			"msg->message_id : %d "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session,
+//			msg->message_id
+//			);
 
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 
