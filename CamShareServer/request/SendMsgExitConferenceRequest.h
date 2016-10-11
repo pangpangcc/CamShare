@@ -20,12 +20,15 @@ public:
 
 	bool StartRequest();
 	void FinisRequest(bool bFinish);
+	string ParamString();
+
 	void SetParam(
 			FreeswitchClient* freeswitch,
 			ILiveChatClient* livechat,
 			int seq,
 			const string& fromId,
-			const string& toId
+			const string& toId,
+			const list<string>& userList
 			);
 
 	MemberType GetMemberType();
@@ -36,6 +39,7 @@ private:
 	int mSeq;
 	string mFromId;
 	string mToId;
+	list<string> mUserList;
 };
 
 #endif /* SENDMSGEXITCONFERENCEREQUEST_H_ */

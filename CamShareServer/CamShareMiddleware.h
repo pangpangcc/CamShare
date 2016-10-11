@@ -210,11 +210,13 @@ private:
 	 * @param	livechat
 	 * @param 	fromId		用户Id
 	 * @param 	toId		对方Id
+	 * @param	userList	会议室当前用户列表
 	 */
 	bool SendMsgEnterConference2LiveChat(
 			ILiveChatClient* livechat,
 			const string& fromId,
-			const string& toId
+			const string& toId,
+			const list<string>& userList
 			);
 
 	/**
@@ -222,11 +224,13 @@ private:
 	 * @param	livechat
 	 * @param 	fromId		用户Id
 	 * @param 	toId		对方Id
+	 * @param	userList	会议室当前用户列表
 	 */
 	bool SendMsgExitConference2LiveChat(
 			ILiveChatClient* livechat,
 			const string& fromId,
-			const string& toId
+			const string& toId,
+			const list<string>& userList
 			);
 
 	/**

@@ -25,7 +25,7 @@ using namespace std;
 
 #define SERVER_IP "127.0.0.1"
 //#define SERVER_IP "192.168.88.152"
-#define MAX_CLIENT 1
+#define MAX_CLIENT 100
 bool testReconnect = false;
 #define RECONN_MAX_TIME_MS (20*1000*1000)
 #define RECONN_CHECK_INTERVAL (200*1000)

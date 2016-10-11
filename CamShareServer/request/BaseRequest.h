@@ -16,6 +16,8 @@ public:
 	virtual ~BaseRequest();
 
 	virtual bool IsNeedReturn();
+
+	virtual string ToString();
 };
 
 #endif /* BASEREQUEST_H_ */

@@ -18,3 +18,7 @@ BaseRequest::~BaseRequest() {
 bool BaseRequest::IsNeedReturn() {
 	return true;
 }
+
+string BaseRequest::ToString() {
+	return "";
+}

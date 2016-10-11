@@ -9,6 +9,7 @@
 #include "LogManager.h"
 
 #include <common/StringHandle.h>
+#include <common/CommonFunc.h>
 
 static const char *LEVEL_NAMES[] = {
 	"EMERG",
@@ -178,6 +179,12 @@ bool FreeswitchClient::Proceed(
 
 			// 清空Rtmp在线用户
 	    	mRtmpSessionMap.Lock();
+	    	mRtmpSessionMap.Clear();
+	    	for(RtmpSessionMap::iterator itr = mRtmpSessionMap.Begin(); itr != mRtmpSessionMap.End();) {
+	    		RtmpList* list = itr->second;
+	    		delete list;
+	    		mRtmpSessionMap.Erase(itr++);
+	    	}
 	    	mRtmpSessionMap.Clear();
 	    	mRtmpUserMap.Clear();
 	    	mRtmpSessionMap.Unlock();
@@ -723,7 +730,6 @@ bool FreeswitchClient::SyncRtmpSessionList() {
 					    	} else {
 					    		itr2->second = user;
 					    	}
-
 							mRtmpSessionMap.Unlock();
 						}
 					}
@@ -996,6 +1002,25 @@ bool FreeswitchClient::AuthorizationAllConference() {
 				}
 			}
 			// 获取会议室结束
+		} else {
+			// XML解析错误
+			LogManager::GetLogManager()->Log(
+					LOG_ERR_USER,
+					"FreeswitchClient::AuthorizationAllConference( "
+					"tid : %d, "
+					"[Freeswitch, 重新验证当前所有会议室用户, XML解析错误], "
+					"errorId : %d, "
+					"errorDesc : %s, "
+					"errorRow : %d, "
+					"errorCol : %d "
+					")",
+					(int)syscall(SYS_gettid),
+					doc.ErrorId(),
+					doc.ErrorDesc(),
+					doc.ErrorRow(),
+					doc.ErrorCol()
+					);
+			bFlag = false;
 		}
 	}
 
@@ -1112,10 +1137,180 @@ unsigned int FreeswitchClient::GetOnlineUserCount() {
 			(int)syscall(SYS_gettid)
 			);
 	unsigned int count = 0;
-	mRtmpSessionMap.Lock();
-	count = mRtmpUserMap.Size();
-	mRtmpSessionMap.Unlock();
+//	mRtmpSessionMap.Lock();
+//	count = mRtmpUserMap.Size();
+//	mRtmpSessionMap.Unlock();
 	return count;
+}
+
+bool FreeswitchClient::GetConferenceUserList(
+		const string& conference,
+		list<string>& userList
+		) {
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"FreeswitchClient::GetConferenceUserList( "
+			"tid : %d, "
+			"[Freeswitch, 获取指定会议室用户列表], "
+			"conference : %s "
+			")",
+			(int)syscall(SYS_gettid),
+			conference.c_str()
+			);
+	bool bFlag = false;
+
+	string result = "";
+	if( conference.length() > 0 ) {
+		char temp[1024] = {'\0'};
+		snprintf(temp, sizeof(temp), "api conference %s xml_list", conference.c_str());
+		if( SendCommandGetResult(temp, result) ) {
+			bFlag = true;
+		}
+	}
+
+	if( bFlag ) {
+		TiXmlDocument doc;
+		doc.Parse(result.c_str());
+		if ( !doc.Error() ) {
+			int i = 0;
+			string conferenceName = "";
+
+			TiXmlHandle handle( &doc );
+			while ( true ) {
+				TiXmlHandle conferenceHandle = handle.FirstChild( "conferences" ).Child( "conference", i++ );
+				if ( conferenceHandle.ToNode() == NULL ) {
+					// 没有更多会议室
+					LogManager::GetLogManager()->Log(
+							LOG_MSG,
+							"FreeswitchClient::GetConferenceUserList( "
+							"tid : %d, "
+							"[Freeswitch, 获取指定会议室用户列表, 成功] "
+							")",
+							(int)syscall(SYS_gettid)
+							);
+					break;
+				}
+
+				TiXmlElement* conferenceElement = conferenceHandle.ToElement();
+				if( conferenceElement ) {
+					conferenceName = conferenceElement->Attribute("name");
+					LogManager::GetLogManager()->Log(
+							LOG_STAT,
+							"FreeswitchClient::GetConferenceUserList( "
+							"tid : %d, "
+							"[Freeswitch, 获取指定会议室用户列表, 获取到会议室], "
+							"conferenceName : %s "
+							")",
+							(int)syscall(SYS_gettid),
+							conferenceName.c_str()
+							);
+
+					string uuId = "";
+					string user = "";
+					int j = 0;
+
+					while( true ) {
+						TiXmlHandle memberHandle = conferenceHandle.FirstChild( "members" ).Child( "member", j++ );
+						if ( memberHandle.ToNode() == NULL ) {
+							// 没有更多会员
+							LogManager::GetLogManager()->Log(
+									LOG_STAT,
+									"FreeswitchClient::GetConferenceUserList( "
+									"tid : %d, "
+									"[Freeswitch, 获取指定会议室用户列表, 没有更多会员], "
+									"conferenceName : %s "
+									")",
+									(int)syscall(SYS_gettid),
+									conferenceName.c_str()
+									);
+							break;
+						}
+
+						const char* type = memberHandle.ToElement()->Attribute("type");
+						LogManager::GetLogManager()->Log(
+								LOG_STAT,
+								"FreeswitchClient::AuthorizationAllConference( "
+								"tid : %d, "
+								"[Freeswitch, 获取指定会议室用户列表, 获取到会员], "
+								"conferenceName : %s, "
+								"type : %s "
+								")",
+								(int)syscall(SYS_gettid),
+								conferenceName.c_str(),
+								type
+								);
+
+						if( strcmp(type, "caller") == 0 ) {
+							TiXmlElement* uuidElement = memberHandle.FirstChild("uuid").ToElement();
+							if( uuidElement ) {
+								uuId = uuidElement->GetText();
+								user = GetUserByUUID(uuId);
+							}
+
+							LogManager::GetLogManager()->Log(
+									LOG_STAT,
+									"FreeswitchClient::GetConferenceUserList( "
+									"tid : %d, "
+									"[Freeswitch, 获取指定会议室用户列表, 获取到用户], "
+									"conferenceName : %s, "
+									"user : %s, "
+									"uuId : %s "
+									")",
+									(int)syscall(SYS_gettid),
+									conferenceName.c_str(),
+									user.c_str(),
+									uuId.c_str()
+									);
+
+							if( user.length() > 0 ) {
+								// 加入到用户列表
+								userList.push_back(user);
+							}
+						}
+
+					}
+					// 获取会议室成员结束
+				}
+			}
+			// 获取会议室结束
+		} else {
+			// XML解析错误
+			LogManager::GetLogManager()->Log(
+					LOG_MSG,
+					"FreeswitchClient::GetConferenceUserList( "
+					"tid : %d, "
+					"[Freeswitch, 获取指定会议室用户列表, XML解析错误], "
+					"conference : %s, "
+					"errorId : %d, "
+					"errorDesc : %s, "
+					"errorRow : %d, "
+					"errorCol : %d "
+					")",
+					(int)syscall(SYS_gettid),
+					conference.c_str(),
+					doc.ErrorId(),
+					doc.ErrorDesc(),
+					doc.ErrorRow(),
+					doc.ErrorCol()
+					);
+			bFlag = false;
+		}
+	}
+
+	if( !bFlag ) {
+		LogManager::GetLogManager()->Log(
+				LOG_MSG,
+				"FreeswitchClient::GetConferenceUserList( "
+				"tid : %d, "
+				"[Freeswitch, 获取指定会议室用户列表, 失败], "
+				"conference : %s "
+				")",
+				(int)syscall(SYS_gettid),
+				conference.c_str()
+				);
+	}
+
+	return bFlag;
 }
 
 string FreeswitchClient::GetChannelParam(
@@ -1390,51 +1585,54 @@ bool FreeswitchClient::StartRecordConference(
 		) {
 	bool bFlag = false;
 
-	char temp[2048] = {'\0'};
 	string result = "";
 
 	// get current time
-	char timeBuffer[64];
 	time_t stm = time(NULL);
 	struct tm tTime;
 	localtime_r(&stm, &tTime);
-	snprintf(timeBuffer, 64, "%d%02d%02d%02d%02d%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-	char filePath[1024];
-	snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264",
+	// get directory
+	char dirPath[255] = {'\0'};
+	snprintf(dirPath, sizeof(dirPath), "%s/%02d/%02d/%02d",
 			mRecordingPath.c_str(),
-			conference.c_str(),
-			siteId.c_str(),
-			timeBuffer
+			tTime.tm_year + 1900,
+			tTime.tm_mon + 1,
+			tTime.tm_mday
 			);
-	outFilePath = filePath;
-
 	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
+			LOG_STAT,
 			"FreeswitchClient::StartRecordConference( "
 			"tid : %d, "
 			"[Freeswitch, 开始录制会议视频], "
 			"conference : '%s', "
 			"siteId : '%s', "
-			"outFilePath : '%s' "
+			"dirPath : '%s' "
 			")",
 			(int)syscall(SYS_gettid),
 			conference.c_str(),
 			siteId.c_str(),
-			outFilePath.c_str()
+			dirPath
 			);
+	if( MakeDir(dirPath) ) {
+		// get file path
+		char timeBuffer[64] = {'\0'};
+		snprintf(timeBuffer, 64, "%d%02d%02d%02d%02d%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-	snprintf(temp, sizeof(temp), "api conference %s record %s",
-			conference.c_str(),
-			outFilePath.c_str()
-			);
+		char filePath[256] = {'\0'};
+		snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264",
+				dirPath,
+				conference.c_str(),
+				siteId.c_str(),
+				timeBuffer
+				);
+		outFilePath = filePath;
 
-	if( SendCommandGetResult(temp, result) ) {
 		LogManager::GetLogManager()->Log(
-				LOG_MSG,
+				LOG_WARNING,
 				"FreeswitchClient::StartRecordConference( "
 				"tid : %d, "
-				"[Freeswitch, 开始录制会议视频, 成功], "
+				"[Freeswitch, 开始录制会议视频], "
 				"conference : '%s', "
 				"siteId : '%s', "
 				"outFilePath : '%s' "
@@ -1444,7 +1642,30 @@ bool FreeswitchClient::StartRecordConference(
 				siteId.c_str(),
 				outFilePath.c_str()
 				);
-		bFlag = true;
+
+		char temp[2048] = {'\0'};
+		snprintf(temp, sizeof(temp), "api conference %s record %s",
+				conference.c_str(),
+				outFilePath.c_str()
+				);
+
+		if( SendCommandGetResult(temp, result) ) {
+			LogManager::GetLogManager()->Log(
+					LOG_MSG,
+					"FreeswitchClient::StartRecordConference( "
+					"tid : %d, "
+					"[Freeswitch, 开始录制会议视频, 成功], "
+					"conference : '%s', "
+					"siteId : '%s', "
+					"outFilePath : '%s' "
+					")",
+					(int)syscall(SYS_gettid),
+					conference.c_str(),
+					siteId.c_str(),
+					outFilePath.c_str()
+					);
+			bFlag = true;
+		}
 	}
 
 	if( !bFlag ) {

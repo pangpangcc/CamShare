@@ -22,16 +22,7 @@ SendMsgEnterConferenceRequest::~SendMsgEnterConferenceRequest() {
 
 bool SendMsgEnterConferenceRequest::StartRequest() {
 	// 构造json协议
-	Json::Value root;
-	root["cmd"] = 1;
-
-	Json::Value data;
-	data["fromId"] = mFromId;
-	data["toId"] = mToId;
-	root["data"] = data;
-
-	Json::FastWriter writer;
-	string msg = writer.write(root);
+	string msg = ParamString();
 
 	// 向LiveChat client发送消息请求
 	return mpLivechat->SendMsg(mSeq, mFromId, mToId, msg);
@@ -45,11 +36,35 @@ void SendMsgEnterConferenceRequest::SetParam(
 		ILiveChatClient* livechat,
 		int seq,
 		const string& fromId,
-		const string& toId
+		const string& toId,
+		const list<string>& userList
 		) {
 	mpFreeswitch = freeswitch;
 	mpLivechat = livechat;
 	mSeq = seq;
 	mFromId = fromId;
 	mToId = toId;
+	std::copy(userList.begin(), userList.end(), std::back_inserter(mUserList));
+}
+
+string SendMsgEnterConferenceRequest::ParamString() {
+	// 构造json协议
+	Json::Value root;
+	root["cmd"] = 1;
+
+	Json::Value data;
+	data["fromId"] = mFromId;
+	data["toId"] = mToId;
+
+	Json::Value userList;
+	for(list<string>::const_iterator itr = mUserList.begin(); itr != mUserList.end(); itr++) {
+		userList.append(*itr);
+	}
+	data["userlist"] = userList;
+
+	root["data"] = data;
+	Json::FastWriter writer;
+	string msg = writer.write(root);
+
+	return msg;
 }

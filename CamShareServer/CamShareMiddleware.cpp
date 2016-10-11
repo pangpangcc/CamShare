@@ -1358,16 +1358,11 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 	// 踢出相同账户已经进入的其他连接
 	mFreeswitch.KickUserFromConference(channel->user, channel->conference, channel->memberId);
 
-	if( channel->user != channel->conference && !CheckTestAccount(channel->user) ) {
+	if( channel->user != channel->conference ) {
 		// 进入别人聊天室
-//		// 开放成员视频
-//		mFreeswitch.StartUserRecvVideo(user, conference, type);
-
-		// 进入别人的会议室
-		string serverId = channel->serverId;
-		string siteId = channel->siteId;
 
 		// 找出需要发送的LiveChat Client
+		string siteId = channel->siteId;
 		ILiveChatClient* livechat = NULL;
 		mLiveChatClientMap.Lock();
 		LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
@@ -1376,14 +1371,28 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 		}
 		mLiveChatClientMap.Unlock();
 
-		// 发送进入聊天室认证命令
-		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active) ) {
-			// 断开指定用户视频
-			freeswitch->KickUserFromConference(channel->user, channel->conference, "");
+		if( !CheckTestAccount(channel->user) ) {
+			// 非测试账号
+			string serverId = channel->serverId;
+
+			// 发送进入聊天室认证命令
+			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active) ) {
+				// 断开指定用户视频
+				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
+			}
+
+		} else {
+			// 测试账号
+			// 开放成员视频
+			mFreeswitch.StartUserRecvVideo(channel->user, channel->conference, channel->type);
 		}
 
+		// 获取用户列表
+		list<string> userList;
+		mFreeswitch.GetConferenceUserList(channel->conference, userList);
+
 		// 发送通知客户端进入聊天室命令
-		SendMsgEnterConference2LiveChat(livechat, channel->user, channel->conference);
+		SendMsgEnterConference2LiveChat(livechat, channel->user, channel->conference, userList);
 
 	} else {
 		// 进入自己会议室, 直接通过
@@ -1433,8 +1442,12 @@ void CamShareMiddleware::OnFreeswitchEventConferenceDelMember(
 			}
 			mLiveChatClientMap.Unlock();
 
+			// 获取用户列表
+			list<string> userList;
+			mFreeswitch.GetConferenceUserList(channel->conference, userList);
+
 			// 发送通知客户端退出聊天室命令
-			SendMsgExitConference2LiveChat(livechat, channel->user, channel->conference);
+			SendMsgExitConference2LiveChat(livechat, channel->user, channel->conference, userList);
 		}
 
 	}
@@ -1826,7 +1839,8 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 		ILiveChatClient* livechat,
 		const string& fromId,
-		const string& toId
+		const string& toId,
+		const list<string>& userList
 		) {
 	bool bFlag = true;
 
@@ -1840,6 +1854,9 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 		bFlag = false;
 	}
 
+	SendMsgEnterConferenceRequest request;
+	request.SetParam(&mFreeswitch, livechat, seq, fromId, toId, userList);
+
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
@@ -1847,19 +1864,17 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 			"[外部服务(LiveChat), 发送命令:通知客户端用户进入聊天室], "
 			"siteId : '%s', "
 			"fromId : '%s', "
-			"toId : '%s' "
+			"toId : '%s', "
+			"param : '%s' "
 			")",
 			(int)syscall(SYS_gettid),
 			siteId.c_str(),
 			fromId.c_str(),
-			toId.c_str()
+			toId.c_str(),
+			request.ParamString().c_str()
 			);
 
 	if( bFlag ) {
-		bFlag = false;
-
-		SendMsgEnterConferenceRequest request;
-		request.SetParam(&mFreeswitch, livechat, seq, fromId, toId);
 		bFlag = request.StartRequest();
 
 		if( bFlag ) {
@@ -1871,12 +1886,14 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 					"[外部服务(LiveChat), 发送命令:通知客户端用户进入聊天室, 成功], "
 					"siteId : '%s', "
 					"fromId : '%s', "
-					"toId : '%s' "
+					"toId : '%s', "
+					"param : '%s' "
 					")",
 					(int)syscall(SYS_gettid),
 					siteId.c_str(),
 					fromId.c_str(),
-					toId.c_str()
+					toId.c_str(),
+					request.ParamString().c_str()
 					);
 		}
 	}
@@ -1889,12 +1906,14 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 				"[外部服务(LiveChat), 发送命令:通知客户端用户进入聊天室, 失败], "
 				"siteId : '%s', "
 				"fromId : '%s', "
-				"toId : '%s' "
+				"toId : '%s', "
+				"param : '%s' "
 				")",
 				(int)syscall(SYS_gettid),
 				siteId.c_str(),
 				fromId.c_str(),
-				toId.c_str()
+				toId.c_str(),
+				request.ParamString().c_str()
 				);
 	}
 
@@ -1904,7 +1923,8 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 		ILiveChatClient* livechat,
 		const string& fromId,
-		const string& toId
+		const string& toId,
+		const list<string>& userList
 		) {
 	bool bFlag = true;
 
@@ -1917,6 +1937,10 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 	} else {
 		bFlag = false;
 	}
+
+	SendMsgExitConferenceRequest request;
+	request.SetParam(&mFreeswitch, livechat, seq, fromId, toId, userList);
+
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"CamShareMiddleware::SendMsgExitConference2LiveChat( "
@@ -1924,19 +1948,17 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 			"[外部服务(LiveChat), 发送命令:通知客户端用户退出聊天室], "
 			"siteId : '%s', "
 			"fromId : '%s', "
-			"toId : '%s' "
+			"toId : '%s', "
+			"param : '%s' "
 			")",
 			(int)syscall(SYS_gettid),
 			siteId.c_str(),
 			fromId.c_str(),
-			toId.c_str()
+			toId.c_str(),
+			request.ParamString().c_str()
 			);
 
 	if( bFlag ) {
-		bFlag = false;
-
-		SendMsgExitConferenceRequest request;
-		request.SetParam(&mFreeswitch, livechat, seq, fromId, toId);
 		bFlag = request.StartRequest();
 
 		if( bFlag ) {
@@ -1948,12 +1970,14 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 					"[外部服务(LiveChat), 发送命令:通知客户端用户退出聊天室, 成功], "
 					"siteId : '%s', "
 					"fromId : '%s', "
-					"toId : '%s' "
+					"toId : '%s', "
+					"param : '%s' "
 					")",
 					(int)syscall(SYS_gettid),
 					siteId.c_str(),
 					fromId.c_str(),
-					toId.c_str()
+					toId.c_str(),
+					request.ParamString().c_str()
 					);
 		}
 	}
@@ -1966,12 +1990,14 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 				"[外部服务(LiveChat), 发送命令:通知客户端用户退出聊天室, 失败], "
 				"siteId : '%s', "
 				"fromId : '%s', "
-				"toId : '%s' "
+				"toId : '%s', "
+				"param : '%s' "
 				")",
 				(int)syscall(SYS_gettid),
 				siteId.c_str(),
 				fromId.c_str(),
-				toId.c_str()
+				toId.c_str(),
+				request.ParamString().c_str()
 				);
 	}
 

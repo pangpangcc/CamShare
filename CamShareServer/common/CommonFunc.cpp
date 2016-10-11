@@ -11,13 +11,13 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <fstream>
 
 #ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
+#include <string.h>
 #else
 #include <windows.h>
 #endif
@@ -96,7 +96,12 @@ bool MakeDir(const string& path)
 			if (!IsDirExist(parentDir)) {
 				// 设备可读写权限（没有执行权限）
 #ifndef _WIN32
+#ifndef IOS
 				result = (0 == mkdir(parentDir.c_str(), 0660));
+#else
+                int mod = S_IRWXU | S_IRWXG | S_IRWXO;
+                result = (0 == mkdir(parentDir.c_str(), mod));
+#endif
 #else
 				result = (TRUE == CreateDirectory(parentDir.c_str(), NULL));
 #endif
@@ -159,35 +164,41 @@ bool RenameFile(const string& srcPath, const string& desPath)
 bool CopyFile(const string& srcPath, const string& desPath)
 {
 	bool result = false;
-	if (IsFileExist(srcPath)
-		&& !desPath.empty()
-		&& desPath.at(desPath.length()-1) != '/'
-		&& desPath.at(desPath.length()-1) != '\\')
+    
+    if (IsFileExist(srcPath))
 	{
-		// 删除目标文件
-		RemoveFile(desPath);
+        if (srcPath == desPath) {
+            result = true;
+        }
+        else if (!desPath.empty()
+                 && desPath.at(desPath.length()-1) != '/'
+                 && desPath.at(desPath.length()-1) != '\\')
+        {
+            // 删除目标文件
+            RemoveFile(desPath);
 
-		// 方法1:执行复制文件命令
-//		string cmd = "cp -f";
-//		cmd += srcPath;
-//		cmd += " ";
-//		cmd += desPath;
-//		system(cmd.c_str());
-		// 方法2:使用c++
-		ifstream srcStream(srcPath.c_str(), ios::in | ios::binary);
-		if (!srcStream.bad())
-		{
-			ofstream dstStream(desPath.c_str(), ios::out | ios::binary);
-			if (!dstStream.bad())
-			{
-				dstStream << srcStream.rdbuf();
-				dstStream.close();
-			}
-			srcStream.close();
-		}
+#ifdef _WIN32
+            std::locale loc1 = std::locale::global(std::locale(""));
+#endif
 
-		// 判断目标文件是否存在
-		result = IsFileExist(desPath);
+            ifstream srcStream(srcPath.c_str(), ios::in | ios::binary);
+            if (!srcStream.bad())
+            {
+                ofstream dstStream(desPath.c_str(), ios::out | ios::binary);
+                if (!dstStream.bad())
+                {
+                    dstStream << srcStream.rdbuf();
+                    dstStream.close();
+                }
+                srcStream.close();
+            }
+#ifdef _WIN32
+            std::locale::global(std::locale(loc1));
+#endif
+
+            // 判断目标文件是否存在
+            result = IsFileExist(desPath);
+        }
 	}
 	return result;
 }
@@ -229,33 +240,44 @@ bool CleanDir(const string& path)
 			closedir(dfd);
 		}
 #else
+		// 修正目录路径
+		string dirPath = path;
+		if (!dirPath.empty() 
+			&& dirPath.at(dirPath.length()-1) != '\\'
+			&& dirPath.at(dirPath.length()-1) != '/')
+		{
+			dirPath += '\\';
+		}
+
+		// 遍历目录文件
 		WIN32_FIND_DATA ffd; 
-		string strFind = path + "/*.*";
+		string strFind = dirPath + "*.*";
 		HANDLE hFind = FindFirstFile(strFind.c_str(), &ffd);
-		if (INVALID_HANDLE_VALUE == hFind)
+		if (INVALID_HANDLE_VALUE != hFind)
 		{
 			while (true)
 			{
-				if (0 == strcmp(ffd.cFileName, ".")
-					|| 0 == strcmp(ffd.cFileName, ".."))
+				if (0 != strcmp(ffd.cFileName, ".")
+					&& 0 != strcmp(ffd.cFileName, ".."))
 				{
-					continue;
-				}
-
-				string subPath = path + '/' + ffd.cFileName;
-				if (IsFileExist(subPath)) {
-					// 删除文件
-					RemoveFile(subPath);
-				}
-				else if (IsDirExist(subPath)) {
-					// 删除目录
-					RemoveDir(subPath);
+					string subPath = path + '/' + ffd.cFileName;
+					if (IsFileExist(subPath)) {
+						// 删除文件
+						RemoveFile(subPath);
+					}
+					else if (IsDirExist(subPath)) {
+						// 删除目录
+						RemoveDir(subPath);
+					}
 				}
 
 				if(!FindNextFile(hFind, &ffd)) {
 					break;
 				}
 			}
+
+			// 关闭句柄
+			FindClose(hFind);
 		}
 #endif
 	}

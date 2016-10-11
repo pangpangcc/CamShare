@@ -176,6 +176,7 @@ public:
 	 * 从会议室踢出用户
 	 * @param user	用户名
 	 * @param conference	会议室
+	 * @return true:成功/false:失败
 	 */
 	bool KickUserFromConference(
 			const string& user,
@@ -185,6 +186,7 @@ public:
 
 	/**
 	 * 允许用户开始观看聊天室视频
+	 * @return true:成功/false:失败
 	 */
 	bool StartUserRecvVideo(
 			const string& user,
@@ -206,11 +208,13 @@ public:
 
 	/**
 	 * 重新验证当前所有会议室用户
+	 * @return true:成功/false:失败
 	 */
 	bool AuthorizationAllConference();
 
 	/**
 	 * 创建频道
+	 * @return true:成功/false:失败
 	 */
 	bool CreateChannel(
 			const string& channelId,
@@ -233,6 +237,14 @@ public:
 	 * 获取在线用户数目
 	 */
 	unsigned int GetOnlineUserCount();
+
+	/**
+	 * 获取指定会议室用户列表
+	 * @param conference	会议室
+	 * @param userList		用户列表
+	 * @return true:成功/false:失败
+	 */
+	bool GetConferenceUserList(const string& conference, list<string>& userList);
 
 private:
 	/**

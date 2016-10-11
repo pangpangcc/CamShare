@@ -12,8 +12,14 @@
 
 #include "Socket.h"
 
+/**
+ * 每次读取数据Buffer Size
+ */
 #define READ_BUFFER_SIZE 1024
-#define CLIENT_BUFFER_SIZE 3 * 1024 * 1024
+/**
+ * 总读包缓存Buffer Size
+ */
+#define CLIENT_BUFFER_SIZE 1 * 1024 * 1024
 
 typedef struct Client {
 	static Client* Create(Socket *socket) {

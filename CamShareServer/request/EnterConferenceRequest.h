@@ -25,6 +25,7 @@ public:
 
 	bool StartRequest();
 	void FinisRequest(bool bFinish);
+
 	void SetParam(
 			FreeswitchClient* freeswitch,
 			ILiveChatClient* livechat,
