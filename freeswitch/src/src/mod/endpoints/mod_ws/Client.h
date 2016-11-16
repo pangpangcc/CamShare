@@ -64,7 +64,7 @@ typedef struct Client {
 
 		if( !buffer ) {
 			switch_buffer_create(pool, &buffer, CLIENT_BUFFER_SIZE);
-			switch_buffer_bzero(buffer);
+//			switch_buffer_bzero(buffer);
 		}
 
 		if( !clientMutex ) {
@@ -158,9 +158,8 @@ typedef struct Client {
 //							);
 
 					// 去除已经解析的Buffer
-					size = switch_buffer_recorvery(buffer, parseLen);
-					// for test
-					switch_buffer_bzero(buffer);
+//					size = switch_buffer_recorvery(buffer, parseLen);
+					size = switch_buffer_toss(buffer, parseLen);
 				}
 			}
 		}

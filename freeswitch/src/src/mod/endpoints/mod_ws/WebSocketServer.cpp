@@ -247,6 +247,7 @@ void WebSocketServer::OnDisconnect(Client* client) {
 
 	WSClientParser* parser = (WSClientParser *)client->parser;
 	if( parser ) {
+		parser->SetClient(NULL);
 		// Hang up if make call already
 		parser->Lock();
 		switch_core_session_t* session = parser->DestroyChannel(true);
@@ -493,11 +494,11 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 	switch_channel_t* channel = NULL;
 	WSChannel* wsChannel = NULL;
 
-	if ( client != NULL &&
-			/*number != NULL &&*/
-			(newsession = switch_core_session_request(ws_endpoint_interface, SWITCH_CALL_DIRECTION_INBOUND, SOF_NONE, NULL))
-			) {
-		bFlag = true;
+	if ( client != NULL ) {
+		newsession = switch_core_session_request(ws_endpoint_interface, SWITCH_CALL_DIRECTION_INBOUND, SOF_NONE, NULL);
+		if( newsession != NULL ) {
+			bFlag = true;
+		}
 	}
 
 	// 创建会话
@@ -560,9 +561,12 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 				parser
 				);
 
-		if (!switch_core_session_running(newsession) && !switch_core_session_started(newsession)) {
-			switch_core_session_destroy(&newsession);
+		if( newsession ) {
+			if (!switch_core_session_running(newsession) && !switch_core_session_started(newsession)) {
+				switch_core_session_destroy(&newsession);
+			}
 		}
+
 	} else {
 		switch_log_printf(
 				SWITCH_CHANNEL_UUID_LOG(client->uuid),

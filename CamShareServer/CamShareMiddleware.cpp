@@ -1526,7 +1526,15 @@ void CamShareMiddleware::OnDisconnect(
 
 }
 
-void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) {
+void CamShareMiddleware::OnSendEnterConference(
+		ILiveChatClient* livechat,
+		int seq,
+		const string& fromId,
+		const string& toId,
+		const string& key,
+		LCC_ERR_TYPE err,
+		const string& errmsg
+		) {
 	if( err == LCC_ERR_SUCCESS ) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
@@ -1537,14 +1545,16 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				"siteId : '%s', "
 				"seq : '%d', "
 				"fromId : '%s', "
-				"toId : '%s' "
+				"toId : '%s', "
+				"key : '%s' "
 				")",
 				(int)syscall(SYS_gettid),
 				livechat,
 				livechat->GetSiteId().c_str(),
 				seq,
 				fromId.c_str(),
-				toId.c_str()
+				toId.c_str(),
+				key.c_str()
 				);
 
 	} else {
@@ -1558,6 +1568,7 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				"seq : '%d', "
 				"fromId : '%s', "
 				"toId : '%s' "
+				"key : '%s', "
 				"err : '%d', "
 				"errmsg : '%s' "
 				")",
@@ -1567,17 +1578,10 @@ void CamShareMiddleware::OnSendEnterConference(ILiveChatClient* livechat, int se
 				seq,
 				fromId.c_str(),
 				toId.c_str(),
+				key.c_str(),
 				err,
 				errmsg.c_str()
 				);
-
-		// 结束会话
-		IRequest* request = mSessionManager.FinishSessionByCustomIdentify(livechat, fromId + toId);
-		if( request != NULL ) {
-			delete request;
-			request = NULL;
-		}
-
 		// 断开用户
 		mFreeswitch.KickUserFromConference(fromId, toId, "");
 	}
@@ -2077,8 +2081,10 @@ bool CamShareMiddleware::SendRecordFinish(
 				LOG_WARNING,
 				"CamShareMiddleware::SendRecordFinish( "
 				"[发送录制文件完成记录到服务器, 返回], "
+				"filePath : '%s', "
 				"respond : '%s' "
 				")",
+				record.filePath.c_str(),
 				respond
 				);
 		if( respondSize > 0 ) {

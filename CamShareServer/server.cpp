@@ -93,7 +93,9 @@ void SignalFunc(int sign_no) {
 
 	switch(sign_no) {
 	default:{
-		exit(EXIT_SUCCESS);
+		signal(sign_no, SIG_DFL);
+		kill(getpid(), sign_no);
+//		exit(EXIT_SUCCESS);
 	}break;
 	}
 }

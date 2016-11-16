@@ -22,7 +22,7 @@ public:
 	// 回调函数的参数在 err 之前的为请求参数，在 errmsg 之后为返回参数
 	virtual void OnConnect(ILiveChatClient* client, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnDisconnect(ILiveChatClient* client, LCC_ERR_TYPE err, const string& errmsg) = 0;
-	virtual void OnSendEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
+	virtual void OnSendEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, const string& key, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	// 服务器主动请求
 	virtual void OnRecvEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnRecvKickUserFromConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;

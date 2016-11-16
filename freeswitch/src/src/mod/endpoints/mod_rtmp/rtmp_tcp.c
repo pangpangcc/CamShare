@@ -152,7 +152,7 @@ again:
 		status = switch_socket_send_nonblock(io_pvt->socket, (char*)buf, len);
 
 		if ((status == 32 || SWITCH_STATUS_IS_BREAK(status)) && sanity-- > 0) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "sending too fast, retrying %d\n", sanity);
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "sending too fast, retrying %d\n", sanity);
 			goto again;
 		}
 
@@ -167,7 +167,7 @@ again:
 			break;
 		}
 
-		if (*len != orig_len) switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "sent %"SWITCH_SIZE_T_FMT" of %"SWITCH_SIZE_T_FMT"\n", *len, orig_len);
+		if (*len != orig_len) switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "sent %"SWITCH_SIZE_T_FMT" of %"SWITCH_SIZE_T_FMT"\n", *len, orig_len);
 		buf += *len;
 		remaining -= *len;
 		*len = remaining;

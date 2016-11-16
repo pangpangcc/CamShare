@@ -37,8 +37,10 @@ void EnterConferenceRequest::FinisRequest(bool bSuccess) {
 		// 任务处理失败
 		if( mCheckType != Timer ) {
 			// 不是定时检测
-			// 踢出用户
-			mpFreeswitch->KickUserFromConference(mFromId, mToId, "");
+			if( mpFreeswitch ) {
+				// 踢出用户
+				mpFreeswitch->KickUserFromConference(mFromId, mToId, "");
+			}
 		}
 	}
 }

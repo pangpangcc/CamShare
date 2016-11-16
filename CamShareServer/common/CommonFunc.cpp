@@ -96,12 +96,12 @@ bool MakeDir(const string& path)
 			if (!IsDirExist(parentDir)) {
 				// 设备可读写权限（没有执行权限）
 #ifndef _WIN32
-#ifndef IOS
-				result = (0 == mkdir(parentDir.c_str(), 0660));
-#else
+//#ifndef IOS
+//				result = (0 == mkdir(parentDir.c_str(), 0777));
+//#else
                 int mod = S_IRWXU | S_IRWXG | S_IRWXO;
                 result = (0 == mkdir(parentDir.c_str(), mod));
-#endif
+//#endif
 #else
 				result = (TRUE == CreateDirectory(parentDir.c_str(), NULL));
 #endif

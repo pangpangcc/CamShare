@@ -53,13 +53,13 @@ if support_test == 1 then
   if index ~= nil then
     value = string.sub(req_user, index, string.len(req_user));
     local size = string.len(value);
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
+--    freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
     
     if( size < 6 ) then
       result = 1
-      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
+      freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
     else 
-      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
+      freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
     end
   else
     freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
@@ -95,7 +95,7 @@ end
 
 -- 登陆成功
 if result == 1 then
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆成功:\n" .. req_user .. "\n");
+  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "登陆成功\n");
 	
   XML_STRING = 
   [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -116,5 +116,5 @@ if result == 1 then
   </document>]]
 end
 
-freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")
+--freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")
 freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->结束\n")

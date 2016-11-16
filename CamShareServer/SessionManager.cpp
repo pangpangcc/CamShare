@@ -190,20 +190,30 @@ bool SessionManager::StartSession(
 
 	/**
 	 * 开始任务
-	 * 1.不需要等待返回的请求
-	 * 2.不是重复的请求
+	 * 不需要等待返回的请求, 或者不是重复的请求
 	 */
 	if( !bNeedReturn || bRecord ) {
 		bFlag = request->StartRequest();
 	}
 
 	/**
-	 * 释放请求
-	 * 1.不需要等待返回的请求
-	 * 2.重复的请求
-	 * 3.启动失败的请求
+	 * 清除任务
+	 * 启动失败, 并且需要返回, 并且不是重复
 	 */
-	if( !bNeedReturn || !bRecord || !bFlag ) {
+	if( !bFlag ) {
+		if( bNeedReturn && bRecord ) {
+			// 需要返回, 并且不是重复
+			mLiveChat2SessionMap.Lock();
+			Session* session = NULL;
+			LiveChat2SessionMap::iterator itr = mLiveChat2SessionMap.Find(livechat);
+			if( itr != mLiveChat2SessionMap.End() ) {
+				session = itr->second;
+				session->EraseRequest(identify);
+			}
+			mLiveChat2SessionMap.Unlock();
+		}
+
+		// 释放请求
 		delete request;
 	}
 

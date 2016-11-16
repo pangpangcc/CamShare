@@ -161,7 +161,7 @@ public:
 	/***************************** 外部服务(LiveChat), 任务回调 **************************************/
 	void OnConnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
 	void OnDisconnect(ILiveChatClient* livechat, LCC_ERR_TYPE err, const string& errmsg);
-	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
+	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, const string& key, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvKickUserFromConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
 	/***************************** 外部服务(LiveChat), 任务回调 end **************************************/

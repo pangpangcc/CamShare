@@ -103,6 +103,6 @@ bool SendEnterConferenceTask::IsWaitToRespond()
 void SendEnterConferenceTask::OnDisconnect()
 {
 	if (NULL != m_listener) {
-		m_listener->OnSendEnterConference(m_client, GetSeq(), mFromId, mToId, LCC_ERR_CONNECTFAIL, "");
+		m_listener->OnSendEnterConference(m_client, GetSeq(), mFromId, mToId, mKey, LCC_ERR_CONNECTFAIL, "");
 	}
 }

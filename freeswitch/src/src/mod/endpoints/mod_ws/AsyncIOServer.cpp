@@ -132,14 +132,16 @@ bool AsyncIOServer::Send(Client* client, const char* buffer, switch_size_t* len)
 			);
 	bool bFlag = false;
 
-	switch_mutex_lock(client->clientMutex);
-	if( !client->disconnected ) {
-		bFlag = mTcpServer.Send(client->socket, buffer, len);
-		if( !bFlag ) {
-			Disconnect(client);
+	if( client ) {
+		switch_mutex_lock(client->clientMutex);
+		if( !client->disconnected ) {
+			bFlag = mTcpServer.Send(client->socket, buffer, len);
+			if( !bFlag ) {
+				Disconnect(client);
+			}
 		}
+		switch_mutex_unlock(client->clientMutex);
 	}
-	switch_mutex_unlock(client->clientMutex);
 
 	return bFlag;
 }
@@ -153,7 +155,9 @@ void AsyncIOServer::Disconnect(Client* client) {
 			") \n",
 			client
 			);
-	mTcpServer.Disconnect(client->socket);
+	if( client ) {
+		mTcpServer.Disconnect(client->socket);
+	}
 }
 
 bool AsyncIOServer::OnAccept(Socket* socket) {
