@@ -37,6 +37,7 @@ public class MainActivity extends Activity implements CamshareClientCallback {
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
 				camshareClient.Login("MM1", "192.168.88.152", "1", "SESSION123456", UserType.Man);
+//				camshareClient.Login("MM1", "172.25.10.32", "1", "SESSION123456", UserType.Man);
 			}
 		});
         

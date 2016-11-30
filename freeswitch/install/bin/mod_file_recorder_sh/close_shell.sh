@@ -88,4 +88,6 @@ fi
 if [ ! -e "$mp4filepath" ]; then
   PrintLog "mp4 file is not exist, userId:$userid, siteId:$siteid, startTime:$starttime, endTime:$endtime, mp4FileName:$mp4filename, mp4FilePath:$mp4filepath, cmd:$tranvideo_cmd"
   PrintLog "tranvideo_log:$tranvideo_log"
+else
+  rm -f $h264path
 fi

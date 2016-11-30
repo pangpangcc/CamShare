@@ -360,5 +360,5 @@ JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_Hangup
 JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_Stop
   (JNIEnv *env, jobject thiz, jlong jclient) {
 	CamshareClient* client = (CamshareClient *)jclient;
-	client->Stop();
+	client->Stop(true);
 }

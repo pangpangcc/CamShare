@@ -32,9 +32,15 @@ protected:
 					")"
 					);
 
+			// 断开连接
+			mContainer->Stop();
+
 		} else {
 			// 连接失败
-			mContainer->mRtmpClient.Close();
+			if( mContainer->mpCamshareClientListener ) {
+				mContainer->mpCamshareClientListener->OnDisconnect(mContainer);
+			}
+			mContainer->Stop();
 		}
 	}
 
@@ -65,7 +71,7 @@ CamshareClient::CamshareClient() {
 
 CamshareClient::~CamshareClient() {
 	// TODO Auto-generated destructor stub
-	Stop();
+	Stop(true);
 
 	if( mpRunnable ) {
 		delete mpRunnable;
@@ -100,7 +106,7 @@ bool CamshareClient::Start(
 			);
 
 	if( IsRunning() ) {
-		Stop();
+		Stop(true);
 	}
 
 	mbRunning = true;
@@ -128,16 +134,18 @@ bool CamshareClient::Start(
 			);
 
 	if( !bFlag ) {
-		Stop();
+		Stop(true);
 	}
 
 	return bFlag;
 }
 
-void CamshareClient::Stop() {
+void CamshareClient::Stop(bool bWait) {
 	FileLog("CamshareClient",
 			"CamshareClient::Stop( "
 			"this : %p, "
+			"bWait : %s, "
+			"mbRunning : %s, "
 			"hostName : %s, "
 			"user : %s, "
 			"site : %s, "
@@ -145,6 +153,8 @@ void CamshareClient::Stop() {
 			"userType : %d "
 			")",
 			this,
+			bWait?"true":"false",
+			mbRunning?"true":"false",
 			hostName.c_str(),
 			user.c_str(),
 			site.c_str(),
@@ -152,10 +162,17 @@ void CamshareClient::Stop() {
 			userType
 			);
 
+	if( !mbRunning ) {
+		return;
+	}
 	mbRunning = false;
 
 	mRtmpClient.Shutdown();
-	mClientThread.stop();
+
+	if( bWait ) {
+		mClientThread.stop();
+	}
+
 	mH264Decoder.Destroy();
 	mRtmpClient.Close();
 }

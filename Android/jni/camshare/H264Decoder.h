@@ -32,8 +32,8 @@ public:
 			unsigned int dataLen,
 			char* frame,
 			int& frameLen,
-			int width,
-			int height
+			int& width,
+			int& height
 			);
 
 	void SetRecordFile(const string& filePath);

@@ -46,6 +46,8 @@ camshare_name="CamShareServer"
 camsharedir_gz="$tempgzdir/$camshare_name.tar.gz"
 camsharedir="$tempdir/$camshare_name"
 tar zxvf $camsharedir_gz -C $tempdir
+# copy version file
+cp $currdir/version $camsharedir/
 cp -rf $camsharedir $dest_dir
 
 # decompression freeswitch.tar.gz

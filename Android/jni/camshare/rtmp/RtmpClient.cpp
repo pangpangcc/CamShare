@@ -102,6 +102,13 @@ typedef struct RTMP2RTP_HELPER_S {
 
 RtmpClient::RtmpClient() {
 	// TODO Auto-generated constructor stub
+	FileLog("RtmpClient",
+			"RtmpClient::RtmpClient( "
+			"this : %p "
+			")",
+			this
+			);
+
 	m_socketHandler = ISocketHandler::CreateSocketHandler(ISocketHandler::TCP_SOCKET);
 
 	mpRtmpClientListener = NULL;
@@ -111,6 +118,12 @@ RtmpClient::RtmpClient() {
 
 RtmpClient::~RtmpClient() {
 	// TODO Auto-generated destructor stub
+	FileLog("RtmpClient",
+			"RtmpClient::~RtmpClient( "
+			"this : %p "
+			")",
+			this
+			);
 	Close();
 
 	if( m_socketHandler ) {
@@ -137,9 +150,13 @@ void RtmpClient::SetRtmpClientListener(RtmpClientListener *listener) {
 bool RtmpClient::Connect(const string& hostName) {
 	FileLog("RtmpClient",
 			"RtmpClient::Connect( "
-			"hostName : %s "
+			"hostName : %s, "
+			"mbConnected : %s, "
+			"mbShutdown : %s "
 			")",
-			hostName.c_str()
+			hostName.c_str(),
+			mbConnected?"true":"false",
+			mbShutdown?"true":"false"
 			);
 	bool bFlag = false;
 
@@ -159,7 +176,7 @@ bool RtmpClient::Connect(const string& hostName) {
 	this->hostName = hostName;
 	if( hostName.length() > 0 ) {
 		bFlag = m_socketHandler->Create();
-		bFlag = bFlag & m_socketHandler->Connect(hostName, port, 0) == SOCKET_RESULT_SUCCESS;
+		bFlag = bFlag & m_socketHandler->Connect(hostName, port, 10 * 1000) == SOCKET_RESULT_SUCCESS;
 		if( bFlag ) {
 			m_socketHandler->SetBlock(true);
 			bFlag = HandShake();
@@ -202,7 +219,7 @@ bool RtmpClient::Connect(const string& hostName) {
 
 void RtmpClient::Shutdown() {
 	FileLog("RtmpClient",
-			"RtmpClient::Close( "
+			"RtmpClient::Shutdown( "
 			"port : %u, "
 			"user : '%s, "
 			"dest : '%s' "
@@ -221,9 +238,9 @@ void RtmpClient::Shutdown() {
 		if( m_socketHandler ) {
 			m_socketHandler->Shutdown();
 		}
+		mbShutdown = true;
 	}
 
-	mbShutdown = true;
 }
 
 void RtmpClient::Close() {
@@ -1212,9 +1229,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 				")"
 				);
 		Shutdown();
-		if( mpRtmpClientListener != NULL ) {
-			mpRtmpClientListener->OnDisconnect(this);
-		}
+//		if( mpRtmpClientListener != NULL ) {
+//			mpRtmpClientListener->OnDisconnect(this);
+//		}
 		bFlag = false;
 	}
 
@@ -1250,9 +1267,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 							")"
 							);
 					Shutdown();
-					if( mpRtmpClientListener != NULL ) {
-						mpRtmpClientListener->OnDisconnect(this);
-					}
+//					if( mpRtmpClientListener != NULL ) {
+//						mpRtmpClientListener->OnDisconnect(this);
+//					}
 					bFlag = false;
 					break;
 				}
@@ -1273,9 +1290,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 							")"
 							);
 					Shutdown();
-					if( mpRtmpClientListener != NULL ) {
-						mpRtmpClientListener->OnDisconnect(this);
-					}
+//					if( mpRtmpClientListener != NULL ) {
+//						mpRtmpClientListener->OnDisconnect(this);
+//					}
 					bFlag = false;
 					break;
 				}

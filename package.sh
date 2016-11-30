@@ -2,16 +2,17 @@
 
 # define param
 env=$1
+ver=$2
 
 # print param error
 param_err="0"
 if [ "$env" != "develop" ] && [ "$env" != "demo" ] && [ "$env" != "operating" ]; then
-  echo "$env"
-  echo "develop"
+  param_err="1"
+elif [ -z "$ver" ]; then
   param_err="1"
 fi
-if [ "$param_err" = "1" ]; then
-  echo "$0 [develop | demo | operating]"
+if [ "$param_err" != "0" ]; then
+  echo "$0 [develop | demo | operating] version"
   exit 0
 fi
 
@@ -19,6 +20,9 @@ fi
 rm -rf ./package
 mkdir ./package
 mkdir ./package/camshare
+
+# make version file
+echo $ver > ./package/camshare/version
 
 # package dependents tool
 cd deps

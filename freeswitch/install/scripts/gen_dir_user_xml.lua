@@ -70,8 +70,9 @@ end
 if result == 0 then 
   local loginPath = getLoginPath(siteId);
   if( loginPath ~= nil ) then
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. loginPath .. "\n");
-    response = api:execute("curl", loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom);
+    local url = loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom;
+    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
+    response = api:execute("curl", url);
     if response ~= nil then
       freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
       json = cjson.decode(response);

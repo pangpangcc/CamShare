@@ -81,8 +81,8 @@ public class CamshareClient implements CamshareClientJniCallback {
      * 国家
      */
     public enum UserType {
+    	Lady,
     	Man,
-    	Lady
     };
     
     /**

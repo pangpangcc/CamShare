@@ -1,6 +1,19 @@
 #!/bin/sh
 
+# define param
+ver=$1
+
+# print param error
+param_err="0"
+if [ -z "$ver" ]; then
+  param_err="1"
+fi
+if [ "$param_err" != "0" ]; then
+  echo "$0 version"
+  exit 0
+fi
+
 # build update package
-./update.sh develop &&
-./update.sh demo &&
-./update.sh operating
+./update.sh develop $ver &&
+./update.sh demo $ver &&
+./update.sh operating $ver

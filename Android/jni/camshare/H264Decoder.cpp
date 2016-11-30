@@ -97,8 +97,8 @@ bool H264Decoder::DecodeFrame(
 		unsigned int dataLen,
 		char* frame,
 		int& frameLen,
-		int width,
-		int height
+		int& width,
+		int& height
 		) {
 	bool bFlag = false;
 

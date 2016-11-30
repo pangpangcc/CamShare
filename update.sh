@@ -1,11 +1,18 @@
 #!/bin/sh
 
 # define param
-env=$1 
+env=$1
+ver=$2 
 
 # ---- print param error
+param_err="0"
 if [ "$env" != "develop" ] && [ "$env" != "demo" ] && [ "$env" != "operating" ]; then
-  echo "$0 [develop | demo | operating]"
+  param_err="1"
+elif [ -z "$ver" ]; then
+  param_err="2"
+fi
+if [ "$param_err" != "0" ]; then
+  echo "$0 [develop | demo | operating] version"
   exit 0
 fi
 
@@ -21,6 +28,9 @@ if [ -e $updatepackagepath ]; then
 fi
 rm -rf $updatefiledir/*
 mkdir -p $updatedir/file
+
+# ---- make version file
+echo "$ver" > $updatedir/version
 
 # ---- set update.sh executable
 chmod +x $updatedir/update.sh
@@ -48,8 +58,8 @@ chmod +x $updatedir/update.sh
 #cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $upatefiledir/
 
 # copy mod_rtmp files
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
 
 # copy mod_ws files
 cp -f /usr/local/freeswitch/mod/mod_ws.so $updatefiledir/
@@ -62,7 +72,7 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 # copy freeswitch scripts
 #cp -f ./freeswitch/install/scripts/common.lua $updatefiledir/
 #cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
 
 # remove freeswitch scripts config
 #rm -f $updatefiledir/site_config*.lua
@@ -92,6 +102,9 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 #cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
 #cp -f ./CamShareServer/bin/check_run.sh $updatefiledir/
 #cp -f ./CamShareServer/bin/dump_crash_log.sh $updatefiledir/
+
+# copy camshare clean shell
+cp -rf ./CamShareServer/bin/clean $updatefiledir/
 
 # build package
 mkdir -p $updatepackagedir

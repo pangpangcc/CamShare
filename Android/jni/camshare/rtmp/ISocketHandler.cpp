@@ -248,6 +248,12 @@ public:
 			if (msTimeout > 0) {
 				SetBlock(false);
 				if (connect(m_socket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
+					FileLog("ISocketHandler",
+							"ISocketHandler::Connect( "
+							"errno : %d "
+							")",
+							errno
+							);
 					if (errno == EINPROGRESS) {
 						timeval timeout;
 						timeout.tv_sec = msTimeout / 1000;
@@ -262,8 +268,21 @@ public:
 						if (ret == 0) {
 							result = SOCKET_RESULT_TIMEOUT;
 						}
-						else if (ret > 0 && 0 != FD_ISSET(m_socket, &exceptset)) {
-							result  = SOCKET_RESULT_SUCCESS;
+//						else if (ret > 0 && FD_ISSET(m_socket, &exceptset)) {
+						else if (ret > 0) {
+							int error, len;
+							getsockopt(m_socket, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len);
+//							FileLog("ISocketHandler",
+//									"ISocketHandler::Connect( "
+//									"ret : %d, "
+//									"error: %d "
+//									")",
+//									ret,
+//									error
+//									);
+							if(error == 0) {
+								result  = SOCKET_RESULT_SUCCESS;
+							}
 						}
 					}
 					else if (errno == 0) {

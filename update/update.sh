@@ -9,7 +9,7 @@ sleep 5
 
 # ---- freeswitch ----
 # freeswitch common config
-cp -f ./file/modules.conf.xml /usr/local/freeswitch/conf/autoload_configs/
+#cp -f ./file/modules.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch ./lib & ./mod files
 #cp -f ./file/lib/* /usr/local/freeswitch/lib/
@@ -32,14 +32,14 @@ cp -f ./file/mod_rtmp* /usr/local/freeswitch/mod/
 
 # freeswitch mod_ws
 cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
-cp -f ./file/ws.conf.xml /usr/local/freeswitch/conf/autoload_configs/
+#cp -f ./file/ws.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_logfile
-cp -f ./file/logfile.conf.xml /usr/local/freeswitch/conf/autoload_configs/
+#cp -f ./file/logfile.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # ---- camshare ----
 # camshare-middleware file
-cp -f ./file/camshare-middleware /usr/local/CamShareServer/
+#cp -f ./file/camshare-middleware /usr/local/CamShareServer/
 #cp -f ./file/camshare-middleware.config /usr/local/CamShareServer/
 
 # camshare shell
@@ -47,6 +47,12 @@ cp -f ./file/camshare-middleware /usr/local/CamShareServer/
 #cp -f ./file/stop.sh /usr/local/CamShareServer/
 #cp -f ./file/check_run.sh /usr/local/CamShareServer/
 #cp -f ./file/dump_crash_log.sh /usr/local/CamShareServer/
+
+# camshare clean shell
+cp -rf ./file/clean /usr/local/CamShareServer/
+
+# version
+cp -f ./version /usr/local/CamShareServer/
 
 # --- start camshare & freeswitch ---
 # run camshare & freeswitch

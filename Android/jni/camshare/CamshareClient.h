@@ -82,7 +82,7 @@ public:
 	/**
 	 * 停止连接或者断开流媒体服务器
 	 */
-	void Stop();
+	void Stop(bool bWait = false);
 
 	/**
 	 * 是否正在运行
