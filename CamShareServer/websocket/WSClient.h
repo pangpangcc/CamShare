@@ -43,8 +43,10 @@ public:
 
 	const string& GetUser();
 	bool IsConnected();
+	bool IsRunning();
 
 	void SetWSClientListener(WSClientListener *listener);
+
 	bool Connect(const string& hostName, const string& user, const string& dest);
 	void Shutdown();
 	void Close();
@@ -55,6 +57,7 @@ private:
 	 * Do it when TCP connected
 	 */
 	bool HandShake();
+	void Init();
 
 	unsigned short port;
 	string hostname;
@@ -63,6 +66,7 @@ private:
 	string mUser;
 	string mDest;
 
+	bool mbRunning;
 	bool mbConnected;
 	bool mbShutdown;
 

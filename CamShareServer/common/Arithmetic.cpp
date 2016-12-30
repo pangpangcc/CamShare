@@ -6,12 +6,13 @@
  * Description  : Class for Arithmetic 
  */
 
+#include "Arithmetic.h"
+
 #include <malloc.h>
 #include <string.h>
 #include <ctype.h>
 #include <iconv.h>
 #include "aes.h"
-#include "Arithmetic.hpp"
 
 char Arithmetic::hex[16] = {
 	'0','1','2','3','4','5','6','7',
@@ -563,7 +564,7 @@ size_t Arithmetic::ChangeCharset(char* outbuf, size_t outbytes, const char* inbu
     return (outbytes - 2 - outlen);
 }
 
-string Arithmetic::AsciiToHexWithSep(const char* data, int i_in_len) {
+string Arithmetic::AsciiToHexWithSep(char* data, int i_in_len) {
     string result = "";
     unsigned char c;
     for (int i = 0; i < i_in_len; i++){

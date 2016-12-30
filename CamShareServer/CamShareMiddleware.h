@@ -33,7 +33,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.7"
+#define VERSION_STRING "1.0.9"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -128,7 +128,8 @@ public:
 			const string& channelId,
 			const string& conference,
 			const string& serverId,
-			const string& siteId
+			const string& siteId,
+			const string& source
 			);
 	void OnClientRecordFinish(
 			Client* client,
@@ -433,6 +434,12 @@ private:
 	unsigned int mTotal;
 	unsigned int mResponed;
 	KMutex mCountMutex;
+
+	/**
+	 * 统计Makecall总数
+	 */
+	unsigned int mMakeCallTotal;
+	KMutex mMakeCallCountMutex;
 
 	/**
 	 * 监听线程输出间隔

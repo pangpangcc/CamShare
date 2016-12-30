@@ -6,6 +6,7 @@ package com.qpidnetwork.camshare;
 // The following four imports are needed saveBitmapToJPEG which
 // is for debug only
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.nio.ByteBuffer;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Environment;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -44,7 +46,13 @@ public class VideoRenderer implements Callback, VideoRendererInterface {
         if(surfaceHolder == null)
             return;
         surfaceHolder.addCallback(this);
-        CreateByteBuffer(508, 382);
+        CreateByteBuffer(220, 180);
+        
+        if(debug){
+        	File path = Environment.getExternalStorageDirectory();
+        	String filePath = path.getAbsolutePath();
+        	setLogDirPath(filePath + "/camshare/record");
+        }
     }
 
 	/**
@@ -124,12 +132,12 @@ public class VideoRenderer implements Callback, VideoRendererInterface {
         return bitmap;
     }
 
-    public ByteBuffer CreateByteBuffer(int width, int height) {
+    synchronized public ByteBuffer CreateByteBuffer(int width, int height) {
         Log.i(TAG, "CreateByteBuffer " + width + ":" + height);
-        if (bitmap == null) {
+//        if (bitmap == null) {
             bitmap = CreateBitmap(width, height);
             byteBuffer = ByteBuffer.allocateDirect(width * height * 5);
-        }
+//        }
         return byteBuffer;
     }
 
@@ -180,7 +188,22 @@ public class VideoRenderer implements Callback, VideoRendererInterface {
 	public void DrawFrame(byte[] data, int size, int timestamp) {
 		// TODO Auto-generated method stub
 		byteBuffer.put(data, 0, size);
+		
 		DrawByteBuffer();
 	}
 
+	@Override
+	public void ChangeRendererSize(int width, int height) {
+		// TODO Auto-generated method stub
+		 Log.i(TAG, "ChangeRendererSize " + width + ":" + height);
+		CreateByteBuffer(width, height);
+	}
+
+	
+	public void DrawFrame2(int[] data, int width, int height) {
+		// TODO Auto-generated method stub
+		bitmap = Bitmap.createBitmap(data, width, height, Bitmap.Config.RGB_565);
+		DrawBitmap();
+	}
+	
 }

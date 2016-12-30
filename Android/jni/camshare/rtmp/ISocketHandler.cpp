@@ -8,7 +8,7 @@
 #include "ISocketHandler.h"
 #include <common/KLog.h>
 #include <common/Arithmetic.h>
-
+#include <common/IPAddress.h>
 #ifdef WIN32
 class WinTcpSocketHandler : public ISocketHandler
 {
@@ -169,6 +169,8 @@ public:
 		m_socket = INVALID_SOCKET;
 		m_block = true;
 		port = 0;
+		m_supportIpv6 = false;
+		m_connStatus = CONNECTION_STATUS_DISCONNECT;
 	}
 	virtual ~LinuxTcpSocketHandler() {
 		Shutdown();
@@ -177,11 +179,12 @@ public:
 
 public:
 	// 创建socket
-	virtual bool Create()
+	virtual bool Create(bool supportIpv6)
 	{
 		if (INVALID_SOCKET == m_socket)
 		{
-			m_socket = socket(AF_INET, SOCK_STREAM, 0);
+            m_supportIpv6 = supportIpv6;
+            m_socket = socket(m_supportIpv6?AF_INET6:AF_INET, SOCK_STREAM, 0);
 		}
 		return INVALID_SOCKET != m_socket;
 	}
@@ -232,87 +235,118 @@ public:
 	{
 		SOCKET_RESULT_CODE result = SOCKET_RESULT_FAIL;
 
-		// 定义socketaddr
-		sockaddr_in server;
-		bzero(&server, sizeof(server));
-		server.sin_family = AF_INET;
-		server.sin_port = htons(port);
+		FileLog("CamshareClient",
+				"ISocketHandler::Connect( "
+				"ip : %s, "
+				"port : %d, "
+				"msTimeout : %d "
+				")",
+				ip.c_str(),
+				port,
+				msTimeout
+				);
 
-		if (INVALID_SOCKET != m_socket
-			&& !(inet_pton(AF_INET, ip.c_str(), &server.sin_addr) < 0))
-		{
+        if( m_supportIpv6 ) {
+            // 判断是否IPV6环境
+            struct addrinfo hints, *res, *res0;
+            bzero(&hints, sizeof(hints));
+            hints.ai_family = PF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags = AI_DEFAULT;
+
+            int error = getaddrinfo(ip.c_str(), "http", &hints, &res0);
+            if( !error ) {
+                for (res = res0; res; res = res->ai_next) {
+                    if(res->ai_family == AF_INET6) {
+                        // ipv6
+                        char ipv6_buf[INET6_ADDRSTRLEN] = { 0 };
+                        sockaddr_in6 *iddr = (sockaddr_in6 *)res->ai_addr;
+                        inet_ntop(res->ai_family, &(iddr->sin6_addr), ipv6_buf, sizeof(ipv6_buf));
+                        iddr->sin6_port = htons(port);
+
+                        result = Connect((struct sockaddr*)iddr, sizeof(sockaddr_in6), msTimeout);
+
+                    } else {
+                        // ipv4
+                        char ipv4_buf[INET_ADDRSTRLEN] = { 0 };
+                        sockaddr_in *iddr = (sockaddr_in *)res->ai_addr;
+                        inet_ntop(res->ai_family, &(iddr->sin_addr), ipv4_buf, sizeof(ipv4_buf));
+                        iddr->sin_port = htons(port);
+
+                        char ipv_buf[INET6_ADDRSTRLEN] = { 0 };
+                        sprintf(ipv_buf, "::FFFF:%s", IPAddress::Ipv42Ipv6(ipv4_buf).c_str());
+                        sockaddr_in6 iddr6;
+                        iddr6.sin6_family = AF_INET6;
+                        inet_pton(AF_INET6, ipv_buf, (void *)&iddr6.sin6_addr);
+                        iddr6.sin6_port = htons(port);
+
+                        result = Connect((struct sockaddr*)&iddr6, sizeof(sockaddr_in6), msTimeout);
+                    }
+
+                    if( result == SOCKET_RESULT_SUCCESS ) {
+                        break;
+                    }
+                }
+
+            }
+        } else {
+            // ipv4
+            sockaddr_in iddr;
+            iddr.sin_family = AF_INET;
+            iddr.sin_addr.s_addr = inet_addr(ip.c_str());
+            iddr.sin_port = htons(port);
+
+            result = Connect((struct sockaddr*)&iddr, sizeof(sockaddr_in), msTimeout);
+        }
+
+		FileLog("CamshareClient",
+				"ISocketHandler::Connect( "
+				"connect finish "
+				"m_socket : %d, "
+				"result : %d "
+				")",
+				m_socket,
+				result
+				);
+
+		return result;
+	}
+    SOCKET_RESULT_CODE Connect(struct sockaddr* server, int socketLen, int msTimeout) {
+        SOCKET_RESULT_CODE result = SOCKET_RESULT_FAIL;
+
+        if (INVALID_SOCKET != m_socket )
+        {
 			// 获取当前block状态
 			bool block = IsBlock();
 
-			// 连接
-			if (msTimeout > 0) {
-				SetBlock(false);
-				if (connect(m_socket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
-					FileLog("ISocketHandler",
-							"ISocketHandler::Connect( "
-							"errno : %d "
-							")",
-							errno
-							);
-					if (errno == EINPROGRESS) {
-						timeval timeout;
-						timeout.tv_sec = msTimeout / 1000;
-						timeout.tv_usec = msTimeout % 1000;
-						fd_set writeset, exceptset;
-						FD_ZERO(&writeset);
-						FD_SET(m_socket, &writeset);
-						FD_ZERO(&exceptset);
-						FD_SET(m_socket, &exceptset);
+			SetBlock(true);
 
-						int ret = select(FD_SETSIZE, NULL, &writeset, &exceptset, &timeout);
-						if (ret == 0) {
-							result = SOCKET_RESULT_TIMEOUT;
-						}
-//						else if (ret > 0 && FD_ISSET(m_socket, &exceptset)) {
-						else if (ret > 0) {
-							int error, len;
-							getsockopt(m_socket, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len);
-//							FileLog("ISocketHandler",
-//									"ISocketHandler::Connect( "
-//									"ret : %d, "
-//									"error: %d "
-//									")",
-//									ret,
-//									error
-//									);
-							if(error == 0) {
-								result  = SOCKET_RESULT_SUCCESS;
-							}
-						}
-					}
-					else if (errno == 0) {
-						result = SOCKET_RESULT_SUCCESS;
-					}
-				}
-				else {
-					result = SOCKET_RESULT_SUCCESS;
-				}
-			}
-			else {
-				SetBlock(true);
-				if (connect(m_socket, (struct sockaddr*)&server, sizeof(sockaddr_in)) == 0) {
-					result = SOCKET_RESULT_SUCCESS;
-				}
-			}
+            m_connStatus = CONNECTION_STATUS_CONNECTING;
+			if( msTimeout > 0 ) {
+                timeval timeout;
+                timeout.tv_sec = msTimeout / 1000;
+                timeout.tv_usec = msTimeout % 1000;
+                socklen_t len = sizeof(timeout);
+                setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, len);
+            }
 
-			// 回复block状态
+            if (connect(m_socket, (struct sockaddr*)server, socketLen) == 0) {
+                result = SOCKET_RESULT_SUCCESS;
+            }
+
+            if (SOCKET_RESULT_SUCCESS == result) {
+                m_connStatus = CONNECTION_STATUS_CONNECTED;
+            }
+            else {
+                m_connStatus = CONNECTION_STATUS_DISCONNECT;
+            }
+
+            // 回复block状态
 			SetBlock(block);
-		}
+        }
+        return result;
+    }
 
-		if( result == SOCKET_RESULT_SUCCESS ) {
-			sockaddr_in client;
-			socklen_t client_len = sizeof(client);
-			getsockname(m_socket, (struct sockaddr*)&client, &client_len);
-			this->port = ntohs(client.sin_port);
-		}
-		return result;
-	}
-	
 	// 发送
 	virtual HANDLE_RESULT Send(void* data, unsigned int dataLen)
 	{
@@ -347,8 +381,6 @@ public:
 					|| (iSent < 0 && (EWOULDBLOCK == errno || EINTR == errno)))
 				{
 					result = HANDLE_SUCCESS;
-				}
-				else {
 				}
 			}
 		}
@@ -397,8 +429,8 @@ public:
 //								dataSize
 //								);
 					} else {
-						// 接收失败
-//						FileLog("RtmpClient",
+//						// 接收失败
+//						FileLog("CamshareClient",
 //								"ISocketHandler::Recv( "
 //								"break, "
 //								"length : %d "
@@ -456,6 +488,12 @@ public:
 		return result;
 	}
 
+    // 获取当前连接状态
+    virtual CONNNECTION_STATUS GetConnectionStatus() const
+    {
+        return m_connStatus;
+    }
+
 //private:
 	// blocking设置
 	virtual bool SetBlock(bool block)
@@ -498,6 +536,8 @@ private:
 	SOCKET	m_socket;
 	bool	m_block;
 	unsigned short port;
+	bool    m_supportIpv6;
+    CONNNECTION_STATUS m_connStatus;
 };
 
 #endif

@@ -7,7 +7,7 @@
 
 #include "ISocketHandler.h"
 #include <common/KLog.h>
-
+#include <common/Arithmetic.h>
 
 #ifdef WIN32
 class WinTcpSocketHandler : public ISocketHandler
@@ -169,6 +169,7 @@ public:
 		m_socket = INVALID_SOCKET;
 		m_block = true;
 		port = 0;
+		m_connStatus = CONNECTION_STATUS_DISCONNECT;
 	}
 	virtual ~LinuxTcpSocketHandler() {
 		Shutdown();
@@ -230,6 +231,19 @@ public:
 	// 连接（msTimeout：超时时间(毫秒)，不大于0表示使用默认超时）
 	virtual SOCKET_RESULT_CODE Connect(const string& ip, unsigned int port, int msTimeout)
 	{
+		FileLog("RtmpClient",
+				"ISocketHandler::Connect( "
+				"m_socket : %d, "
+				"ip : %s, "
+				"port : %d, "
+				"msTimeout : %d "
+				")",
+				m_socket,
+				ip.c_str(),
+				port,
+				msTimeout
+				);
+
 		SOCKET_RESULT_CODE result = SOCKET_RESULT_FAIL;
 
 		// 定义socketaddr
@@ -244,42 +258,27 @@ public:
 			// 获取当前block状态
 			bool block = IsBlock();
 
-			// 连接
-			if (msTimeout > 0) {
-				SetBlock(false);
-				if (connect(m_socket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
-					if (errno == EINPROGRESS) {
-						timeval timeout;
-						timeout.tv_sec = msTimeout / 1000;
-						timeout.tv_usec = msTimeout % 1000;
-						fd_set writeset, exceptset;
-						FD_ZERO(&writeset);
-						FD_SET(m_socket, &writeset);
-						FD_ZERO(&exceptset);
-						FD_SET(m_socket, &exceptset);
+			SetBlock(true);
 
-						int ret = select(FD_SETSIZE, NULL, &writeset, &exceptset, &timeout);
-						if (ret == 0) {
-							result = SOCKET_RESULT_TIMEOUT;
-						}
-						else if (ret > 0 && 0 != FD_ISSET(m_socket, &exceptset)) {
-							result  = SOCKET_RESULT_SUCCESS;
-						}
-					}
-					else if (errno == 0) {
-						result = SOCKET_RESULT_SUCCESS;
-					}
-				}
-				else {
-					result = SOCKET_RESULT_SUCCESS;
-				}
+            m_connStatus = CONNECTION_STATUS_CONNECTING;
+			if( msTimeout > 0 ) {
+                timeval timeout;
+                timeout.tv_sec = msTimeout / 1000;
+                timeout.tv_usec = msTimeout % 1000;
+                socklen_t len = sizeof(timeout);
+                setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, len);
+            }
+
+			if (connect(m_socket, (struct sockaddr*)&server, sizeof(sockaddr_in)) == 0) {
+				result = SOCKET_RESULT_SUCCESS;
 			}
-			else {
-				SetBlock(true);
-				if (connect(m_socket, (struct sockaddr*)&server, sizeof(sockaddr_in)) == 0) {
-					result = SOCKET_RESULT_SUCCESS;
-				}
-			}
+
+            if (SOCKET_RESULT_SUCCESS == result) {
+                m_connStatus = CONNECTION_STATUS_CONNECTED;
+            }
+            else {
+                m_connStatus = CONNECTION_STATUS_DISCONNECT;
+            }
 
 			// 回复block状态
 			SetBlock(block);
@@ -291,6 +290,19 @@ public:
 			getsockname(m_socket, (struct sockaddr*)&client, &client_len);
 			this->port = ntohs(client.sin_port);
 		}
+
+		FileLog("RtmpClient",
+				"ISocketHandler::Connect( "
+				"connect finish "
+				"m_socket : %d, "
+				"result : %d, "
+				"errno : %d "
+				")",
+				m_socket,
+				result,
+				errno
+				);
+
 		return result;
 	}
 	
@@ -329,8 +341,6 @@ public:
 				{
 					result = HANDLE_SUCCESS;
 				}
-				else {
-				}
 			}
 		}
 		return result;
@@ -346,10 +356,53 @@ public:
 			if ( IsBlock() )
 			{
 				// blocking receive
+				int length = 0;
 				dataLen = 0;
-				int length = recv(m_socket, (char*)data, dataSize, 0);
-				if (length > 0) {
-					dataLen = length;
+//				FileLog("RtmpClient",
+//						"ISocketHandler::Recv( "
+//						"dataSize : %d "
+//						")",
+//						dataSize
+//						);
+
+				while( dataLen < dataSize ) {
+					length = recv(m_socket, (char*)data + dataLen, dataSize - dataLen, 0);
+					if( length > 0 ) {
+//						string str = Arithmetic::AsciiToHexWithSep(data + dataLen, length);
+//						FileLog("RtmpClient",
+//								"ISocketHandler::Recv( "
+//								"str : %s "
+//								")",
+//								str.c_str()
+//								);
+
+						dataLen += length;
+//						FileLog("RtmpClient",
+//								"ISocketHandler::Recv( "
+//								"length : %d, "
+//								"dataLen : %d, "
+//								"dataSize : %d "
+//								")",
+//								length,
+//								dataLen,
+//								dataSize
+//								);
+					} else {
+//						// 接收失败
+//						FileLog("CamshareClient",
+//								"ISocketHandler::Recv( "
+//								"break, "
+//								"length : %d "
+//								")",
+//								length
+//								);
+
+						break;
+					}
+				}
+
+				// 接收足够数据才算成功
+				if ( dataLen == dataSize ) {
 					result = HANDLE_SUCCESS;
 				}
 			}
@@ -395,6 +448,12 @@ public:
 	}
 
 //private:
+    // 获取当前连接状态
+    virtual CONNNECTION_STATUS GetConnectionStatus() const
+    {
+        return m_connStatus;
+    }
+
 	// blocking设置
 	virtual bool SetBlock(bool block)
 	{
@@ -436,6 +495,7 @@ private:
 	SOCKET	m_socket;
 	bool	m_block;
 	unsigned short port;
+	CONNNECTION_STATUS m_connStatus;
 };
 
 #endif

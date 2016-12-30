@@ -8,7 +8,7 @@
 			<!-- How much time should the clients buffer the media stream (miliseconds) -->
 			<param name="buffer-len" value="200" />
 			<!-- Numbers of handle thread -->
-			<param name="handle-thread" value="4"/>
+			<param name="handle-thread" value="8"/>
 			<!-- Millisecond of connection timeout time without sending data -->
 			<param name="connection-timeout" value="10000"/>
 		</settings>

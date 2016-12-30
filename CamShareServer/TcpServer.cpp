@@ -8,8 +8,8 @@
 
 #include "TcpServer.h"
 
-#include <common/Arithmetic.hpp>
 #include <common/TimeProc.hpp>
+#include <common/Arithmetic.h>
 
 //static struct ev_loop *gLoop = NULL;
 
@@ -30,12 +30,12 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 
 //void send_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//			"tid : %d, "
+//			
 //			"fd : [%d], "
 //			"revents : [0x%x], "
 //			"start "
 //			")",
-//			(int)syscall(SYS_gettid),
+//			,
 //			w->fd,
 //			revents
 //			);
@@ -49,12 +49,12 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //	Message *m = pTcpServer->GetSendMessageList()[fd].PopFront();
 //	if( m == NULL ) {
 //		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//				"tid : %d, "
+//				
 //				"fd : [%d], "
 //				"m == NULL, "
 //				"exit "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				fd
 //				);
 //
@@ -77,11 +77,11 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //
 //	if( revents & EV_ERROR ) {
 //		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//				"tid : %d, "
+//				
 //				"fd : [%d], "
 //				"(revents & EV_ERROR) "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				fd
 //				);
 //		pTcpServer->OnDisconnect(fd, m);
@@ -91,11 +91,11 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //	unsigned long start = GetTickCount();
 //	do {
 //		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//				"tid : %d, "
+//				
 //				"fd : [%d], "
 //				"message : \n%s\n "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				fd,
 //				buffer + index
 //				);
@@ -104,11 +104,11 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //			index += ret;
 //			if( index == len ) {
 //				LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//						"tid : %d, "
+//						
 //						"fd : [%d], "
 //						"send finish "
 //						")",
-//						(int)syscall(SYS_gettid),
+//						,
 //						fd
 //						);
 //
@@ -130,11 +130,11 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //			}
 //		} else if( ret == 0 ) {
 //			LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//					"tid : %d, "
+//					
 //					"fd : [%d], "
 //					"normal closed "
 //					")",
-//					(int)syscall(SYS_gettid),
+//					,
 //					fd
 //					);
 //			pTcpServer->OnDisconnect(fd, m);
@@ -142,19 +142,19 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //		} else {
 //			if(errno == EAGAIN || errno == EWOULDBLOCK) {
 //				LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//						"tid : %d, "
+//						
 //						"errno == EAGAIN || errno == EWOULDBLOCK continue "
 //						")",
-//						(int)syscall(SYS_gettid)
+//						
 //						);
 //				continue;
 //			} else {
 //				LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//						"tid : %d, "
+//						
 //						"fd : [%d], "
 //						"error closed "
 //						")",
-//						(int)syscall(SYS_gettid),
+//						,
 //						fd
 //						);
 //				pTcpServer->OnDisconnect(fd, m);
@@ -166,12 +166,12 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //
 ////	pTcpServer->GetSendMessageList()[fd] = NULL;
 //	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::send_callback( "
-//			"tid : %d, "
+//			
 //			"fd : [%d], "
 //			"revents : [0x%x], "
 //			"exit "
 //			")",
-//			(int)syscall(SYS_gettid),
+//			,
 //			w->fd,
 //			revents
 //			);
@@ -179,11 +179,11 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //
 //void async_send_callback(struct ev_loop *loop, ev_async *w, int revents) {
 //	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::async_send_callback( "
-//			"tid : %d, "
+//			
 //			"revents : [0x%x], "
 //			"start "
 //			")",
-//			(int)syscall(SYS_gettid),
+//			,
 //			revents);
 //
 //	TcpServer *pTcpServer = (TcpServer *)ev_userdata(loop);
@@ -193,19 +193,19 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //		Message *m = pTcpServer->GetHandleSendMessageList()->PopFront();
 //		if( NULL == m ) {
 //			LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::async_send_callback( "
-//					"tid : %d, "
+//					
 //					"m == NULL "
 //					")",
-//					(int)syscall(SYS_gettid)
+//					
 //					);
 //			break;
 //		}
 //
 //		LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::async_send_callback( "
-//				"tid : %d, "
+//				
 //				"m->fd : [%d] "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				m->fd
 //				);
 //
@@ -226,21 +226,21 @@ void recv_callback(struct ev_loop *loop, ev_io *w, int revents) {
 //
 //		} else {
 //			LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::async_send_callback( "
-//					"tid : %d, "
+//					
 //					"no more watcher "
 //					")",
-//					(int)syscall(SYS_gettid),
+//					,
 //					revents);
 //		}
 //
 //	} while( true );
 //
 //	LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::async_send_callback( "
-//				"tid : %d, "
+//				
 //				"revents : [0x%x], "
 //				"exit "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				revents);
 //}
 
@@ -316,13 +316,11 @@ protected:
 			}
 
 			LogManager::GetLogManager()->Log(LOG_STAT, "HandleRunnable::onRun( "
-					"tid: %d, "
 					"m->fd: [%d], "
 					"m->len : %d, "
 					"mIndex : %d "
 					"start "
 					")",
-					(int)syscall(SYS_gettid),
 					m->fd,
 					m->len,
 					mIndex
@@ -341,12 +339,10 @@ protected:
 
 			/* push into idle queue */
 			LogManager::GetLogManager()->Log(LOG_STAT, "HandleRunnable::onRun( "
-					"tid: %d, "
 					"m->fd: [%d], "
 					"m->len : %d, "
 					"handle buffer finish, push into idle queue, exit "
 					")",
-					(int)syscall(SYS_gettid),
 					m->fd,
 					m->len
 					);
@@ -583,12 +579,10 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::Accept_Callback( "
-			"tid : %d, "
 			"fd : [%d], "
 			"revents : [0x%x], "
 			"start "
 			")",
-			(int)syscall(SYS_gettid),
 			w->fd,
 			revents
 			);
@@ -601,11 +595,9 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::Accept_Callback( "
-					"tid : %d, "
 					"fd : [%d], "
 					"errno == EAGAIN ||errno == EWOULDBLOCK "
 					")",
-					(int)syscall(SYS_gettid),
 					w->fd
 					);
 			continue;
@@ -614,11 +606,9 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"TcpServer::Accept_Callback( "
-					"tid : %d, "
 					"fd : [%d], "
 					"accept error "
 					")",
-					(int)syscall(SYS_gettid),
 					w->fd
 					);
 			break;
@@ -667,11 +657,11 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 //	Message *m = GetIdleMessageList()->PopFront();
 //	if( m == NULL ) {
 //		LogManager::GetLogManager()->Log(LOG_WARNING, "TcpServer::Accept_Callback( "
-//				"tid : %d, "
+//				
 //				"accept client fd : [%d], "
 //				"m == NULL "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				client
 //				);
 //		OnDisconnect(client, NULL);
@@ -689,10 +679,8 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::Accept_Callback( "
-					"tid : %d, "
 					"accept client fd : [%d] "
 					")",
-					(int)syscall(SYS_gettid),
 					client
 					);
 
@@ -708,10 +696,8 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"TcpServer::Accept_Callback( "
-					"tid : %d, "
 					"no more watcher "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 			Disconnect(client);
 			OnDisconnect(client, NULL);
@@ -726,12 +712,10 @@ void TcpServer::Accept_Callback(ev_io *w, int revents) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::Accept_Callback( "
-				"tid : %d, "
 				"fd : [%d], "
 				"revents : [0x%x], "
 				"exit "
 				")",
-				(int)syscall(SYS_gettid),
 				w->fd,
 				revents
 				);
@@ -741,12 +725,10 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::Recv_Callback( "
-			"tid : %d, "
 			"fd : [%d], "
 			"revents : [0x%x], "
 			"start "
 			")",
-			(int)syscall(SYS_gettid),
 			w->fd,
 			revents
 			);
@@ -760,12 +742,10 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"TcpServer::Recv_Callback( "
-					"tid : %d, "
 					"fd : [%d], "
 					"m == NULL, "
 					"continue "
 					")",
-					(int)syscall(SYS_gettid),
 					fd
 					);
 			sleep(1);
@@ -781,11 +761,9 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::Recv_Callback( "
-					"tid : %d, "
 					"fd : [%d], "
 					"(revents & EV_ERROR) "
 					")",
-					(int)syscall(SYS_gettid),
 					fd
 					);
 			OnDisconnect(fd, m);
@@ -798,10 +776,8 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::Recv_Callback( "
-					"tid : %d, "
 					"fd : [%d] "
 					")",
-					(int)syscall(SYS_gettid),
 					fd,
 					ret
 					);
@@ -836,11 +812,9 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::Recv_Callback( "
-					"tid : %d, "
 					"fd : [%d], "
 					"normal closed "
 					")",
-					(int)syscall(SYS_gettid),
 					fd);
 			OnDisconnect(fd, m);
 			break;
@@ -850,10 +824,8 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"TcpServer::Recv_Callback( "
-						"tid : %d, "
 						"errno == EAGAIN || errno == EWOULDBLOCK continue "
-						")",
-						(int)syscall(SYS_gettid)
+						")"
 						);
 				GetIdleMessageList()->PushBack(m);
 				break;
@@ -862,11 +834,9 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"TcpServer::Recv_Callback( "
-						"tid : %d, "
 						"fd : [%d], "
 						"error closed "
 						")",
-						(int)syscall(SYS_gettid),
 						fd
 						);
 				OnDisconnect(fd, m);
@@ -879,12 +849,10 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::Recv_Callback( "
-			"tid : %d, "
 			"fd : [%d], "
 			"revents : [0x%x], "
 			"exit "
 			")",
-			(int)syscall(SYS_gettid),
 			w->fd,
 			revents
 			);
@@ -893,11 +861,11 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 
 //void TcpServer::SendMessage(Message *m) {
 ////	LogManager::GetLogManager()->Log(LOG_MSG, "TcpServer::SendMessage( "
-////				"tid : %d, "
+////				
 ////				"m->fd : [%d] "
 ////				"ok"
 ////				")",
-////				(int)syscall(SYS_gettid),
+////				,
 ////				m->fd
 ////				);
 ////
@@ -910,11 +878,11 @@ void TcpServer::Recv_Callback(ev_io *w, int revents) {
 ////	UnLockWatcherList();
 ////
 ////	LogManager::GetLogManager()->Log(LOG_MSG, "TcpServer::SendMessage( "
-////				"tid : %d, "
+////				
 ////				"m->fd : [%d] "
 ////				"end "
 ////				")",
-////				(int)syscall(SYS_gettid),
+////				,
 ////				m->fd
 ////				);
 //}
@@ -923,10 +891,8 @@ void TcpServer::SendMessageByQueue(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::SendMessageByQueue( "
-			"tid : %d, "
 			"m->fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd
 			);
 
@@ -943,11 +909,9 @@ void TcpServer::SendMessageByQueue(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::SendMessageByQueue( "
-			"tid : %d, "
 			"m->fd : [%d] "
 			"end "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd
 			);
 
@@ -962,11 +926,9 @@ void TcpServer::SendMessageImmediately(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::SendMessageImmediately( "
-			"tid : %d, "
 			"fd : [%d], "
 			"buffer( len : %d ) "
 			")",
-			(int)syscall(SYS_gettid),
 			fd,
 			len
 			);
@@ -975,11 +937,9 @@ void TcpServer::SendMessageImmediately(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::SendMessageImmediately( "
-			"tid : %d, "
 			"fd : [%d], "
 			"buffer( len : %d ) : [\n%s\n]"
 			")",
-			(int)syscall(SYS_gettid),
 			fd,
 			len,
 			ari.AsciiToHexWithSep(buffer, len).c_str()
@@ -992,11 +952,9 @@ void TcpServer::SendMessageImmediately(Message *m) {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"TcpServer::SendMessageImmediately( "
-						"tid : %d, "
 						"fd : [%d], "
 						"send finish "
 						")",
-						(int)syscall(SYS_gettid),
 						fd
 						);
 
@@ -1014,11 +972,9 @@ void TcpServer::SendMessageImmediately(Message *m) {
 			}
 		} else if( ret == 0 ) {
 			LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::SendMessageImmediately( "
-					"tid : %d, "
 					"fd : [%d], "
 					"normal closed "
 					")",
-					(int)syscall(SYS_gettid),
 					m->fd
 					);
 			Disconnect(fd);
@@ -1027,19 +983,15 @@ void TcpServer::SendMessageImmediately(Message *m) {
 		} else {
 			if(errno == EAGAIN || errno == EWOULDBLOCK) {
 				LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::SendMessageImmediately( "
-						"tid : %d, "
 						"errno == EAGAIN || errno == EWOULDBLOCK continue "
-						")",
-						(int)syscall(SYS_gettid)
+						")"
 						);
 				continue;
 			} else {
 				LogManager::GetLogManager()->Log(LOG_STAT, "TcpServer::SendMessageImmediately( "
-						"tid : %d, "
 						"fd : [%d], "
 						"error closed "
 						")",
-						(int)syscall(SYS_gettid),
 						fd
 						);
 				Disconnect(fd);
@@ -1068,10 +1020,8 @@ void TcpServer::Disconnect(int fd) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::Disconnect( "
-			"tid : %d, "
 			"fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			fd
 			);
 
@@ -1084,10 +1034,8 @@ void TcpServer::StopEvio(ev_io *w) {
 		LogManager::GetLogManager()->Log(
 				LOG_STAT,
 				"TcpServer::StopEvio( "
-				"tid : %d, "
 				"w != NULL "
-				")",
-				(int)syscall(SYS_gettid)
+				")"
 				);
 
 		LockWatcherList();
@@ -1106,11 +1054,9 @@ void TcpServer::CloseSocketIfNeedByHandleThread(int fd) {
 	LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::CloseSocketIfNeedByHandleThread( "
-					"tid : %d, "
 					"fd : [%d], "
 					"mpHandlingMessageCount[%d] : %d "
 					")",
-					(int)syscall(SYS_gettid),
 					fd,
 					fd,
 					mpHandlingMessageCount[fd]
@@ -1121,11 +1067,9 @@ void TcpServer::CloseSocketIfNeedByHandleThread(int fd) {
 			LogManager::GetLogManager()->Log(
 							LOG_STAT,
 							"TcpServer::CloseSocketIfNeedByHandleThread( "
-							"tid : %d, "
 							"fd : [%d], "
 							"close ok "
 							")",
-							(int)syscall(SYS_gettid),
 							fd
 							);
 
@@ -1188,10 +1132,8 @@ void TcpServer::OnDisconnect(int fd, Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnDisconnect( "
-			"tid : %d, "
 			"fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			fd
 			);
 
@@ -1209,11 +1151,9 @@ void TcpServer::OnDisconnect(int fd, Message *m) {
 	LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"TcpServer::OnDisconnect( "
-					"tid : %d, "
 					"fd : [%d], "
 					"mpHandlingMessageCount[%d] : %d "
 					")",
-					(int)syscall(SYS_gettid),
 					fd,
 					fd,
 					mpHandlingMessageCount[fd]
@@ -1223,11 +1163,9 @@ void TcpServer::OnDisconnect(int fd, Message *m) {
 		LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"TcpServer::OnDisconnect( "
-						"tid : %d, "
 						"fd : [%d], "
 						"close ok "
 						")",
-						(int)syscall(SYS_gettid),
 						fd
 						);
 
@@ -1257,10 +1195,8 @@ bool TcpServer::OnAccept(int fd, char* ip) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnAccept( "
-			"tid : %d, "
 			"fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			fd
 			);
 
@@ -1277,12 +1213,10 @@ void TcpServer::OnRecvMessage(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnRecvMessage( "
-			"tid : %d, "
 			"m->fd : [%d], "
 			"m->seq : %d, "
 			"len : %d "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd,
 			m->seq,
 			m->len
@@ -1292,12 +1226,10 @@ void TcpServer::OnRecvMessage(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnRecvMessage( "
-			"tid : %d, "
 			"m->fd : [%d], "
 			"m->seq : %d, "
 			"buffer : [\n%s\n] "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd,
 			m->seq,
 			ari.AsciiToHexWithSep(m->buffer, m->len).c_str()
@@ -1315,10 +1247,8 @@ void TcpServer::OnSendMessage(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnSendMessage( "
-			"tid : %d, "
 			"m->fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd
 			);
 
@@ -1331,10 +1261,8 @@ void TcpServer::OnTimeoutMessage(Message *m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"TcpServer::OnTimeoutMessage( "
-			"tid : %d, "
 			"m->fd : [%d] "
 			")",
-			(int)syscall(SYS_gettid),
 			m->fd
 			);
 

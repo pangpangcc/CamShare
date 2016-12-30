@@ -33,5 +33,7 @@
     
     <!--<hook event="CUSTOM" subclass="conference::maintenance" script="catch-event.lua"/>-->
     <hook event="CUSTOM" subclass="conference::maintenance" script="event_conference.lua"/>
+    <hook event="CUSTOM" subclass="file_recorder::maintenance" script="event_file_recorder.lua"/>
+    
   </settings>
 </configuration>

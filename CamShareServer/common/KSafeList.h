@@ -67,6 +67,7 @@ public:
 	void PopValueUnSafe(iterator itr) {
 		if( itr != mList.end() ) {
 			mList.erase(itr);
+			mSize--;
 		}
 	}
 

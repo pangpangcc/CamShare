@@ -8,8 +8,8 @@ local cjson = require "cjson"
 dofile("/usr/local/freeswitch/scripts/common.lua");
 dofile("/usr/local/freeswitch/scripts/site_config.lua");
 
-freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->开始\n")
-freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->params:\n" .. params:serialize() .. "\n")
+freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->开始\n")
+freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->params:\n" .. params:serialize() .. "\n")
 
 api = freeswitch.API();
 
@@ -44,7 +44,7 @@ local result = 0
 
 -- 判断是否测试帐号
 if support_test == 1 then
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "检查是否测试账号\n");
+  freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "检查是否测试账号\n");
   local index = string.find(req_user, "^WW%d+$");
   if index == nil then
     index = string.find(req_user, "^MM%d+$");
@@ -62,7 +62,7 @@ if support_test == 1 then
       freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
     end
   else
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
+    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
   end
 end
   
@@ -71,10 +71,10 @@ if result == 0 then
   local loginPath = getLoginPath(siteId);
   if( loginPath ~= nil ) then
     local url = loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom;
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
+    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
     response = api:execute("curl", url);
     if response ~= nil then
-      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
+      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
       json = cjson.decode(response);
       body = json["body"];
       if body ~= nil then
@@ -84,19 +84,19 @@ if result == 0 then
         errno = json["errno"];
         errmsg = json["errmsg"];
       else
-        freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->http返回协议解析失败");
+        freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->http返回协议解析失败\n");
       end
     else
-      freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->获取http返回失败");
+      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回失败\n");
     end
   else
-    freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->没有找到http URL");
+    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->没有找到http URL\n");
   end
 end
 
 -- 登陆成功
 if result == 1 then
-  freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->账号:" .. req_user .. "登陆成功\n");
+  freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "登陆成功\n");
 	
   XML_STRING = 
   [[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -117,5 +117,5 @@ if result == 1 then
   </document>]]
 end
 
---freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")
-freeswitch.consoleLog("CONSOLE", "# 用户登陆脚本->结束\n")
+--freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")
+freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->结束\n")

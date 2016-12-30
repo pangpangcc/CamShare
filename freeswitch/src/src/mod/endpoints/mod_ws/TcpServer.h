@@ -46,6 +46,11 @@ private:
 
 	Socket* mpSocket;
 
+	/**
+	 * 同步锁
+	 */
+	switch_mutex_t *mpSocketMutex;
+
 	switch_thread_t *mpIOThread;
 	switch_pollset_t *mpPollset;
 	switch_pollfd_t *mpPollfd;

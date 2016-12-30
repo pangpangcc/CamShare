@@ -12,13 +12,13 @@
 #include "MessageList.h"
 #include "DataHttpParser.h"
 
-#include <common/Arithmetic.hpp>
 #include <common/Buffer.h>
 #include <common/KCond.h>
 #include <common/KSafeMap.h>
 
 #include <string>
 
+#include "common/Arithmetic.h"
 #include "request/IRequest.h"
 using namespace std;
 
@@ -32,7 +32,8 @@ public:
 			const string& channelId,
 			const string& conference,
 			const string& serverId,
-			const string& siteId
+			const string& siteId,
+			const string& source
 			) = 0;
 	virtual void OnClientRecordFinish(
 			Client* client,

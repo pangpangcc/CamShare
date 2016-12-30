@@ -47,12 +47,10 @@ bool SqliteManager::Query(char* sql, char*** result, int* iRow, int* iColumn) {
 		LogManager::GetLogManager()->Log(
 								LOG_ERR_USER,
 								"SqliteManager::Query( "
-								"tid : %d, "
 								"[执行查询, 失败], "
 								"sql : %s, "
 								"msg : %s "
 								")",
-								(int)syscall(SYS_gettid),
 								sql,
 								msg
 								);
@@ -72,12 +70,10 @@ bool SqliteManager::QuerySQL(sqlite3 *db, const char* sql, char*** result, int* 
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"SqliteManager::QuerySQL( "
-					"tid : %d, "
 					"[执行查询, 繁忙], "
 					"sql : %s, "
 					"msg : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					sql,
 					sqlite3_errmsg(db)
 					);
@@ -93,13 +89,11 @@ bool SqliteManager::QuerySQL(sqlite3 *db, const char* sql, char*** result, int* 
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"SqliteManager::QuerySQL( "
-					"tid : %d, "
 					"[执行查询, 失败], "
 					"ret : %d, "
 					"sql : %s, "
 					"msg : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					ret,
 					sql,
 					sqlite3_errmsg(db)
@@ -120,12 +114,10 @@ bool SqliteManager::ExecSQL(const char* sql) {
 		LogManager::GetLogManager()->Log(
 								LOG_ERR_USER,
 								"SqliteManager::ExecSQL( "
-								"tid : %d, "
 								"[执行查询, 失败], "
 								"sql : %s, "
 								"msg : %s "
 								")",
-								(int)syscall(SYS_gettid),
 								sql,
 								msg
 								);
@@ -145,12 +137,10 @@ bool SqliteManager::ExecSQL(sqlite3 *db, const char* sql, char** msg) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"SqliteManager::ExecSQL( "
-					"tid : %d, "
 					"[执行查询, 繁忙], "
 					"sql : %s, "
 					"msg : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					sql,
 					sqlite3_errmsg(db)
 					);
@@ -165,13 +155,11 @@ bool SqliteManager::ExecSQL(sqlite3 *db, const char* sql, char** msg) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"SqliteManager::ExecSQL( "
-					"tid : %d, "
 					"[执行查询, 失败], "
 					"ret : %d, "
 					"sql : %s, "
 					"msg : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					ret,
 					sql,
 					sqlite3_errmsg(db)

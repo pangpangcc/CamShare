@@ -51,12 +51,10 @@ int Client::ParseData(Message* m)  {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"Client::ParseData( "
-			"tid : %d, "
 			"[收到客户端数据包], "
 			"miDataPacketRecvSeq : %d, "
 			"seq : %d "
 			")",
-			(int)syscall(SYS_gettid),
 			miDataPacketRecvSeq,
 			seq
 			);
@@ -65,10 +63,8 @@ int Client::ParseData(Message* m)  {
 		LogManager::GetLogManager()->Log(
 				LOG_STAT,
 				"Client::ParseData( "
-				"tid : %d, "
 				"[客户端数据包已经解析错误, 不再处理] "
-				")",
-				(int)syscall(SYS_gettid)
+				")"
 				);
 
 		ret = -1;
@@ -80,10 +76,8 @@ int Client::ParseData(Message* m)  {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseData( "
-					"tid : %d, "
 					"[收到客户端乱序的数据包] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 			// 缓存到队列
@@ -92,10 +86,8 @@ int Client::ParseData(Message* m)  {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"Client::ParseData( "
-						"tid : %d, "
 						"[缓存客户端乱序的数据包到队列] "
-						")",
-						(int)syscall(SYS_gettid)
+						")"
 						);
 
 				if( len > 0 ) {
@@ -109,10 +101,8 @@ int Client::ParseData(Message* m)  {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"Client::ParseData( "
-						"tid : %d, "
 						"[客户端没有缓存空间] "
-						")",
-						(int)syscall(SYS_gettid)
+						")"
 						);
 
 				ret = -1;
@@ -123,10 +113,8 @@ int Client::ParseData(Message* m)  {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseData( "
-					"tid : %d, "
 					"[收到客户端顺序的数据包] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 			ret = 1;
@@ -137,10 +125,8 @@ int Client::ParseData(Message* m)  {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseData( "
-					"tid : %d, "
 					"[开始解析客户端当前数据包] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 			// 解当前数据包
@@ -151,10 +137,8 @@ int Client::ParseData(Message* m)  {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"Client::ParseData( "
-						"tid : %d, "
 						"[开始解析客户端缓存数据包] "
-						")",
-						(int)syscall(SYS_gettid)
+						")"
 						);
 
 				// 解析缓存数据包
@@ -166,11 +150,9 @@ int Client::ParseData(Message* m)  {
 						LogManager::GetLogManager()->Log(
 								LOG_STAT,
 								"Client::ParseData( "
-								"tid : %d, "
 								"[找到对应缓存包], "
 								"miDataPacketRecvSeq : %d "
 								")",
-								(int)syscall(SYS_gettid),
 								miDataPacketRecvSeq
 								);
 
@@ -192,10 +174,8 @@ int Client::ParseData(Message* m)  {
 						LogManager::GetLogManager()->Log(
 								LOG_STAT,
 								"Client::ParseData( "
-								"tid : %d, "
 								"[已经没有缓存包]"
-								")",
-								(int)syscall(SYS_gettid)
+								")"
 								);
 						break;
 					}
@@ -209,10 +189,8 @@ int Client::ParseData(Message* m)  {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseData( "
-					"tid : %d, "
 					"[客户端数据包解析错误] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 		}
@@ -223,11 +201,9 @@ int Client::ParseData(Message* m)  {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"Client::ParseData( "
-			"tid : %d, "
 			"[解析客户端数据包完成], "
 			"ret : %d "
 			")",
-			(int)syscall(SYS_gettid),
 			ret
 			);
 
@@ -245,11 +221,9 @@ int Client::ParseCurrentPackage(Message* m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"Client::ParseCurrentPackage( "
-			"tid : %d, "
 			"[解析当前数据包], "
 			"miDataPacketRecvSeq : %d "
 			")",
-			(int)syscall(SYS_gettid),
 			miDataPacketRecvSeq
 			);
 
@@ -267,14 +241,12 @@ int Client::ParseCurrentPackage(Message* m) {
 		LogManager::GetLogManager()->Log(
 				LOG_STAT,
 				"Client::ParseCurrentPackage( "
-				"tid : %d, "
 				"[解析数据], "
 				"mBuffer.len : %d, "
 				"recv : %d, "
 				"last : %d, "
 				"len : %d "
 				")",
-				(int)syscall(SYS_gettid),
 				mBuffer.len,
 				recv,
 				last,
@@ -298,11 +270,9 @@ int Client::ParseCurrentPackage(Message* m) {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"Client::ParseCurrentPackage( "
-						"tid : %d, "
 						"[替换数据], "
 						"mBuffer.len : %d "
 						")",
-						(int)syscall(SYS_gettid),
 						mBuffer.len
 						);
 
@@ -324,11 +294,9 @@ int Client::ParseCurrentPackage(Message* m) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"Client::ParseCurrentPackage( "
-			"tid : %d, "
 			"[解析当前数据包], "
 			"ret : %d "
 			")",
-			(int)syscall(SYS_gettid),
 			ret
 			);
 
@@ -339,11 +307,9 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"Client::ParseCommand( "
-			"tid : %d, "
 			"[解析命令], "
 			"pDataHttpParser->GetPath() : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			pDataHttpParser->GetPath().c_str()
 			);
 	if( pDataHttpParser->GetPath() == "/GETDIALPLAN" ) {
@@ -354,17 +320,16 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 			const string conference = pDataHttpParser->GetParam("conference");
 			const string serverId = pDataHttpParser->GetParam("serverId");
 			const string siteId = pDataHttpParser->GetParam("siteId");
+			const string source = pDataHttpParser->GetParam("source");
 
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseCommand( "
-					"tid : %d, "
 					"[解析命令:获取拨号计划] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
-			mpClientCallback->OnClientGetDialplan(this, caller, channelId, conference, serverId, siteId);
+			mpClientCallback->OnClientGetDialplan(this, caller, channelId, conference, serverId, siteId, source);
 		}
 	} else if( pDataHttpParser->GetPath() == "/RECORDFINISH" ) {
 		// 录制文件成功
@@ -381,10 +346,8 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseCommand( "
-					"tid : %d, "
 					"[解析命令:录制文件成功] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 			mpClientCallback->OnClientRecordFinish(this, conference, siteId, filePath, startTime, endTime);
@@ -394,10 +357,8 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseCommand( "
-					"tid : %d, "
 					"[解析命令:重新加载日志配置] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 
 			mpClientCallback->OnClientReloadLogConfig(this);
@@ -407,10 +368,8 @@ void Client::ParseCommand(DataHttpParser* pDataHttpParser) {
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,
 					"Client::ParseCommand( "
-					"tid : %d, "
 					"[解析命令:未知命令] "
-					")",
-					(int)syscall(SYS_gettid)
+					")"
 					);
 			mpClientCallback->OnClientUndefinedCommand(this);
 		}

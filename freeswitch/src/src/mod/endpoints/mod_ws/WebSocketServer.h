@@ -80,7 +80,17 @@ private:
 	/**
 	 * 请求创建会话
 	 */
-	bool CreateCall(WSClientParser* parser/*, const char *number*/);
+	bool CreateCall(WSClientParser* parser);
+
+	/**
+	 * 销毁会话
+	 */
+	bool DestroyCall(WSClientParser* parser, WSChannel* wsChannel);
+
+	/**
+	 * 断开连接
+	 */
+	bool Disconnect(WSClientParser* parser);
 
 	/**
 	 * 是否运行

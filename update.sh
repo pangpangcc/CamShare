@@ -45,34 +45,45 @@ chmod +x $updatedir/update.sh
 # copy common configs
 #cp -f /usr/local/freeswitch/conf/autoload_configs/modules.conf.xml $updatefiledir/
 
+# copy lua configs
+cp -f /usr/local/freeswitch/conf/autoload_configs/lua.conf.xml $updatefiledir/
+
 # copy common lib
 #cp -f /usr/local/freeswitch/lib/libfreeswitch.a $updatefiledir/
+cp -f /usr/local/freeswitch/lib/libfreeswitch.la $updatefiledir/
+cp -f /usr/local/freeswitch/lib/libfreeswitch.so.1.0.0 $updatefiledir/
 
 # copy shell
 #cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiledir/
 #cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh $updatefiledir/
 
+# copy mod_conference files
+cp -f /usr/local/freeswitch/mod/mod_conference.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_conference.la $updatefiledir/
+
 # copy mod_file_recorder files
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
-#cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $upatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $updatefiledir/
 
 # copy mod_rtmp files
 cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
 cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/rtmp.conf.xml $updatefiledir/
 
 # copy mod_ws files
 cp -f /usr/local/freeswitch/mod/mod_ws.so $updatefiledir/
 cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
-#cp -f /usr/local/freeswitch/conf/autoload_configs/ws.conf.xml $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/ws.conf.xml $updatefiledir/
 
 # copy mod_logfile files
 #cp -f /usr/local/freeswitch/conf/autoload_configs/logfile.conf.xml $updatefiledir/
 
 # copy freeswitch scripts
 #cp -f ./freeswitch/install/scripts/common.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
 cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/event_file_recorder.lua $updatefiledir/
 
 # remove freeswitch scripts config
 #rm -f $updatefiledir/site_config*.lua
@@ -86,7 +97,7 @@ cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
 
 # ---- copy camshare files
 # copy camshare-middleware file 
-#cp -f ./CamShareServer/camshare-middleware $updatefiledir/
+cp -f ./CamShareServer/camshare-middleware $updatefiledir/
 
 # copy configure file
 #if [ "$env" == "develop" ]; then
@@ -104,7 +115,7 @@ cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
 #cp -f ./CamShareServer/bin/dump_crash_log.sh $updatefiledir/
 
 # copy camshare clean shell
-cp -rf ./CamShareServer/bin/clean $updatefiledir/
+#cp -rf ./CamShareServer/bin/clean $updatefiledir/
 
 # build package
 mkdir -p $updatepackagedir

@@ -58,10 +58,6 @@ typedef struct Client {
 		this->pool = pool;
 		this->socket = socket;
 
-		switch_uuid_t uuid;
-		switch_uuid_get(&uuid);
-		switch_uuid_format(this->uuid, &uuid);
-
 		if( !buffer ) {
 			switch_buffer_create(pool, &buffer, CLIENT_BUFFER_SIZE);
 //			switch_buffer_bzero(buffer);
@@ -128,18 +124,18 @@ typedef struct Client {
 		size = switch_buffer_inuse(buffer);
 
 		if( size > 0 && data ) {
-			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(uuid),
-					SWITCH_LOG_DEBUG,
-					"Client::Parse( "
-					"client : %p, "
-					"socket : %p, "
-					"size : %d "
-					") \n",
-					this,
-					this->socket,
-					size
-					);
+//			switch_log_printf(
+//					SWITCH_CHANNEL_UUID_LOG(uuid),
+//					SWITCH_LOG_DEBUG,
+//					"Client::Parse( "
+//					"client : %p, "
+//					"socket : %p, "
+//					"size : %d "
+//					") \n",
+//					this,
+//					this->socket,
+//					size
+//					);
 
 			if( parser ) {
 				int parseLen = parser->ParseData((char *)data, size);
@@ -194,11 +190,6 @@ typedef struct Client {
 	 * 同步锁
 	 */
 	switch_mutex_t *clientMutex;
-
-	/**
-	 * 唯一标识
-	 */
-	char uuid[SWITCH_UUID_FORMATTED_LENGTH+1];
 
 	/**
 	 * 解析器

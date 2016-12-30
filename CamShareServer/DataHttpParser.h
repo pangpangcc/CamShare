@@ -11,7 +11,6 @@
 #include "DataParser.h"
 #include "MessageList.h"
 
-#include <common/Arithmetic.hpp>
 #include <common/KMutex.h>
 
 #include <stdio.h>
@@ -22,6 +21,8 @@
 
 #include <string>
 #include <map>
+
+#include "common/Arithmetic.h"
 using namespace std;
 
 typedef map<string, string> Parameters;

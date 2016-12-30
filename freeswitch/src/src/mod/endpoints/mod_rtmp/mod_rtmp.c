@@ -1089,6 +1089,7 @@ switch_status_t rtmp_real_session_destroy(rtmp_session_t **rsession)
 			sess++;
 		}
 	}
+	switch_safe_free(hi);
 	switch_thread_rwlock_unlock((*rsession)->session_rwlock);
 
 	if (sess) {
@@ -1336,6 +1337,7 @@ switch_status_t rtmp_profile_destroy(rtmp_profile_t **profile) {
 
 		if (rsession->state != RS_DESTROY) rtmp_session_destroy(&rsession);
 	}
+	switch_safe_free(hi);
 
 	if ((*profile)->io->running > 0) {
 		(*profile)->io->running = 0;
@@ -1896,6 +1898,7 @@ SWITCH_STANDARD_API(rtmp_function)
 											   item->account ? item->account->domain : NULL,
 											   item->flashVer, state2name(item->state));
 					}
+					switch_safe_free(hi);
 					switch_thread_rwlock_unlock(profile->session_rwlock);
 				} else if (!zstr(argv[3]) && !strcmp(argv[3], "reg")) {
 					switch_hash_index_t *hi;
@@ -1916,6 +1919,7 @@ SWITCH_STANDARD_API(rtmp_function)
 								key, switch_str_nil(item->nickname), item->uuid);
 						}
 					}
+					switch_safe_free(hi);
 					switch_thread_rwlock_unlock(profile->reg_rwlock);
 				} else {
 					stream->write_function(stream, "Dialplan: %s\n", profile->dialplan);
@@ -1940,11 +1944,13 @@ SWITCH_STANDARD_API(rtmp_function)
 				stream->write_function(stream, "%s\t%s:%s\tprofile\n", item->name, item->io->name, item->io->address);
 
 			}
+			switch_safe_free(hi);
 			switch_thread_rwlock_unlock(rtmp_globals.profile_rwlock);
 		}
 
 	} else if (!strcmp(argv[0], "session")) {
 		rtmp_session_t *rsession;
+		switch_bool_t bFlag = SWITCH_TRUE;
 
 		if (zstr(argv[1]) || zstr(argv[2])) {
 			goto usage;
@@ -1959,28 +1965,33 @@ SWITCH_STANDARD_API(rtmp_function)
 		if (!strcmp(argv[2], "login")) {
 			char *user, *domain;
 			if (zstr(argv[3])) {
-				goto usage;
-			}
-			switch_split_user_domain(argv[3], &user, &domain);
-
-			if (!zstr(user) && !zstr(domain)) {
-				rtmp_session_login(rsession, user, domain);
-				stream->write_function(stream, "+OK\n");
+				bFlag = SWITCH_FALSE;
+//				goto usage;
 			} else {
-				stream->write_function(stream, "-ERR I need user@domain\n");
+				switch_split_user_domain(argv[3], &user, &domain);
+
+				if (!zstr(user) && !zstr(domain)) {
+					rtmp_session_login(rsession, user, domain);
+					stream->write_function(stream, "+OK\n");
+				} else {
+					stream->write_function(stream, "-ERR I need user@domain\n");
+				}
 			}
+
 		} else 	if (!strcmp(argv[2], "logout")) {
 			char *user, *domain;
 			if (zstr(argv[3])) {
-				goto usage;
-			}
-			switch_split_user_domain(argv[3], &user, &domain);
-
-			if (!zstr(user) && !zstr(domain)) {
-				rtmp_session_logout(rsession, user, domain);
-				stream->write_function(stream, "+OK\n");
+				bFlag = SWITCH_FALSE;
+//				goto usage;
 			} else {
-				stream->write_function(stream, "-ERR I need user@domain\n");
+				switch_split_user_domain(argv[3], &user, &domain);
+
+				if (!zstr(user) && !zstr(domain)) {
+					rtmp_session_logout(rsession, user, domain);
+					stream->write_function(stream, "+OK\n");
+				} else {
+					stream->write_function(stream, "-ERR I need user@domain\n");
+				}
 			}
 		} else 	if (!strcmp(argv[2], "kill")) {
 //			rtmp_session_rwunlock(rsession);
@@ -2026,6 +2037,11 @@ SWITCH_STANDARD_API(rtmp_function)
 		if (rsession) {
 			rtmp_session_rwunlock(rsession);
 		}
+
+		if( bFlag == SWITCH_FALSE ) {
+			goto usage;
+		}
+
 	} else {
 		goto usage;
 	}
@@ -2057,6 +2073,7 @@ static switch_status_t console_complete_hashtable(switch_hash_t *hash, const cha
 		switch_core_hash_this(hi, &vvar, NULL, &val);
 		switch_console_push_match(&my_matches, (const char *) vvar);
 	}
+	switch_safe_free(hi);
 
 	if (my_matches) {
 		*matches = my_matches;
@@ -2250,6 +2267,7 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_rtmp_shutdown)
 		rtmp_profile_destroy(&item);
 		switch_mutex_lock(rtmp_globals.mutex);
 	}
+	switch_safe_free(hi);
 	switch_mutex_unlock(rtmp_globals.mutex);
 
 	switch_event_unbind_callback(rtmp_event_handler);

@@ -15,6 +15,8 @@
 #include "WSPacket.h"
 #include "Rtp2H264VideoTransfer.h"
 
+#define WS_EVENT_MAINT "ws::maintenance"
+
 class WSClientParser;
 typedef struct WSChannel {
 	WSClientParser* parser;
@@ -45,6 +47,9 @@ typedef struct WSChannel {
 
 	switch_core_media_params_t mparams;
 	switch_media_handle_t *media_handle;
+
+	char* uuid_str;
+
 } WSChannel;
 
 class WSClientParser;
@@ -75,6 +80,11 @@ public:
 	void SetWSClientParserCallback(WSClientParserCallback* callback);
 
 	/**
+	 * 登录
+	 */
+	bool Login();
+
+	/**
 	 * 创建和销毁频道
 	 */
 	WSChannel* CreateCall(
@@ -85,8 +95,7 @@ public:
 			const char *profileDialplan,
 			const char* ip
 			);
-	switch_core_session_t* DestroyChannel(bool hangup);
-	switch_core_session_t* DestroyChannel(WSChannel* wsChannel, bool hangup);
+	WSChannel* DestroyCall();
 
 	bool IsConnected();
 	void Disconnected();
@@ -100,12 +109,23 @@ public:
 	bool GetFrame(switch_frame_t *frame, const char** data, switch_size_t *len);
 	void DestroyVideoBuffer();
 
+	const char* GetUUID();
+	const char* GetUser();
+	const char* GetDomain();
+	const char* GetDestNumber();
+
 private:
 	WSChannel* CreateChannel(switch_core_session_t *session);
 	bool InitChannel(WSChannel* wsChannel);
 	bool ParseFirstLine(char* line);
 	void ParseHeader(char* line);
 	bool CheckHandShake();
+
+	/**
+	 * 用于发送事件的函数
+	 */
+	bool ws_login();
+	bool ws_disconnect();
 
 	switch_memory_pool_t *mpPool;
 
@@ -116,6 +136,8 @@ private:
 	char* mpUser;
 	char* mpDomain;
 	char* mpDestNumber;
+	char* mpSite;
+	char* mpCustom;
 	char mWebSocketKey[256];
 
 	/**
@@ -132,6 +154,11 @@ private:
 	 * 同步锁
 	 */
 	switch_mutex_t *clientMutex;
+
+	/**
+	 * 唯一标识
+	 */
+	char uuid[SWITCH_UUID_FORMATTED_LENGTH+1];
 };
 
 #endif /* SRC_MOD_ENDPOINTS_MOD_WS_WSCLIENTPARSER_H_ */

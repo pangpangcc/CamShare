@@ -11,6 +11,8 @@
 
 #include <switch.h>
 
+#define FILE_RECORDER_EVENT_MAINT "file_recorder::maintenance"
+
 #define MAX_PATH_LENGTH	512
 
 class VideoRecorder
@@ -106,6 +108,10 @@ private:
 	bool BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen);
 	// 执行生成截图shell
 	bool RunPictureShell();
+
+	// 发送命令事件
+	bool SendCommand(const char* cmd);
+	bool file_record_send_command(const char* cmd);
 
 private:
 	char mcH264Path[2048];

@@ -273,6 +273,7 @@ switch_status_t rtmp_check_auth(rtmp_session_t *rsession, const char *user, cons
 			}
 
 		}
+		switch_safe_free(hi);
 		switch_thread_rwlock_unlock(rsession->profile->session_rwlock);
 	}
 

@@ -1,0 +1,19 @@
+define print_event_nodes
+	set $i=0
+	set $name=""
+	set $node=0x0
+	while($i<90)
+		set $node=EVENT_NODES[$i]
+		if($node)
+			printf "event_id : %d\n", $node->event_id
+		  while($node)
+		  	if($node->subclass_name != 0x0)
+		  		printf "subclass_name : %s\n", $node->subclass_name
+		  	end
+				p $node->callback
+				set $node=$node->next
+			end
+		end
+		set $i++
+	end
+end

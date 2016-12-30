@@ -81,12 +81,10 @@ bool SessionManager::StartSession(
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"SessionManager::StartSession( "
-			"tid : %d, "
 			"[会话交互(Session), 创建客户端到LiveChat会话], "
 			"livechat : %p, "
 			"request : %p "
 			")",
-			(int)syscall(SYS_gettid),
 			livechat,
 			request
 			);
@@ -107,14 +105,12 @@ bool SessionManager::StartSession(
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
 					"SessionManager::StartSession( "
-					"tid : %d, "
 					"[会话交互(Session), Client -> LiveChat, 继续会话], "
 					"livechat : %p, "
 					"session : %p, "
 					"request : %p, "
 					"identify : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					livechat,
 					session,
 					request,
@@ -129,14 +125,12 @@ bool SessionManager::StartSession(
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
 					"SessionManager::StartSession( "
-					"tid : %d, "
 					"[会话交互(Session), Client -> LiveChat, 开始新会话] "
 					"livechat : %p, "
 					"session : %p, "
 					"request : %p, "
 					"identify : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					livechat,
 					session,
 					request,
@@ -147,14 +141,12 @@ bool SessionManager::StartSession(
 		LogManager::GetLogManager()->Log(
 				LOG_MSG,
 				"SessionManager::StartSession( "
-				"tid : %d, "
 				"[会话交互(Session), Client -> LiveChat, 插入任务到会话], "
 				"livechat : %p, "
 				"session : %p, "
 				"request : %p, "
 				"identify : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				livechat,
 				session,
 				request,
@@ -169,14 +161,12 @@ bool SessionManager::StartSession(
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"SessionManager::StartSession( "
-					"tid : %d, "
 					"[会话交互(Session), Client -> LiveChat, 插入任务到会话, 任务已经存在, 丢弃], "
 					"livechat : %p, "
 					"session : %p, "
 					"request : %p, "
 					"identify : %s "
 					")",
-					(int)syscall(SYS_gettid),
 					livechat,
 					session,
 					request,
@@ -229,12 +219,10 @@ IRequest* SessionManager::FinishSession(
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"SessionManager::FinishSession( "
-			"tid : %d, "
 			"[会话交互(Session), LiveChat -> Client, 返回响应到客户端], "
 			"livechat : %p, "
 			"identify : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			livechat,
 			identify.c_str()
 			);
@@ -246,12 +234,10 @@ IRequest* SessionManager::FinishSession(
 		LogManager::GetLogManager()->Log(
 				LOG_MSG,
 				"SessionManager::FinishSession( "
-				"tid : %d, "
 				"[会话交互(Session), LiveChat -> Client, 返回响应到客户端, 找到对应会话], "
 				"livechat : %p, "
 				"identify : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				livechat,
 				identify.c_str()
 				);
@@ -263,13 +249,11 @@ IRequest* SessionManager::FinishSession(
 				LogManager::GetLogManager()->Log(
 						LOG_MSG,
 						"SessionManager::FinishSession( "
-						"tid : %d, "
 						"[会话交互(Session), LiveChat -> Client, 返回响应到客户端, 找到对应请求], "
 						"livechat : %p, "
 						"identify : %s, "
 						"request : %p "
 						")",
-						(int)syscall(SYS_gettid),
 						livechat,
 						identify.c_str(),
 						request
@@ -284,12 +268,10 @@ IRequest* SessionManager::FinishSession(
 				LogManager::GetLogManager()->Log(
 						LOG_MSG,
 						"SessionManager::FinishSession( "
-						"tid : %d, "
 						"[会话交互(Session), LiveChat -> Client, 返回响应到客户端, 找不到对应请求], "
 						"livechat : %p, "
 						"identify : %s "
 						")",
-						(int)syscall(SYS_gettid),
 						livechat,
 						identify.c_str()
 						);
@@ -310,11 +292,9 @@ bool SessionManager::CloseSessionByLiveChat(ILiveChatClient* livechat) {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"SessionManager::CloseSessionByLiveChat( "
-			"tid : %d, "
 			"[外部服务(LiveChat), 关闭所有会话], "
 			"livechat : %p "
 			")",
-			(int)syscall(SYS_gettid),
 			livechat
 			);
 

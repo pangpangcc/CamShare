@@ -17,7 +17,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "Arithmetic.hpp"
+
+#include "Arithmetic.h"
 
 using namespace std;
 

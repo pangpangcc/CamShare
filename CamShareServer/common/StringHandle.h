@@ -9,8 +9,6 @@
 #ifndef _INC_STRINGHANDLE_
 #define _INC_STRINGHANDLE_
 
-#include "Arithmetic.hpp"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +17,8 @@
 
 #include <list>
 #include <vector>
+
+#include "Arithmetic.h"
 using namespace std;
 class StringHandle {
 public:

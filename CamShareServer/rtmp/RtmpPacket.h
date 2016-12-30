@@ -24,11 +24,14 @@ typedef enum RTMP_CHANNEL {
 typedef enum RTMP_HEADER_CHUNK_TYPE {
 	RTMP_HEADER_CHUNK_TYPE_LARGE = 0x00,
 	RTMP_HEADER_CHUNK_TYPE_MEDIUM = 0x01,
-	RTMP_HEADER_TYPE_SMALL = 0x02,
-	RTMP_HEADER_TYPE_MINIMUM = 0x03,
+	RTMP_HEADER_CHUNK_TYPE_SMALL = 0x02,
+	RTMP_HEADER_CHUNK_TYPE_MINIMUM = 0x03,
 } RTMP_HEADER_CHUNK_TYPE;
 
 typedef enum RTMP_HEADER_MESSAGE_TYPE {
+	RTMP_HEADER_MESSAGE_TYPE_SET_CHUNK = 0x01,
+	RTMP_HEADER_MESSAGE_TYPE_ACK = 0x03,
+	RTMP_HEADER_MESSAGE_TYPE_WINDOW_ACK_SIZE = 0x5,
 	RTMP_HEADER_MESSAGE_TYPE_AUDIO = 0x08,
 	RTMP_HEADER_MESSAGE_TYPE_VIDEO = 0x09,
 	RTMP_HEADER_MESSAGE_TYPE_INVOKE = 0x14,
@@ -54,7 +57,7 @@ typedef enum RTMP_HEADER_MESSAGE_TYPE {
  +-+-+-+-+-+-+-+-+
  */
 typedef struct _tagRtmpBaseHeader {
-	char buffer;
+	unsigned char buffer;
 
 	_tagRtmpBaseHeader() {
 		Reset();
@@ -136,10 +139,14 @@ typedef struct _tagRtmpBaseHeader {
 
  */
 typedef struct _tagRtmpMessageHeader {
-	char buffer[11];
+	unsigned char buffer[11];
 
 	_tagRtmpMessageHeader() {
 		Reset();
+	}
+
+	_tagRtmpMessageHeader(const _tagRtmpMessageHeader& item) {
+		memcpy(buffer, item.buffer, sizeof(buffer));
 	}
 
 	_tagRtmpMessageHeader& operator=(const _tagRtmpMessageHeader& item) {
@@ -207,17 +214,34 @@ typedef struct _tagRtmpPacket {
 	RtmpMessageHeader messageHeader;
 	char* body;
 
+    unsigned int nBytesRead;
+
 	_tagRtmpPacket() {
 		body = NULL;
+		nBytesRead = 0;
+	}
+
+	_tagRtmpPacket(const _tagRtmpPacket& item) {
+		body = NULL;
+
+		baseHeader = item.baseHeader;
+		messageHeader = item.messageHeader;
+		nBytesRead = item.nBytesRead;
 	}
 
 	_tagRtmpPacket& operator=(const _tagRtmpPacket& item) {
 		baseHeader = item.baseHeader;
 		messageHeader = item.messageHeader;
+		nBytesRead = item.nBytesRead;
 		return *this;
 	}
 
 	~_tagRtmpPacket() {
+	}
+
+	void Reset() {
+		baseHeader.Reset();
+		messageHeader.Reset();
 	}
 
 	unsigned int GetMessageHeaderLength() {
@@ -229,10 +253,10 @@ typedef struct _tagRtmpPacket {
 		case RTMP_HEADER_CHUNK_TYPE_MEDIUM:{
 			length += 7;
 		}break;
-		case RTMP_HEADER_TYPE_SMALL:{
+		case RTMP_HEADER_CHUNK_TYPE_SMALL:{
 			length += 3;
 		}break;
-		case RTMP_HEADER_TYPE_MINIMUM:{
+		case RTMP_HEADER_CHUNK_TYPE_MINIMUM:{
 			length += 0;
 		}break;
 		default:{
@@ -249,8 +273,10 @@ typedef struct _tagRtmpPacket {
 	}
 
 	void AllocBody() {
-		FreeBody();
-		body = new char[messageHeader.GetBodySize() + 1];
+		if( messageHeader.GetBodySize() > 0 && body == NULL ) {
+			body = new char[messageHeader.GetBodySize() + 1];
+			nBytesRead = 0;
+		}
 	}
 
 	void FreeBody() {
@@ -258,6 +284,7 @@ typedef struct _tagRtmpPacket {
 			delete[] body;
 			body = NULL;
 		}
+		nBytesRead = 0;
 	}
 
 } RtmpPacket;

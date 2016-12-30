@@ -17,7 +17,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <strings.h>
+#include <netdb.h>
 
 #define SOCKET int
 #define SOCKET_ERROR -1
@@ -47,6 +47,13 @@ public:
 		HANDLE_TIMEOUT	// 处理超时
 	} HANDLE_RESULT;
 
+    // 连接状态
+    typedef enum  {
+        CONNECTION_STATUS_DISCONNECT,   // 未连接
+        CONNECTION_STATUS_CONNECTING,   // 连接中
+        CONNECTION_STATUS_CONNECTED,    // 已连接
+    } CONNNECTION_STATUS;
+
 public:
 	static bool InitEnvironment();
 	static void ReleaseEnvironment();
@@ -61,7 +68,7 @@ public:
 
 public:
 	// 创建socket
-	virtual bool Create() = 0;
+	virtual bool Create(bool supportIpv6 = false) = 0;
 	// 停止socket
 	virtual void Shutdown() = 0;
 	// 关闭socket
@@ -80,4 +87,6 @@ public:
 	virtual HANDLE_RESULT Send(void* data, unsigned int dataLen) = 0;
 	// 接收
 	virtual HANDLE_RESULT Recv(void* data, unsigned int dataSize, unsigned int& dataLen) = 0;
+    // 获取当前连接状态
+    virtual CONNNECTION_STATUS GetConnectionStatus() const = 0;
 };

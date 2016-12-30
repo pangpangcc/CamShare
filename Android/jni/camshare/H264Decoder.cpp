@@ -33,7 +33,8 @@ void H264Decoder::GobalInit() {
 }
 
 bool H264Decoder::Create() {
-	mCodec = avcodec_find_decoder(CODEC_ID_H264);
+	//mCodec = avcodec_find_decoder(CODEC_ID_H264);
+	mCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
 	if ( !mCodec ) {
 		// codec not found
 		FileLog("CamshareClient",
@@ -133,20 +134,21 @@ bool H264Decoder::DecodeFrame(
 				h264FrameLen
 				);
 
-		// 录制文件
-		if( mFilePath.length() > 0 ) {
-			FILE* file = fopen(mFilePath.c_str(), "a+b");
-		    if( file != NULL ) {
-		    	int iLen = -1;
-		    	fseek(file, 0L, SEEK_END);
-				iLen = fwrite(h264frame, 1, h264FrameLen, file);
-		    	fclose(file);
-		    }
-		}
+//		// 录制文件
+//		if( mFilePath.length() > 0 ) {
+//			FILE* file = fopen(mFilePath.c_str(), "a+b");
+//		    if( file != NULL ) {
+//		    	int iLen = -1;
+//		    	fseek(file, 0L, SEEK_END);
+//				iLen = fwrite(h264frame, 1, h264FrameLen, file);
+//		    	fclose(file);
+//		    }
+//		}
 
 		AVFrame* pictureFrame = av_frame_alloc();
 	    int useLen = avcodec_decode_video2(mContext, pictureFrame, &mGotPicture, &avpkt);
 		if (mGotPicture) {
+
 			AVFrame *rgbFrame = av_frame_alloc();
 			int numBytes = avpicture_get_size(PIX_FMT_RGB565, mContext->width, mContext->height);
 			uint8_t* buffer = (uint8_t *)av_malloc(numBytes);
@@ -191,6 +193,15 @@ bool H264Decoder::DecodeFrame(
 			av_free(buffer);
 			av_free(rgbFrame);
 			sws_freeContext(img_convert_ctx);
+		}
+		else
+		{
+			FileLog("CamshareClient",
+					"H264Decoder::DecodeFrame( "
+					"mGotPicture:%d"
+					")",
+					mGotPicture
+					);
 		}
 		av_free(pictureFrame);
 

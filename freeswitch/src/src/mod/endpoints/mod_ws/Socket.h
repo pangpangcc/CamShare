@@ -40,6 +40,7 @@ typedef struct Socket {
 	}
 
 	void Destroy() {
+
 	}
 
 	void SetAddress(const char* ip, switch_port_t port) {

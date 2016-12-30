@@ -7,4 +7,5 @@ public interface CamshareClientJniCallback {
 	public void onRecvVideo(byte[] data, int size, int timestamp);
 	public void onRecvVideoSizeChange(int width, int height);
 	public void onDisconnect();
+	public void onCallVideo(byte[] data, int width, int height, int size, int timestamp);
 }

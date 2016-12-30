@@ -896,9 +896,11 @@ void VideoRecorder::RunCloseShell()
 
 		// run shell
 		int result = system(cmd);
+//		bool bFlag = SendCommand(cmd);
 
 		// log
 		if (result >= 0) {
+//		if( bFlag ) {
 			// success
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 success, result:%d, cmd:%s\n"
@@ -907,8 +909,8 @@ void VideoRecorder::RunCloseShell()
 		else {
 			// error
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 fail! result:%d, cmd:%s\n"
-						, result, cmd);
+						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 fail!, cmd:%s\n"
+						, cmd);
 		}
 	}
 
@@ -1320,6 +1322,41 @@ bool VideoRecorder::RunPictureShell()
 	}
 
 	return result;
+}
+
+bool VideoRecorder::SendCommand(const char* cmd) {
+	switch_log_printf(
+			SWITCH_CHANNEL_LOG,
+			SWITCH_LOG_INFO,
+			"mod_file_recorder: VideoRecorder::SendCommand() cmd : %s\n",
+			cmd
+			);
+	return file_record_send_command(cmd);
+}
+
+bool VideoRecorder::file_record_send_command(const char* cmd) {
+	switch_status_t status = SWITCH_STATUS_FALSE;
+	switch_event_t *event;
+	if ( (status = switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, FILE_RECORDER_EVENT_MAINT)) == SWITCH_STATUS_SUCCESS) {
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "cmd", cmd);
+		status = switch_event_fire(&event);
+	}
+
+	if( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_LOG,
+				SWITCH_LOG_ERROR,
+				"mod_file_recorder: VideoRecorder::file_record_send_command( "
+				"[Send event Fail], "
+				"this : %p, "
+				"cmd : '%s' "
+				") \n",
+				this,
+				cmd
+				);
+	}
+
+	return status == SWITCH_STATUS_SUCCESS;
 }
 
 // 获取空闲buffer

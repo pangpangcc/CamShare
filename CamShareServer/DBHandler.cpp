@@ -44,11 +44,9 @@ bool DBHandler::CreateTable() {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::CreateTable( "
-				"tid : %d, "
 				"[创建录制完成记录表, 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 
@@ -71,11 +69,9 @@ bool DBHandler::CreateTable() {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::CreateTable( "
-				"tid : %d, "
 				"[创建录制完成上传失败记录表, 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 
@@ -100,11 +96,9 @@ bool DBHandler::InsertRecord(const Record& record) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"DBHandler::InsertRecord( "
-			"tid : %d, "
 			"[插入录制完成记录], "
 			"sql : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			sql
 			);
 
@@ -112,11 +106,9 @@ bool DBHandler::InsertRecord(const Record& record) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::InsertRecord( "
-				"tid : %d, "
 				"[插入录制完成记录, 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 
@@ -170,11 +162,9 @@ bool DBHandler::GetRecords(Record* records, int maxSize, int& getSize) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::GetRecords( "
-				"tid : %d, "
 				"[获取录制完成记录, 失败], "
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 	}
@@ -192,11 +182,9 @@ bool DBHandler::RemoveRecord(const Record& record) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"DBHandler::RemoveRecord( "
-			"tid : %d, "
 			"[删除录制完成记录]"
 			"sql : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			sql
 			);
 
@@ -204,11 +192,9 @@ bool DBHandler::RemoveRecord(const Record& record) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::RemoveRecord( "
-				"tid : %d, "
 				"[删除录制完成记录, 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 	}
@@ -235,11 +221,9 @@ bool DBHandler::RemoveRecords(Record* records, int size) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::RemoveRecords( "
-				"tid : %d, "
 				"[删除录制完成记录(批量), 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 	}
@@ -269,11 +253,9 @@ bool DBHandler::GetRecordsCount(unsigned int& getSize) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::GetRecordsCount( "
-				"tid : %d, "
 				"[获取录制完成记录剩余数量, 失败], "
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 	}
@@ -297,11 +279,9 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"DBHandler::InsertErrorRecord( "
-			"tid : %d, "
 			"[插入录制完成上传失败记录], "
 			"sql : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			sql
 			);
 
@@ -309,11 +289,9 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::InsertErrorRecord( "
-				"tid : %d, "
 				"[插入录制完成上传失败记录, 失败]"
 				"sql : %s "
 				")",
-				(int)syscall(SYS_gettid),
 				sql
 				);
 

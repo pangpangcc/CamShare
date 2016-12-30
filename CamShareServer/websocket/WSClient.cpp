@@ -11,10 +11,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "ISocketHandler.h"
 #include <common/md5.h>
+#include <common/KLog.h>
 
-#include "../LogManager.h"
+#include "ISocketHandler.h"
 #include "WSClient.h"
 
 #define WS_HANDSHAKE_SIZE 2048
@@ -34,6 +34,8 @@ WSClient::WSClient() {
 	m_socketHandler = ISocketHandler::CreateSocketHandler(ISocketHandler::TCP_SOCKET);
 
 	mpWSClientListener = NULL;
+
+	Init();
 }
 
 WSClient::~WSClient() {
@@ -59,49 +61,63 @@ bool WSClient::IsConnected() {
 	return mbConnected;
 }
 
+bool WSClient::IsRunning() {
+	return mbRunning;
+}
+
 void WSClient::SetWSClientListener(WSClientListener *listener) {
 	mpWSClientListener = listener;
+}
+
+void WSClient::Init() {
+    mbRunning = false;
+	mbConnected = false;
+	mbShutdown = false;
 }
 
 bool WSClient::Connect(const string& hostName, const string& user, const string& dest) {
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"WSClient::Connect( "
-			"tid : %d, "
 			"index : '%d', "
-			"hostName : %s, "
-			"user : %s, "
-			"dest : %s "
+			"hostName : '%s', "
+			"user : '%s', "
+			"dest : '%s', "
+			"mbRunning : %s "
 			")",
-			(int)syscall(SYS_gettid),
 			mIndex,
 			hostName.c_str(),
 			user.c_str(),
-			dest.c_str()
+			dest.c_str(),
+			mbRunning?"true":"false"
 			);
+
+	bool bFlag = false;
+
+	if( mbRunning ) {
+		FileLog("WSClient",
+				"WSClient::Connect( "
+				"this : %p, "
+				"[Client Already Running], "
+				"hostName : '%s' "
+				"user : %s, "
+				"dest : %s "
+				")",
+				this,
+				hostName.c_str(),
+				user.c_str(),
+				dest.c_str()
+				);
+		return false;
+	}
+
+	Init();
 
 	hostname = hostName;
 	mUser = user;
 	mDest = dest;
 
-	bool bFlag = false;
-
-	if( mbConnected || mbShutdown ) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"WSClient::Connect( "
-				"tid : %d, "
-				"[Already Connected or Shutdown], "
-				"index : '%d', "
-				"hostName : '%s' "
-				")",
-				(int)syscall(SYS_gettid),
-				mIndex,
-				hostName.c_str()
-				);
-		return false;
-	}
-
+	mbRunning = true;
 	if( hostname.length() > 0 ) {
 		bFlag = m_socketHandler->Create();
 		bFlag = bFlag & m_socketHandler->Connect(hostname, port, 0) == SOCKET_RESULT_SUCCESS;
@@ -118,12 +134,10 @@ bool WSClient::Connect(const string& hostName, const string& user, const string&
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
 					"WSClient::Connect( "
-					"tid : %d, "
 					"[Tcp connect fail], "
 					"index : '%d', "
 					"hostName : '%s' "
 					")",
-					(int)syscall(SYS_gettid),
 					mIndex,
 					hostName.c_str()
 					);
@@ -131,29 +145,23 @@ bool WSClient::Connect(const string& hostName, const string& user, const string&
 	}
 
 	if( !bFlag ) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
+		FileLog("WSClient",
 				"WSClient::Connect( "
-				"tid : %d, "
 				"[Fail], "
 				"index : '%d', "
 				"hostName : '%s' "
 				")",
-				(int)syscall(SYS_gettid),
 				mIndex,
 				hostName.c_str()
 				);
-
+		mbRunning = false;
 	} else {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
+		FileLog("WSClient",
 				"WSClient::Connect( "
-				"tid : %d, "
 				"[Success], "
 				"index : '%d', "
 				"hostName : '%s' "
 				")",
-				(int)syscall(SYS_gettid),
 				mIndex,
 				hostName.c_str()
 				);
@@ -165,66 +173,68 @@ bool WSClient::Connect(const string& hostName, const string& user, const string&
 void WSClient::Shutdown() {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
-			"WSClient::Close( "
-			"tid : %d, "
+			"WSClient::Shutdown( "
 			"index : '%d', "
 			"port : %u, "
 			"user : '%s, "
 			"dest : '%s' "
 			")",
-			(int)syscall(SYS_gettid),
 			mIndex,
 			m_socketHandler->GetPort(),
 			mUser.c_str(),
 			mDest.c_str()
 			);
-	if( m_socketHandler ) {
-		m_socketHandler->Shutdown();
+
+	if( !mbShutdown ) {
+		mbShutdown = true;
+		if( m_socketHandler ) {
+			if (ISocketHandler::CONNECTION_STATUS_CONNECTING == m_socketHandler->GetConnectionStatus()) {
+				m_socketHandler->Close();
+			}
+			else {
+				m_socketHandler->Shutdown();
+			}
+		} else {
+			if( m_socketHandler ) {
+				m_socketHandler->Shutdown();
+			}
+		}
 	}
 
-	mbShutdown = true;
 }
 
 void WSClient::Close() {
 	LogManager::GetLogManager()->Log(
 			LOG_MSG,
 			"WSClient::Close( "
-			"tid : %d, "
 			"index : '%d', "
 			"port : %u, "
 			"user : '%s, "
 			"dest : '%s' "
 			")",
-			(int)syscall(SYS_gettid),
 			mIndex,
 			m_socketHandler->GetPort(),
 			mUser.c_str(),
 			mDest.c_str()
 			);
 
-	if( m_socketHandler ) {
-		m_socketHandler->Shutdown();
-		m_socketHandler->Close();
+	if( mbRunning ) {
+		if( m_socketHandler ) {
+			m_socketHandler->Close();
+		}
 	}
 
-	mbShutdown = false;
-	mbConnected = false;
+	mbRunning = false;
 }
 
 bool WSClient::RecvWSPacket() {
-	if( !mbConnected || mbShutdown ) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"RtmpClient::RecvWSPacket( "
-				"tid : %d, "
-				"[Not connected], "
-				"index : '%d' "
-				")",
-				(int)syscall(SYS_gettid),
-				mIndex
-				);
-		return false;
-	}
+	FileLog("WSClient",
+			"WSClient::RecvWSPacket( "
+			"this : %p, "
+			"####################### Recv ####################### "
+			")",
+			this
+			);
 
 	bool bFlag = true;
 
@@ -234,14 +244,11 @@ bool WSClient::RecvWSPacket() {
 	char buffer[1024];
 	result = m_socketHandler->Recv((void *)buffer, sizeof(buffer), len);
 	if( ISocketHandler::HANDLE_FAIL == result ) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"RtmpClient::RecvWSPacket( "
-				"tid : %d, "
+		FileLog("WSClient",
+				"WSClient::RecvWSPacket( "
 				"[Recv fail], "
 				"index : '%d' "
 				")",
-				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		Shutdown();
@@ -291,14 +298,11 @@ bool WSClient::HandShake() {
 	ISocketHandler::HANDLE_RESULT result = ISocketHandler::HANDLE_FAIL;
 	result = m_socketHandler->Send(buffer, strlen(buffer));
 	if (result == ISocketHandler::HANDLE_FAIL) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
+		FileLog("WSClient",
 				"WSClient::HandShake( "
-				"tid : %d, "
 				"[Send fail], "
 				"index : '%d', "
 				")",
-				(int)syscall(SYS_gettid),
 				mIndex
 				);
 		return false;
@@ -309,11 +313,11 @@ bool WSClient::HandShake() {
 //		LogManager::GetLogManager()->Log(
 //				LOG_MSG,
 //				"WSClient::HandShake( "
-//				"tid : %d, "
+//				
 //				"[Recv fail], "
 //				"index : '%d' "
 //				")",
-//				(int)syscall(SYS_gettid),
+//				,
 //				mIndex
 //				);
 //		return false;

@@ -10,10 +10,10 @@
 
 #include <openssl/ssl.h>
 
-static const char hex[16] = {
-	'0','1','2','3','4','5','6','7',
-	'8','9','A','B','C','D','E','F'
-};
+//static const char hex[16] = {
+//	'0','1','2','3','4','5','6','7',
+//	'8','9','A','B','C','D','E','F'
+//};
 
 static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -22,6 +22,8 @@ static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 
 #define HTTP_URL_MAX_PATH 2048
 #define HTTP_URL_FIRSTLINE_PARAM_COUNT 3
+//#define HTTP_URL_PATH_PARAM_COUNT 5
+// 临时解决, 不做PHP用户验证
 #define HTTP_URL_PATH_PARAM_COUNT 3
 
 #define HTTP_PARAM_SEP ":"
@@ -95,6 +97,8 @@ WSClientParser::WSClientParser() {
 	mpUser = NULL;
 	mpDomain = NULL;
 	mpDestNumber = NULL;
+	mpSite = NULL;
+	mpCustom = NULL;
 	mpChannel = NULL;
 	memset(mWebSocketKey, '\0', sizeof(mWebSocketKey));
 
@@ -102,6 +106,10 @@ WSClientParser::WSClientParser() {
 	switch_core_new_memory_pool(&mpPool);
 	switch_mutex_init(&clientMutex, SWITCH_MUTEX_NESTED, mpPool);
 
+	// 生成唯一标识
+	switch_uuid_t uuid;
+	switch_uuid_get(&uuid);
+	switch_uuid_format(this->uuid, &uuid);
 }
 
 WSClientParser::~WSClientParser() {
@@ -115,16 +123,16 @@ WSClientParser::~WSClientParser() {
 
 int WSClientParser::ParseData(char* buffer, int len) {
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+			SWITCH_CHANNEL_UUID_LOG(this->uuid),
 			SWITCH_LOG_DEBUG,
 			"WSClientParser::ParseData( "
 			"parser : %p, "
-			"len : %d, "
-			"buffer : \n%s\n"
+			"len : %d "
+//			"buffer : \n%s\n"
 			") \n",
 			this,
-			len,
-			buffer
+			len
+//			buffer
 			);
 
 	int ret = 0;
@@ -143,10 +151,10 @@ int WSClientParser::ParseData(char* buffer, int len) {
 		const char* sep = NULL;
 		if( sepHeader ) {
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+					SWITCH_CHANNEL_UUID_LOG(this->uuid),
 					SWITCH_LOG_INFO,
 					"WSClientParser::ParseData( "
-					"HandShake, "
+					"[HandShake], "
 					"parser : %p, "
 					"len : %d, "
 					"buffer : \n%s\n"
@@ -214,7 +222,7 @@ int WSClientParser::ParseData(char* buffer, int len) {
 //			p += 3;
 //		}
 //		switch_log_printf(
-//				SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 //				SWITCH_LOG_INFO,
 //				"WSClientParser::ParseData( "
 //				"parser : %p, "
@@ -227,7 +235,7 @@ int WSClientParser::ParseData(char* buffer, int len) {
 		WSPacket* packet = (WSPacket *)buffer;
 
 //		switch_log_printf(
-//				SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 //				SWITCH_LOG_INFO,
 //				"WSClientParser::ParseData( "
 //				"parser : %p, "
@@ -298,7 +306,7 @@ bool WSClientParser::GetHandShakeRespond(char** buffer, int& len) {
 		len = strlen(temp);
 
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_INFO,
 				"WSClientParser::GetHandShakeRespond( "
 				"parser : %p, "
@@ -326,7 +334,7 @@ bool WSClientParser::GetPacket(WSPacket* packet, unsigned long long dataLen) {
 		packet->SetMaskKey(NULL);
 
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_DEBUG,
 				"WSClientParser::GetPacket( "
 				"parser : %p, "
@@ -359,6 +367,56 @@ void WSClientParser::SetWSClientParserCallback(WSClientParserCallback* callback)
 	mpCallback = callback;
 }
 
+bool WSClientParser::Login() {
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(this->uuid),
+			SWITCH_LOG_NOTICE,
+			"WSClientParser::Login( "
+			"this : %p, "
+			"user : '%s', "
+			"domain : '%s', "
+			"site : '%s', "
+			"custom : '%s' "
+			") \n",
+			this,
+			mpUser,
+			mpDomain,
+			mpSite,
+			mpCustom
+			);
+
+// 临时解决, 不做PHP用户验证
+//	switch_event_t *locate_params;
+//	switch_xml_t xml = NULL;
+//
+//	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
+//	switch_assert(locate_params);
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
+//
+//	/* Locate user */
+//	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
+//		switch_log_printf(
+//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+//				SWITCH_LOG_WARNING,
+//				"WSClientParser::Login( "
+//				"this : %p, "
+//				"user : '%s', "
+//				"domain : '%s' ",
+//				this,
+//				mpUser,
+//				mpDomain
+//				);
+//		return false;
+//	}
+
+	// 发送登录成功事件
+	ws_login();
+
+	return true;
+}
+
 WSChannel* WSClientParser::CreateCall(
 		switch_core_session_t *session,
 		const char *profileName,
@@ -376,6 +434,7 @@ WSChannel* WSClientParser::CreateCall(
 	const char *destNumber = mpDestNumber;
 	const char *context = NULL;
 	const char *dialplan = NULL;
+	switch_status_t status = SWITCH_STATUS_FALSE;
 
 	if ( !user || !domain || !destNumber ) {
 		return NULL;
@@ -390,53 +449,60 @@ WSChannel* WSClientParser::CreateCall(
 
 	if (!zstr(user) && !zstr(domain)) {
 		const char *ivrUser = switch_core_session_sprintf(session, "%s@%s", user, domain);
+//		status = switch_ivr_set_user(session, ivrUser);
+		// 临时解决, 不做PHP用户验证
 		switch_ivr_set_user(session, ivrUser);
+		status = SWITCH_STATUS_SUCCESS;
 	}
 
-	if (!(context = switch_channel_get_variable(channel, "user_context"))) {
-		if (!(context = profileContext)) {
-			context = "public";
+	if( status == SWITCH_STATUS_SUCCESS ) {
+		if (!(context = switch_channel_get_variable(channel, "user_context"))) {
+			if (!(context = profileContext)) {
+				context = "public";
+			}
 		}
-	}
 
-	if (!(dialplan = switch_channel_get_variable(channel, "inbound_dialplan"))) {
-		if (!(dialplan = profileDialplan)) {
-			dialplan = "LUA";
+		if (!(dialplan = switch_channel_get_variable(channel, "inbound_dialplan"))) {
+			if (!(dialplan = profileDialplan)) {
+				dialplan = "LUA";
+			}
 		}
+
+		//	switch_log_printf(
+		//			SWITCH_CHANNEL_SESSION_LOG(session),
+		//			SWITCH_LOG_NOTICE,
+		//			"WSClientParser::CreateCall( "
+		//			"context : %s, "
+		//			"dialplan : %s "
+		//			") \n",
+		//			context,
+		//			dialplan
+		//			);
+
+		// 设置主叫
+		caller_profile = switch_caller_profile_new(
+				pool,
+				switch_str_nil(user),
+				dialplan,
+				SWITCH_DEFAULT_CLID_NAME,
+				!zstr(user) ? user : SWITCH_DEFAULT_CLID_NUMBER,
+				ip /* net addr */,
+				NULL /* ani   */,
+				NULL /* anii  */,
+				NULL /* rdnis */,
+				"mod_ws",
+				context,
+				destNumber
+				);
+		switch_channel_set_caller_profile(channel, caller_profile);
+		switch_core_session_add_stream(session, NULL);
+		switch_channel_set_variable(channel, "caller", user);
+		switch_channel_set_state(channel, CS_INIT);
+
+		return CreateChannel(session);
 	}
 
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_NOTICE,
-//			"WSClientParser::CreateCall( "
-//			"context : %s, "
-//			"dialplan : %s "
-//			") \n",
-//			context,
-//			dialplan
-//			);
-
-	// 设置主叫
-	caller_profile = switch_caller_profile_new(
-			pool,
-			switch_str_nil(user),
-			dialplan,
-			SWITCH_DEFAULT_CLID_NAME,
-			!zstr(user) ? user : SWITCH_DEFAULT_CLID_NUMBER,
-			ip /* net addr */,
-			NULL /* ani   */,
-			NULL /* anii  */,
-			NULL /* rdnis */,
-			"mod_ws",
-			context,
-			destNumber
-			);
-	switch_channel_set_caller_profile(channel, caller_profile);
-	switch_core_session_add_stream(session, NULL);
-	switch_channel_set_variable(channel, "caller", user);
-	switch_channel_set_state(channel, CS_INIT);
-
-	return CreateChannel(session);
+	return NULL;
 }
 
 WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
@@ -444,7 +510,7 @@ WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 
 	if( mState != WSClientState_Disconnected ) {
 		// 连接还没被销毁
-		DestroyChannel(true);
+		DestroyCall();
 	}
 
 	// 创建channel
@@ -452,9 +518,10 @@ WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 	wsChannel = (WSChannel *)switch_core_alloc(mpPool, sizeof(WSChannel));
 	wsChannel->session = session;
 	wsChannel->parser = this;
+	wsChannel->uuid_str = switch_core_strdup(mpPool, switch_core_session_get_uuid(session));
 
 	// 创建计时器
-	switch_core_timer_init(&wsChannel->timer, "soft", 20, (16000 / (1000 / 20)), mpPool);
+//	switch_core_timer_init(&wsChannel->timer, "soft", 20, (16000 / (1000 / 20)), mpPool);
 
 	if( InitChannel(wsChannel) ) {
 		mpChannel = wsChannel;
@@ -463,41 +530,11 @@ WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 	return wsChannel;
 }
 
-switch_core_session_t* WSClientParser::DestroyChannel(bool hangup) {
-	switch_core_session_t* session = NULL;
-	if( mpChannel ) {
-		session = DestroyChannel(mpChannel, hangup);
-	}
-	return session;
-}
-
-switch_core_session_t* WSClientParser::DestroyChannel(WSChannel* wsChannel, bool hangup) {
-	switch_core_session_t* session = NULL;
-	if( mpChannel && mpChannel == wsChannel ) {
-		// 销毁计时器
-		switch_core_timer_destroy(&wsChannel->timer);
-
-		session = wsChannel->session;
-		if( session ) {
-			switch_channel_t* channel = switch_core_session_get_channel(session);
-			if( channel && hangup ) {
-				switch_log_printf(
-						SWITCH_CHANNEL_SESSION_LOG(session),
-						SWITCH_LOG_NOTICE,
-						"WSClientParser::DestroyChannel( "
-						"Hang up session : %s "
-						") \n",
-						switch_core_session_get_uuid(session)
-						);
-
-				switch_channel_hangup(channel, SWITCH_CAUSE_DESTINATION_OUT_OF_ORDER);
-			}
-
-		}
-
-		mpChannel = NULL;
-	}
-	return session;
+WSChannel* WSClientParser::DestroyCall() {
+	WSChannel* wsChannel = NULL;
+	wsChannel = mpChannel;
+	mpChannel = NULL;
+	return wsChannel;
 }
 
 bool WSClientParser::InitChannel(WSChannel* wsChannel) {
@@ -635,6 +672,7 @@ bool WSClientParser::IsConnected() {
 }
 
 void WSClientParser::Disconnected() {
+	ws_disconnect();
 	mState = WSClientState_Disconnected;
 }
 
@@ -662,6 +700,22 @@ void WSClientParser::DestroyVideoBuffer() {
 	return mVideoTransfer.DestroyVideoBuffer();
 }
 
+const char* WSClientParser::GetUUID() {
+	return uuid;
+}
+
+const char* WSClientParser::GetUser() {
+	return mpUser;
+}
+
+const char* WSClientParser::GetDomain() {
+	return mpDomain;
+}
+
+const char* WSClientParser::GetDestNumber() {
+	return mpDestNumber;
+}
+
 bool WSClientParser::ParseFirstLine(char* line) {
 	bool bFlag = false;
 
@@ -676,11 +730,11 @@ bool WSClientParser::ParseFirstLine(char* line) {
 		ac.decode_url(array[1], strlen(array[1]), decodeUrl);
 
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_INFO,
 				"WSClientParser::ParseFirstLine( "
 				"parser : %p, "
-				"decodeUrl : %s "
+				"decodeUrl : '%s' "
 				") \n",
 				this,
 				decodeUrl
@@ -692,24 +746,33 @@ bool WSClientParser::ParseFirstLine(char* line) {
 			if( *p == *delim ) {
 				p++;
 			}
-			if( switch_separate_string_string(p, delim, array, HTTP_URL_PATH_PARAM_COUNT) == HTTP_URL_PATH_PARAM_COUNT ) {
+			if( switch_separate_string_string(p, delim, array, HTTP_URL_PATH_PARAM_COUNT) >= HTTP_URL_PATH_PARAM_COUNT ) {
 				mpUser = switch_core_strdup(mpPool, array[0]);
 				mpDomain = switch_core_strdup(mpPool, array[1]);
 				mpDestNumber = switch_core_strdup(mpPool, array[2]);
+//				mpSite = switch_core_strdup(mpPool, array[3]);
+//				mpCustom = switch_core_strdup(mpPool, array[4]);
+				// 临时解决, 不做PHP用户验证
+				mpSite = switch_core_strdup(mpPool, "");
+				mpCustom = switch_core_strdup(mpPool, "");
 
 				switch_log_printf(
-						SWITCH_CHANNEL_UUID_LOG(this->GetClient()->uuid),
+						SWITCH_CHANNEL_UUID_LOG(this->uuid),
 						SWITCH_LOG_INFO,
 						"WSClientParser::ParseFirstLine( "
 						"parser : %p, "
-						"mpUser : %s, "
-						"mpDomain : %s, "
-						"mpDestNumber : %s "
+						"user : '%s', "
+						"domain : '%s', "
+						"destnumber : '%s', "
+						"site : '%s', "
+						"custom : '%s' "
 						") \n",
 						this,
 						mpUser,
 						mpDomain,
-						mpDestNumber
+						mpDestNumber,
+						mpSite,
+						mpCustom
 						);
 			}
 		}
@@ -751,4 +814,60 @@ bool WSClientParser::CheckHandShake() {
 		bFlag = true;
 	}
 	return bFlag;
+}
+
+bool WSClientParser::ws_login() {
+	switch_status_t status = SWITCH_STATUS_FALSE;
+	switch_event_t *event;
+	if ( (status = switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, WS_EVENT_MAINT)) == SWITCH_STATUS_SUCCESS) {
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "User", mpUser);
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Domain", mpDomain);
+		status = switch_event_fire(&event);
+	}
+
+	if( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::ws_login( "
+				"[Send event Fail], "
+				"this : %p, "
+				"user : '%s', "
+				"domain : '%s' "
+				") \n",
+				this,
+				mpUser,
+				mpDomain
+				);
+	}
+
+	return status == SWITCH_STATUS_SUCCESS;
+}
+
+bool WSClientParser::ws_disconnect() {
+	switch_status_t status = SWITCH_STATUS_FALSE;
+	switch_event_t *event;
+	if ( (status = switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, WS_EVENT_MAINT)) == SWITCH_STATUS_SUCCESS) {
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "User", mpUser);
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Domain", mpDomain);
+		status = switch_event_fire(&event);
+	}
+
+	if( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::ws_disconnect( "
+				"[Send event Fail], "
+				"this : %p, "
+				"user : '%s', "
+				"domain : '%s' "
+				") \n",
+				this,
+				mpUser,
+				mpDomain
+				);
+	}
+
+	return status == SWITCH_STATUS_SUCCESS;
 }

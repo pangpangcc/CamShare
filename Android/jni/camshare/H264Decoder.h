@@ -41,6 +41,8 @@ public:
 private:
 	AVCodec *mCodec;
 	AVCodecContext *mContext;
+
+
 	int mGotPicture, mLen;
 
 	Rtp2H264VideoTransfer mRtp2H264VideoTransfer;

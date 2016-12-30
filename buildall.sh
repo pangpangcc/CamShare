@@ -2,6 +2,7 @@
 
 # define param
 ver=$1
+noclean="$2"
 
 # check param
 param_err="0"
@@ -13,8 +14,15 @@ if [ "$param_err" != "0" ]; then
   exit 0
 fi
 
+if [ "$noclean" == "noclean" ]; then
+	echo "# build withou clean"
+else
+  echo "# build with clean"
+  noclean=""
+fi
+
 # compile
-./compile.sh &&
+./compile.sh $noclean &&
 
 # build install package
 ./packageall.sh $ver &&

@@ -24,11 +24,19 @@ using namespace std;
 #define VERSION_STRING "1.0.0"
 
 //#define SERVER_IP "127.0.0.1"
-#define SERVER_IP "192.168.88.152"
-#define MAX_CLIENT 100
+//char ip[128] = {"172.16.172.129"};
+char ip[128] = {"192.168.88.152"};
+int iTotal = 1;
+int iReconnect = 10;
+bool bPlay = false;
+bool bNoVideo = false;
+
+bool Parse(int argc, char *argv[]);
+
+#define MAX_CLIENT 200
 bool testReconnect = true;
-#define RECONN_MAX_TIME_MS (20*1000*1000)
-#define RECONN_CHECK_INTERVAL (200*1000)
+#define RECONN_MAX_TIME_S (10*1000*1000)
+#define RECONN_CHECK_INTERVAL (100*1000)
 
 unsigned char frame0[] = {
 		0x17,0x00,0x00,0x00,0x00,0x01,0x42,0x00,0x1f,0xff,0xe1,0x00,0x19,0x67,0x42,0x80,
@@ -299,6 +307,9 @@ void SignalFunc(int sign_no);
 
 RtmpClient client[MAX_CLIENT];
 KThread* clientThreads[MAX_CLIENT];
+KMutex clientRandTimeMutext[MAX_CLIENT];
+int clientRandTime[MAX_CLIENT];
+string clientDest[MAX_CLIENT];
 
 KThread sendVideoThread[MAX_CLIENT];
 KThread heartBeatThread[MAX_CLIENT];
@@ -316,7 +327,7 @@ protected:
 		unsigned int timestamp = 0;
 		unsigned int start = 0, end = 0;
 
-		while( mContainer->IsConnected() ) {
+		while( mContainer->IsRunning() ) {
 			if( !mContainer->SendHeartBeat() ) {
 				break;
 			}
@@ -326,15 +337,13 @@ protected:
 
 		LogManager::GetLogManager()->Log(
 				LOG_MSG,
-				"SendHeartBeatRunnable::onRun( "
-				"tid : %d, "
-				"[Disconnected], "
+				"rtmp_client::SendHeartBeatRunnable( "
+				"[Stop], "
 				"index : '%d' "
 				")",
-				(int)syscall(SYS_gettid),
 				mContainer->GetIndex()
 				);
-		mContainer->Close();
+		mContainer->Shutdown();
 	}
 private:
 	RtmpClient *mContainer;
@@ -353,7 +362,7 @@ protected:
 		unsigned int timestamp = 0;
 		unsigned int start = 0, end = 0;
 
-		while( mContainer->IsConnected() ) {
+		while( mContainer->IsRunning() ) {
 			start = timestamp;
 			timestamp += timestamps[0];
 			if( !mContainer->SendVideoData((const char* )frame0, sizeof(frame0), timestamp) ) {
@@ -399,15 +408,13 @@ protected:
 
 		LogManager::GetLogManager()->Log(
 				LOG_MSG,
-				"SendVideoRunnable::onRun( "
-				"tid : %d, "
-				"[Disconnected], "
+				"rtmp_client::SendVideoRunnable( "
+				"[Stop], "
 				"index : '%d' "
 				")",
-				(int)syscall(SYS_gettid),
 				mContainer->GetIndex()
 				);
-		mContainer->Close();
+		mContainer->Shutdown();
 	}
 private:
 	RtmpClient *mContainer;
@@ -424,10 +431,31 @@ public:
 protected:
 	void onRun() {
 		while( gStart ) {
-			if( mContainer->Connect(SERVER_IP) ) {
-				// 开始心跳线程
-				SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(client);
-				heartBeatThread[client->GetIndex()].start(pHeartBeatRunable);
+			clientRandTimeMutext[mContainer->GetIndex()].lock();
+			if( clientRandTime[mContainer->GetIndex()] <= 0 ) {
+				if( iReconnect ) {
+					clientRandTime[mContainer->GetIndex()] = rand() % iReconnect;
+				}
+			}
+			clientRandTimeMutext[mContainer->GetIndex()].unlock();
+
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"rtmp_client::ClientRunnable( "
+					"[Connect], "
+					"index : '%d', "
+					"client : %p, "
+					"clientRandTime : '%d' "
+					")",
+					mContainer->GetIndex(),
+					mContainer,
+					clientRandTime[mContainer->GetIndex()]
+					);
+
+			if( mContainer->Connect(ip) ) {
+//				// 开始心跳线程
+//				SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(client);
+//				heartBeatThread[client->GetIndex()].start(pHeartBeatRunable);
 
 				RtmpPacket recvPacket;
 				while( mContainer->RecvRtmpPacket(&recvPacket) ) {
@@ -435,42 +463,54 @@ protected:
 					recvPacket.FreeBody();
 				}
 
-				// 停止发送视频线程
-				KRunnable* pRunable = sendVideoThread[mContainer->GetIndex()].stop();
-				if( pRunable ) {
-					delete pRunable;
-				}
-
-				// 停止心跳线程
-				pRunable = heartBeatThread[mContainer->GetIndex()].stop();
-				if( pRunable ) {
-					delete pRunable;
-				}
+//				// 停止心跳线程
+//				pRunable = heartBeatThread[mContainer->GetIndex()].stop();
+//				if( pRunable ) {
+//					delete pRunable;
+//				}
 
 				LogManager::GetLogManager()->Log(
 						LOG_WARNING,
-						"ClientRunnable::onRun( "
-						"tid : %d, "
+						"rtmp_client::ClientRunnable( "
 						"[Disconnect], "
-						"index : '%d' "
+						"index : '%d', "
+						"client : %p "
 						")",
-						(int)syscall(SYS_gettid),
-						mContainer->GetIndex()
+						mContainer->GetIndex(),
+						mContainer
 						);
+
+				// 关闭客户端
+				mContainer->Close();
 
 			} else {
 				// 连接失败
-				client->Close();
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"rtmp_client::ClientRunnable( "
+						"[Connect fail], "
+						"index : '%d', "
+						"client : %p "
+						")",
+						mContainer->GetIndex(),
+						mContainer
+						);
+
+				// 关闭客户端
+				mContainer->Close();
 			}
 
-			int randtime = rand() % RECONN_MAX_TIME_MS;
-			while (randtime > 0 && gStart) {
-				int waittime = (randtime > RECONN_CHECK_INTERVAL ? RECONN_CHECK_INTERVAL : randtime);
-				randtime -= waittime;
-				usleep(waittime);
+			// 连接已经断开
+
+			// 停止发送视频线程
+			KRunnable* pRunable = sendVideoThread[mContainer->GetIndex()].stop();
+			if( pRunable ) {
+				delete pRunable;
 			}
+
+			// 休息后重连
+			sleep(1);
 		}
-
 	}
 
 private:
@@ -482,32 +522,44 @@ public:
 	void OnConnect(RtmpClient* client, const string& sessionId) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnConnect( "
-				"tid : %d, "
+				"rtmp_client::OnConnect( "
 				"index : '%d', "
 				"sessionId : '%s', "
 				"client : %p "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex(),
 				sessionId.c_str(),
 				client
 				);
 
 		char temp[1024];
-		sprintf(temp, "WW%d@%s", client->GetIndex(), SERVER_IP);
+		if( bPlay ) {
+			sprintf(temp, "MM%d", client->GetIndex());
+		} else {
+			sprintf(temp, "WW%d", client->GetIndex());
+		}
+
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"rtmp_client::OnConnect( "
+				"[Login], "
+				"index : '%d', "
+				"temp : '%s' "
+				")",
+				client->GetIndex(),
+				temp
+				);
+
 		client->Login(temp, "123456", "1", "sid=SESSION123456&userType=1");
 	}
 
 	void OnDisconnect(RtmpClient* client) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnDisconnect( "
-				"tid : %d, "
+				"rtmp_client::OnDisconnect( "
 				"index : '%d', "
 				"client : %p "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex(),
 				client
 				);
@@ -516,14 +568,12 @@ public:
 	void OnLogin(RtmpClient* client, bool bSuccess) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnLogin( "
-				"tid : %d, "
+				"rtmp_client::OnLogin( "
 				"index : '%d', "
 				"bSuccess : %d, "
 				"user : '%s', "
 				"client : %p "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex(),
 				bSuccess,
 				client->GetUser().c_str(),
@@ -532,59 +582,98 @@ public:
 
 		if( bSuccess ) {
 			char temp[1024];
+			sprintf(temp, "WW%d", client->GetIndex());
+			clientDest[client->GetIndex()] = temp;
 			sprintf(temp, "WW%d|||PC0|||1", client->GetIndex());
+
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"rtmp_client::OnLogin( "
+					"[MakeCall], "
+					"index : '%d', "
+					"temp : '%s' "
+					")",
+					client->GetIndex(),
+					temp
+					);
+
 			client->MakeCall(temp);
-			client->CreatePublishStream();
 		}
 	}
 	void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) {
-		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
-				"RtmpClientListenerImp::OnMakeCall( "
-				"tid : %d, "
-				"index : '%d', "
-				"bSuccess : %d, "
-				"user : '%s', "
-				"channelId : '%s', "
-				"client : %p "
-				")",
-				(int)syscall(SYS_gettid),
-				client->GetIndex(),
-				bSuccess,
-				client->GetUser().c_str(),
-				channelId.c_str(),
-				client
-				);
+		if( client->GetUser() == clientDest[client->GetIndex()] ) {
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"rtmp_client::OnMakeCall( "
+					"[进入自己会议室, 上传], "
+					"index : '%d', "
+					"bSuccess : %d, "
+					"user : '%s', "
+					"dest : '%s', "
+					"channelId : '%s', "
+					"client : %p "
+					")",
+					client->GetIndex(),
+					bSuccess,
+					client->GetUser().c_str(),
+					clientDest[client->GetIndex()].c_str(),
+					channelId.c_str(),
+					client
+					);
+
+			// 进入自己会议室, 上传
+			client->CreatePublishStream();
+		} else {
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"rtmp_client::OnMakeCall( "
+					"[进入别人的会议室, 下载], "
+					"index : '%d', "
+					"bSuccess : %d, "
+					"user : '%s', "
+					"dest : '%s', "
+					"channelId : '%s', "
+					"client : %p "
+					")",
+					client->GetIndex(),
+					bSuccess,
+					client->GetUser().c_str(),
+					clientDest[client->GetIndex()].c_str(),
+					channelId.c_str(),
+					client
+					);
+
+			// 进入别人的会议室, 下载
+			client->CreateReceiveStream();
+		}
 	}
 	void OnCreatePublishStream(RtmpClient* client) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnCreatePublishStream( "
-				"tid : %d, "
+				"rtmp_client::OnCreatePublishStream( "
 				"index : '%d', "
 				"user : '%s', "
 				"client : %p "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex(),
 				client->GetUser().c_str(),
 				client
 				);
 
-		sendVideoThread[client->GetIndex()].start(new SendVideoRunnable(client));
+		if( !bNoVideo ) {
+			sendVideoThread[client->GetIndex()].start(new SendVideoRunnable(client));
+		}
 	}
 
 	void OnHangup(RtmpClient* client, const string& channelId, const string& cause) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnHangup( "
-				"tid : %d, "
+				"rtmp_client::OnHangup( "
 				"index : '%d', "
 				"user : '%s', "
 				"channelId : '%s', "
 				"client : %p "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex(),
 				client->GetUser().c_str(),
 				channelId.c_str(),
@@ -592,28 +681,58 @@ public:
 				client
 				);
 
-		// 停止发送视频
-		KRunnable* pSendVideoRunable = sendVideoThread[client->GetIndex()].stop();
-		if( pSendVideoRunable ) {
-			delete pSendVideoRunable;
-		}
+//		// 停止发送视频
+//		KRunnable* pSendVideoRunable = sendVideoThread[client->GetIndex()].stop();
+//		if( pSendVideoRunable ) {
+//			delete pSendVideoRunable;
+//		}
 
 		// retry MakeCall
 		char temp[1024];
 		sprintf(temp, "WW%d|||PC0|||1", client->GetIndex());
+
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"rtmp_client::OnHangup( "
+				"[MakeCall], "
+				"index : '%d', "
+				"temp : '%s' "
+				")",
+				client->GetIndex(),
+				temp
+				);
+
 		client->MakeCall(temp);
 	}
 
 	void OnHeartBeat(RtmpClient* client) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"RtmpClientListenerImp::OnHeartBeat( "
-				"tid : %d, "
+				"rtmp_client::OnHeartBeat( "
 				"index : '%d' "
 				")",
-				(int)syscall(SYS_gettid),
 				client->GetIndex()
 				);
+	}
+
+	void OnRecvAudio(RtmpClient* client, const char* data, unsigned int size) {
+//		LogManager::GetLogManager()->Log(
+//				LOG_STAT,
+//				"RtmpClientListenerImp::OnRecvAudio( "
+//				"index : '%d' "
+//				")",
+//				client->GetIndex()
+//				);
+	}
+
+	void OnRecvVideo(RtmpClient* client, const char* data, unsigned int size, unsigned int timestamp) {
+//		LogManager::GetLogManager()->Log(
+//				LOG_STAT,
+//				"RtmpClientListenerImp::OnRecvVideo( "
+//				"index : '%d' "
+//				")",
+//				client->GetIndex()
+//				);
 	}
 };
 RtmpClientListenerImp gRtmpClientListenerImp;
@@ -623,6 +742,13 @@ int main(int argc, char *argv[]) {
 	printf("# Version : %s \n", VERSION_STRING);
 	printf("# Build date : %s %s \n", __DATE__, __TIME__ );
 	srand(time(0));
+
+	Parse(argc, argv);
+	printf("# ip : %s \n", ip);
+	printf("# total : %d \n", iTotal);
+	printf("# reconnect time : %d \n", iReconnect);
+	printf("# play : %s \n", bPlay?"true":"false");
+	iReconnect *= 1000 * 1000;
 
 	/* Ignore */
 	struct sigaction sa;
@@ -653,7 +779,7 @@ int main(int argc, char *argv[]) {
 	LogManager::GetLogManager()->SetDebugMode(true);
 
 	gStart = true;
-	for(int i = 0; i < MAX_CLIENT; i++) {
+	for(int i = 0; i < iTotal; i++) {
 		client[i].SetRtmpClientListener(&gRtmpClientListenerImp);
 		client[i].SetIndex(i);
 		ClientRunnable* runnable = new ClientRunnable(&(client[i]));
@@ -666,28 +792,31 @@ int main(int argc, char *argv[]) {
 	// test reconnect
 	if (testReconnect) {
 		sleep(30);
-                srand(time(NULL));
 		while (gStart) {
-			for (int i = 0; i < MAX_CLIENT && gStart; i++) {
-				int randtime = rand() % RECONN_MAX_TIME_MS;
-				while (randtime > 0 && gStart) {
-					int waittime = (randtime > RECONN_CHECK_INTERVAL ? RECONN_CHECK_INTERVAL : randtime);
-					randtime -= waittime;
-					usleep(waittime);
+			for (int i = 0; i < iTotal && gStart; i++) {
+				if( client[i].IsRunning() ) {
+					clientRandTimeMutext[i].lock();
+					if (clientRandTime[i] > 0 && gStart) {
+						clientRandTime[i] -= RECONN_CHECK_INTERVAL;
+					} else {
+						// 只关闭socket, 等待接收线程停止, 再重连
+						client[i].Shutdown();
+					}
+					clientRandTimeMutext[i].unlock();
 				}
-				client[i].Close();
 			}
+			usleep(RECONN_CHECK_INTERVAL);
 		}
 	}
 
-	for(int i = 0; i < MAX_CLIENT; i++) {
-		clientThreads[i]->stop();
+	for(int i = 0; i < iTotal; i++) {
+		KRunnable* runnable = clientThreads[i]->stop();
+		if( runnable ) {
+			delete runnable;
+		}
 	}
 
 	printf("# All threads exit \n");
-//	while( true ) {
-//		sleep(1);
-//	}
 
 	return EXIT_SUCCESS;
 }
@@ -699,12 +828,15 @@ void SignalFunc(int sign_no) {
 	gStart = false;
 	switch(sign_no) {
 	default:{
-		for(int i = 0; i < MAX_CLIENT; i++) {
+		for(int i = 0; i < iTotal; i++) {
 			client[i].Shutdown();
 		}
 
-		for(int i = 0; i < MAX_CLIENT; i++) {
-			clientThreads[i]->stop();
+		for(int i = 0; i < iTotal; i++) {
+			KRunnable* runnable = clientThreads[i]->stop();
+			if( runnable ) {
+				delete runnable;
+			}
 		}
 
 		printf("# All threads exit \n");
@@ -712,4 +844,29 @@ void SignalFunc(int sign_no) {
 		exit(EXIT_SUCCESS);
 	}break;
 	}
+}
+
+bool Parse(int argc, char *argv[]) {
+	string key;
+	string value;
+
+	for( int i = 1; (i + 1) < argc; i+=2 ) {
+		key = argv[i];
+		value = argv[i+1];
+
+		if( key.compare("-h") == 0 ) {
+			memcpy(ip, value.c_str(), value.length());
+		} else if( key.compare("-play") == 0 ) {
+			bPlay = atoi(value.c_str());
+		} else if( key.compare("-n") == 0 ) {
+			iTotal = atoi(value.c_str());
+		} else if( key.compare("-novideo") == 0 ) {
+			bNoVideo = atoi(value.c_str());
+		} else if( key.compare("-reconnect") == 0 ) {
+			iReconnect = atoi(value.c_str());
+		}
+
+	}
+
+	return true;
 }

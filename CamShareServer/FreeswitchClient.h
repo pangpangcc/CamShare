@@ -208,9 +208,10 @@ public:
 
 	/**
 	 * 重新验证当前所有会议室用户
+	 * @param bCreateChannel	true:创建频道,用于freeswitch断开连接时候重新纪录/false:仅定时重新验证
 	 * @return true:成功/false:失败
 	 */
-	bool AuthorizationAllConference();
+	bool AuthorizationAllConference(bool bCreateChannel = false);
 
 	/**
 	 * 创建频道
@@ -237,6 +238,16 @@ public:
 	 * 获取在线用户数目
 	 */
 	unsigned int GetOnlineUserCount();
+
+	/**
+	 * 获取在线RTMP Session数目
+	 */
+	unsigned int GetRTMPSessionCount();
+
+	/**
+	 * 获取在线WebSocket 用户数目
+	 */
+	unsigned int GetWebSocketUserCount();
 
 	/**
 	 * 获取指定会议室用户列表
@@ -329,6 +340,7 @@ private:
 	 * 事件处理分发
 	 */
 	void FreeswitchEventHandle(esl_event_t *event);
+
 	/**
 	 * 事件处理, rtmp终端登陆
 	 */
@@ -337,6 +349,14 @@ private:
 	 * 事件处理, rtmp终端断开
 	 */
 	void FreeswitchEventRtmpDestory(const Json::Value& root);
+	/**
+	 * 事件处理, websocket终端登陆
+	 */
+	void FreeswitchEventWebsocketLogin(const Json::Value& root);
+	/**
+	 * 事件处理, websocket终端断开
+	 */
+	void FreeswitchEventWebsocketDestory(const Json::Value& root);
 	/**
 	 * 事件处理, 增加会议成员
 	 */
@@ -369,6 +389,11 @@ private:
 	 */
 	RtmpUserMap mRtmpUserMap;
 
+	/**
+	 * Freeswitch websocket在线用户数
+	 */
+	unsigned int mWebSocketUserCount;
+
 //	/**
 //	 * Freeswitch <user,conference> -> channel map
 //	 */
@@ -398,6 +423,15 @@ private:
 	 * 命令锁
 	 */
 	KMutex mCmdMutex;
+
+	/**
+	 * 连接锁
+	 */
+	KMutex mConnectedMutex;
+	/**
+	 * 是否已经成功监听
+	 */
+	bool mbIsConnected;
 };
 
 #endif /* FREESWITCHCLIENT_H_ */

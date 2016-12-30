@@ -88,7 +88,10 @@ bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
 	    time_t stm = time(NULL);
         struct tm tTime;
         localtime_r(&stm,&tTime);
-        snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d ] ", tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
+        snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d tid:%-6d ] ",
+        		tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec,
+				(int)syscall(SYS_gettid)
+				);
 
         //get va_list
         va_list	agList;

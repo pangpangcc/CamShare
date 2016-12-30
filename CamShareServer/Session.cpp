@@ -124,12 +124,10 @@ void Session::CheckTimeoutRunnableHandle() {
 				LogManager::GetLogManager()->Log(
 						LOG_STAT,
 						"Session::CheckTimeoutRunnableHandle( "
-						"tid : %d, "
 						"[检测任务超时, 发现有任务超时], "
 						"item->identify : %s, "
 						"item->request : %p "
 						")",
-						(int)syscall(SYS_gettid),
 						item->identify.c_str(),
 						item->request
 						);
@@ -142,12 +140,10 @@ void Session::CheckTimeoutRunnableHandle() {
 						LogManager::GetLogManager()->Log(
 								LOG_WARNING,
 								"Session::CheckTimeoutRunnableHandle( "
-								"tid : %d, "
 								"[检测任务超时, 发现有任务超时, 任务未完成, 标记执行失败], "
 								"item->identify : %s, "
 								"item->request : %p "
 								")",
-								(int)syscall(SYS_gettid),
 								item->identify.c_str(),
 								item->request
 								);
@@ -166,12 +162,10 @@ void Session::CheckTimeoutRunnableHandle() {
 						LogManager::GetLogManager()->Log(
 								LOG_STAT,
 								"Session::CheckTimeoutRunnableHandle( "
-								"tid : %d, "
 								"[检测任务超时, 发现有任务超时, 任务已经被替换], "
 								"item->identify : %s, "
 								"item->request : %p "
 								")",
-								(int)syscall(SYS_gettid),
 								item->identify.c_str(),
 								item->request
 								);
@@ -181,12 +175,10 @@ void Session::CheckTimeoutRunnableHandle() {
 					LogManager::GetLogManager()->Log(
 							LOG_STAT,
 							"Session::CheckTimeoutRunnableHandle( "
-							"tid : %d, "
 							"[检测任务超时, 发现有任务超时, 任务已经完成], "
 							"item->identify : %s, "
 							"item->request : %p "
 							")",
-							(int)syscall(SYS_gettid),
 							item->identify.c_str(),
 							item->request
 							);

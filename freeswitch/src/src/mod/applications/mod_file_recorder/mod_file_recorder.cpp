@@ -67,6 +67,12 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load)
 	supported_formats[i++] = (char*)"h264";
 //	supported_formats[i++] = "mov";
 
+	/* create/register custom event message type */
+	if (switch_event_reserve_subclass(FILE_RECORDER_EVENT_MAINT) != SWITCH_STATUS_SUCCESS) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Couldn't register subclass %s!\n", FILE_RECORDER_EVENT_MAINT);
+		return SWITCH_STATUS_TERM;
+	}
+
 	// 创建模块
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 
@@ -100,6 +106,9 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load)
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_file_recorder_shutdown)
 {
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: shutdown()\n");
+
+	switch_event_free_subclass(FILE_RECORDER_EVENT_MAINT);
+
 	return SWITCH_STATUS_SUCCESS;
 }
 

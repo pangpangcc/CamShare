@@ -121,7 +121,7 @@ bool AsyncIOServer::IsRuning() {
 
 bool AsyncIOServer::Send(Client* client, const char* buffer, switch_size_t* len) {
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_LOG,
 			SWITCH_LOG_DEBUG,
 			"AsyncIOServer::Send( "
 			"client : %p, "
@@ -148,7 +148,7 @@ bool AsyncIOServer::Send(Client* client, const char* buffer, switch_size_t* len)
 
 void AsyncIOServer::Disconnect(Client* client) {
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_LOG,
 			SWITCH_LOG_DEBUG,
 			"AsyncIOServer::Disconnect( "
 			"client : %p "
@@ -166,7 +166,7 @@ bool AsyncIOServer::OnAccept(Socket* socket) {
 	socket->data = client;
 
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_LOG,
 			SWITCH_LOG_DEBUG,
 			"AsyncIOServer::OnAccept( "
 			"client : %p, "
@@ -191,7 +191,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 	Client* client = (Client *)(socket->data);
 	if( client != NULL ) {
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_DEBUG,
 				"AsyncIOServer::OnRecvEvent( client : %p, socket : %p ) \n",
 				client,
@@ -212,7 +212,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 				if( status == SWITCH_STATUS_SUCCESS ) {
 					// 读取数据成功, 缓存到客户端
 					switch_log_printf(
-							SWITCH_CHANNEL_UUID_LOG(client->uuid),
+							SWITCH_CHANNEL_LOG,
 							SWITCH_LOG_DEBUG,
 							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read ok ) \n",
 							client,
@@ -222,7 +222,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 					if( client->Write(buf, len) ) {
 						// 放到处理队列
 						switch_log_printf(
-								SWITCH_CHANNEL_UUID_LOG(client->uuid),
+								SWITCH_CHANNEL_LOG,
 								SWITCH_LOG_DEBUG,
 								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, client write buffer ok ) \n",
 								client,
@@ -234,7 +234,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 					} else {
 						// 没有足够的缓存空间
 						switch_log_printf(
-								SWITCH_CHANNEL_UUID_LOG(client->uuid),
+								SWITCH_CHANNEL_LOG,
 								SWITCH_LOG_INFO,
 								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, write error ) \n",
 								client,
@@ -246,7 +246,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 				} else if( SWITCH_STATUS_IS_BREAK(status) /*|| (status == SWITCH_STATUS_INTR)*/ ) {
 					// 没有数据可读超时返回, 不处理
 					switch_log_printf(
-							SWITCH_CHANNEL_UUID_LOG(client->uuid),
+							SWITCH_CHANNEL_LOG,
 							SWITCH_LOG_DEBUG,
 							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, nothing to read ) \n",
 							client,
@@ -256,7 +256,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 				} else {
 					// 读取数据出错, 断开
 					switch_log_printf(
-							SWITCH_CHANNEL_UUID_LOG(client->uuid),
+							SWITCH_CHANNEL_LOG,
 							SWITCH_LOG_INFO,
 							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read error : %d ) \n",
 							client,
@@ -270,7 +270,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 		} else {
 			// 缓存数据过大, 断开
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_CHANNEL_LOG,
 					SWITCH_LOG_INFO,
 					"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, buffer not enough error ) \n",
 					client,
@@ -289,6 +289,14 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 		switch_mutex_unlock(client->clientMutex);
 
 		if( bFlag ) {
+			// 回调
+			if( mpAsyncIOServerCallback ) {
+				mpAsyncIOServerCallback->OnDisconnect(client);
+			}
+
+			// 关闭Socket
+			mTcpServer.Close(client->socket);
+
 			// 销毁客户端
 			Client::Destroy(client);
 		}
@@ -302,7 +310,7 @@ void AsyncIOServer::OnDisconnect(Socket* socket) {
 		client->disconnected = true;
 
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_DEBUG,
 				"AsyncIOServer::OnDisconnect( "
 				"client : %p, "
@@ -315,10 +323,15 @@ void AsyncIOServer::OnDisconnect(Socket* socket) {
 				);
 
 		bool bFlag = ClientCloseIfNeed(client);
-
 		switch_mutex_unlock(client->clientMutex);
 
 		if( bFlag ) {
+			// 回调
+			if( mpAsyncIOServerCallback ) {
+				mpAsyncIOServerCallback->OnDisconnect(client);
+			}
+			// 关闭Socket
+			mTcpServer.Close(client->socket);
 			// 销毁客户端
 			Client::Destroy(client);
 		}
@@ -337,7 +350,7 @@ void AsyncIOServer::RecvHandleThread() {
 			Client* client = (Client *)pop;
 
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_CHANNEL_LOG,
 					SWITCH_LOG_DEBUG,
 					"AsyncIOServer::RecvHandleThread( "
 					"client : %p "
@@ -357,6 +370,13 @@ void AsyncIOServer::RecvHandleThread() {
 			switch_mutex_unlock(client->clientMutex);
 
 			if( bFlag ) {
+				// 回调
+				if( mpAsyncIOServerCallback ) {
+					mpAsyncIOServerCallback->OnDisconnect(client);
+				}
+
+				// 关闭Socket
+				mTcpServer.Close(client->socket);
 				// 销毁客户端
 				Client::Destroy(client);
 			}
@@ -381,7 +401,7 @@ void AsyncIOServer::RecvHandle(Client* client) {
 //	}
 	switch_mutex_unlock(client->clientMutex);
 
-//	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(client->uuid), SWITCH_LOG_DEBUG, "AsyncIOServer::RecvHandle( "
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "AsyncIOServer::RecvHandle( "
 //			"client : %p, "
 //			"recvHandleCount : %d "
 //			") \n",
@@ -394,21 +414,13 @@ bool AsyncIOServer::ClientCloseIfNeed(Client* client) {
 	bool bFlag = false;
 	if( client->recvHandleCount == 0 && client->disconnected ) {
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_DEBUG,
 				"AsyncIOServer::ClientCloseIfNeed( "
 				"client : %p "
 				") \n",
 				client
 				);
-
-		if( mpAsyncIOServerCallback ) {
-			mpAsyncIOServerCallback->OnDisconnect(client);
-		}
-
-		// 关闭Socket
-		mTcpServer.Close(client->socket);
-
 		bFlag = true;
 	}
 

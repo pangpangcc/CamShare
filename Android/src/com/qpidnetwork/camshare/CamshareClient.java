@@ -131,6 +131,63 @@ public class CamshareClient implements CamshareClientJniCallback {
 	}
 	private native void Stop(long client);
 	
+	/**
+	 * 发送一帧视频数据
+	 * data       采集视频数据
+	 * size       采集视频数据大小
+	 * timesp     采集视频的时间
+	 * width      采集视频的宽
+	 * heigh      采集视频的高
+	 * direction  采集视频的方向（90,180,270,0  也与摄像头前后有关）
+	 * return      成功失败
+	 */
+	public boolean SendVideoData(byte[] data, int size, long timesp, int width, int heigh, int direction){
+		Log.i("CamshareClientJava", String.format("SendVideoData()"));
+		return SendVideoData(client, data, size, timesp, width, heigh, direction);
+	}
+	private native boolean SendVideoData(long client, byte[] data, int size, long timesp, int width, int heigh, int direction);
+	
+	/**
+	 * 设置发送视频数据的大小
+	 */
+	public boolean SetVideoSize(int width, int heigh){
+		Log.i("CamshareClientJava", String.format("SetVideoSize()"));
+		return SetVideoSize(client, width, heigh);
+	}
+	private native boolean SetVideoSize(long client, int width, int heigh);
+	
+	/**
+	 * 设置视频采集帧率（现在基本是编码，采集前进行设置，默认是8帧。以后可以考虑作为SendVideoData每帧的参数）
+	 * rate     采集视频帧率
+	 * return    成功，失败
+	 */
+	public boolean SetVideoRate(int rate){
+		Log.i("CamshareClientJava", String.format("SetVideoRate()"));
+		return SetVideoRate(client, rate);
+	}
+	private native boolean SetVideoRate(long client, int rate);
+	
+	/**
+	 * 开始采集  （开启采集）
+	 * return   成功，失败
+	 */
+	public void StartCapture(){
+		Log.i("CamshareClientJava", String.format("StartCapture()"));
+		StartCapture(client);
+	}
+	private native void StartCapture(long client);
+	
+	/**
+	 * 停止采集 （停止和清除视频队列和编码）
+	 * return   成功，失败
+	 */
+	public void StopCapture(){
+		Log.i("CamshareClientJava", String.format("StopCapture()"));
+		StopCapture(client);
+	}
+	private native void StopCapture(long client);
+	
+	
 	@Override
 	public void onLogin(boolean success) {
 		// TODO Auto-generated method stub
@@ -161,6 +218,7 @@ public class CamshareClient implements CamshareClientJniCallback {
 	@Override
 	public void onRecvVideoSizeChange(int width, int height) {
 		Log.i("CamshareClientJava", String.format("onRecvVideoSizeChange( width : %d, height : %d )", width, height));
+		renderer.ChangeRendererSize(width, height);
 		this.callback.onRecvVideoSizeChange(width, height);
 	}
 
@@ -170,4 +228,15 @@ public class CamshareClient implements CamshareClientJniCallback {
 		Log.i("CamshareClientJava", String.format("onDisconnect()"));
 		this.callback.onDisconnect();
 	}
+	
+	// 采集视频的回调，编码前返回java层显示视频
+	@Override
+	public void onCallVideo(byte[] data, int width, int height, int size, int timestamp) {
+		// TODO Auto-generated method stub
+		Log.i("CamshareClientJava", String.format("onCallVideo()"));
+		//renderer.DrawFrame2(data, width, height);
+		renderer.ChangeRendererSize(width, height);
+		renderer.DrawFrame(data, size, timestamp);
+	}
+	
 }

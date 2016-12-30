@@ -15,6 +15,10 @@ using namespace std;
 
 #include <rtmp/RtmpClient.h>
 #include "H264Decoder.h"
+#include "H264Encoder.h"
+
+#include <rtmp/IThreadHandler.h>
+#include "CaptureData.h"
 
 typedef enum UserType {
 	UserType_Man = 0,
@@ -22,6 +26,7 @@ typedef enum UserType {
 	UserType_Count,
 }UserType;
 
+struct KeyFramePosition;
 class CamshareClient;
 class CamshareClientListener {
 public:
@@ -33,6 +38,7 @@ public:
 	virtual void OnDisconnect(CamshareClient* client) = 0;
 	virtual void OnRecvVideo(CamshareClient* client, const char* data, unsigned int size, unsigned int timestamp) = 0;
 	virtual void OnRecvVideoSizeChange(CamshareClient* client, unsigned int width, unsigned int height) = 0;
+	virtual void OnCallVideo(CamshareClient* client, const char* data, unsigned int width, unsigned int heigth, unsigned int time) = 0;
 };
 
 class ClientRunnable;
@@ -99,6 +105,23 @@ public:
 	 */
 	void SetRecordFilePath(const string& filePath);
 
+	// 编码和发送视频数据
+	bool InsertVideoData(unsigned char* data, unsigned int len, unsigned long timesp, int width, int heigh,  int direction);
+    // 编码视频数据
+	bool EncodeVideoData(CaptureBuffer* item);
+    // 发送视频数据
+	void SendVideoData();
+	// 设置采集视频的高宽
+	bool SetVideoSize(int width, int heigth);
+	// 设置采集视频的方向
+	bool SetVideoDirection(int direction);
+	// 设置采集视频的采集率
+	bool setVideRate(int rate);
+	// 开始采集
+	void StartCapture();
+	// 停止采集
+	void StopCapture();
+
 public:
 	void OnConnect(RtmpClient* client, const string& sessionId);
 	void OnDisconnect(RtmpClient* client);
@@ -111,10 +134,44 @@ public:
 	void OnRecvVideo(RtmpClient* client, const char* data, unsigned int size, unsigned int timestamp);
 
 private:
+	// 分离关键帧（psp，pps和I帧）
+	bool separateKeyFrame(unsigned char* keyFrame, int len, KeyFramePosition* position);
+	// ------- 视频数据线程----------------
+	bool StartVideoDataThread();
+	// 视频数据线程结束
+	void StopVideoDataThread();
+	// 视频数据线程函数
+	static TH_RETURN_PARAM VideoDataThread(void* obj);
+	// 视频数据线程处理函数
+	void VideoDataThreadProc();
+	// 设置编码时间
+	void SetEncodeTime();
+	// 设置发送时间
+	void SetSendTime();
+	// 获取当前时间
+	uint64_t GetCurrentTime();
+
+private:
 	RtmpClient mRtmpClient;
 	ClientRunnable* mpRunnable;
 	KThread mClientThread;
 	H264Decoder mH264Decoder;
+	// 编码器
+	H264Encoder mH264Encoder;
+    CaptureData *mVideoData;
+	// 获取视频数据线程
+	IThreadHandler* mVideoDataThread;
+	// 获取视频数据线程启动标记
+	bool mVideoDataThreadStart;
+	// 采集视频开启标记
+	bool mCaptureVideoStart;
+	// 编码间隔时间
+	int mEncodeTimeInterval;
+	// 编码时间
+	uint64_t mEncodeTimeStamp;
+	// 发送时间
+	uint64_t mSendTimeStamp;
+
 
 	CamshareClientListener* mpCamshareClientListener;
 	bool mbRunning;
@@ -130,6 +187,8 @@ private:
 
 	unsigned int mFrameWidth;
 	unsigned int mFrameHeight;
+
+	string mFilePath;
 };
 
 #endif /* CAMSHARE_CAMSHARECLIENT_H_ */

@@ -65,6 +65,8 @@ int main(int argc, char *argv[]) {
 		bFlag = server.Run("/etc/camshare-middleware.config");
 	}
 
+	LogManager::GetLogManager()->LogFlushMem2File();
+
 	while( bFlag && server.IsRunning() ) {
 		/* do nothing here */
 		sleep(5);

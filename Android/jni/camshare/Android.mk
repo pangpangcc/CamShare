@@ -4,7 +4,6 @@ include $(call all-subdir-makefiles, $(CAMSHARE_PATH))
 LOCAL_PATH := $(CAMSHARE_PATH)
 
 include $(CLEAR_VARS)
-
 LOCAL_MODULE    := camshareclient
 
 LOCAL_C_INCLUDES := $(LIBRARY_PATH)
@@ -15,8 +14,8 @@ LOCAL_CPPFLAGS  := -std=c++11
 LOCAL_CFLAGS = -fpermissive
 LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS
 
-LOCAL_LDLIBS := -llog
-LOCAL_LDFLAGS := -L$(CAMSHARE_PATH)/ffmpeg/lib/$(TARGET_ARCH) \
+LOCAL_LDLIBS := -llog 
+LOCAL_LDFLAGS := -L$(CAMSHARE_PATH)/ffmpeg/lib/$(TARGET_ARCH_ABI)/lib \
 					-lavcodec \
 					-lavutil \
 					-lswscale \

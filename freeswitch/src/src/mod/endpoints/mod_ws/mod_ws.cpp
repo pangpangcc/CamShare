@@ -14,7 +14,7 @@
  */
 static WebSocketServer server;
 
-#define WS_MOD_VERSION "1.0.0"
+#define WS_MOD_VERSION "1.0.1"
 
 /**
  * switch_mod模块接口

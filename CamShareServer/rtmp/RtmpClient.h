@@ -18,6 +18,8 @@ using namespace std;
 #include <common/KSafeMap.h>
 #include "RtmpPacket.h"
 
+#define	RTMP_CHANNELS	65600
+
 typedef enum RTMP_PACKET_TYPE {
 	RTMP_PACKET_TYPE_UNKNOW,
 	RTMP_PACKET_TYPE_CONNECTED,
@@ -33,6 +35,8 @@ typedef KSafeMap<unsigned int, STAND_INVOKE_TYPE> StandInvokeMap;
 
 typedef list<RtmpPacket*> MediaPacketRecvList;
 
+struct RTMP2RTP_HELPER_S;
+
 class RtmpClient;
 class ISocketHandler;
 /**
@@ -47,11 +51,13 @@ public:
 public:
 	virtual void OnConnect(RtmpClient* client, const string& sessionId) = 0;
 	virtual void OnDisconnect(RtmpClient* client) = 0;
-	virtual void OnLogin(RtmpClient* client, bool bSuccess) = 0;
-	virtual void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) = 0;
+	virtual void OnLogin(RtmpClient* client, bool success) = 0;
+	virtual void OnMakeCall(RtmpClient* client, bool success, const string& channelId) = 0;
 	virtual void OnHangup(RtmpClient* client, const string& channelId, const string& cause) = 0;
 	virtual void OnCreatePublishStream(RtmpClient* client) = 0;
 	virtual void OnHeartBeat(RtmpClient* client) = 0;
+	virtual void OnRecvAudio(RtmpClient* client, const char* data, unsigned int size) = 0;
+	virtual void OnRecvVideo(RtmpClient* client, const char* data, unsigned int size, unsigned int timestamp) = 0;
 };
 
 class RtmpClient {
@@ -59,47 +65,65 @@ public:
 	RtmpClient();
 	virtual ~RtmpClient();
 
-	int GetIndex();
-	void SetIndex(int i);
 	const string& GetUser();
-	bool IsConnected();
+	const string& GetDest();
+	bool IsRunning();
 
 	void SetRtmpClientListener(RtmpClientListener *listener);
 	bool Connect(const string& hostName);
 	void Shutdown();
 	void Close();
+
 	bool Login(const string& user, const string& password, const string& site, const string& custom);
 	bool MakeCall(const string& dest);
+	bool Hangup();
 	bool CreatePublishStream();
+	bool CreateReceiveStream();
+
 	bool SendVideoData(const char* data, unsigned int len, unsigned int timestamp);
 	bool SendHeartBeat();
 
 	bool RecvRtmpPacket(RtmpPacket* packet);
+	bool RecvRtmpChunkPacket(RtmpPacket* packet);
 	RTMP_PACKET_TYPE ParseRtmpPacket(RtmpPacket* packet);
 
+	bool IsReadyPacket(RtmpPacket* packet);
+
+	void SetIndex(int i);
+	unsigned int GetIndex();
+
 private:
+	void Init();
+
 	void DumpRtmpPacket(RtmpPacket* packet);
 	bool SendRtmpPacket(RtmpPacket* packet);
 
 	/**
-	 * Stand Invoke Packet
+	 * Standard Invoke Packet
 	 * ++miNumberInvokes every time
 	 */
 	bool SendConnectPacket();
 	bool SendCreateStream(STAND_INVOKE_TYPE type);
 
 	/**
-	 * Stand Stream Packet
+	 * Standard Stream Packet
 	 */
-	bool PublishStream(unsigned int streamId);
-	bool SendPublishPacket();
+	bool SendPublishPacket(unsigned int streamId);
+	bool SendReceiveVideoPacket(unsigned int streamId);
+	bool SendPlayPacket();
 
 	/**
 	 * Custom Invoke Packet
 	 */
 	bool SendLoginPacket(const string& user, const string& auth, const string& site, const string& custom);
 	bool SendMakeCallPacket(const string& dest);
+	bool SendHangupPacket();
 	bool SendActivePacket();
+
+	/**
+	 * Standard Acknowledgment Packet
+	 */
+	bool SendAckPacket();
 
 	/**
 	 * GetCurrentTime
@@ -111,19 +135,20 @@ private:
 	 */
 	bool HandShake();
 
+	bool Rtmp2H264(unsigned char* data, unsigned int len);
+
 	unsigned short port;
-	string hostname;
+	string hostName;
 	string app;
 
-	int mIndex;
 	string mUser;
 	string mDest;
 
+	bool mbRunning;
 	bool mbConnected;
 	bool mbShutdown;
 	string mSession;
-	unsigned int miNumberInvokes;
-	unsigned int m_outChunkSize;
+	int miNumberInvokes;
 
 	ISocketHandler* m_socketHandler;
 	RtmpClientListener* mpRtmpClientListener;
@@ -134,17 +159,7 @@ private:
 	MediaPacketRecvList mMediaPacketRecvList;
 
 	/**
-	 * 上次发送包
-	 */
-	RtmpPacket* mpLastSendPacket;
-
-	/**
-	 * 上次接收到的包
-	 */
-	RtmpPacket* mpLastRecvPacket;
-
-	/**
-	 *	Stand Invoke Packet Seq
+	 *	Standard Invoke Packet Sequence
 	 */
 	StandInvokeMap mpStandInvokeMap;
 
@@ -158,10 +173,49 @@ private:
 	 */
 	KMutex mSendMutex;
 
+	/**
+	 * 上传流
+	 */
 	unsigned int mPublishStreamId;
-	unsigned int mPlayStreamId;
+	/**
+	 * 下载流
+	 */
+	unsigned int mReceiveStreamId;
 
-	unsigned int mTimestamp;
+	/**
+	 * 发包的timestamp
+	 */
+	unsigned int mSendTimestamp;
+
+	/**
+	 * 发包的chunkSize
+	 */
+	unsigned int mSendChunkSize;
+
+	/**
+	 * 收包的chunkSize
+	 */
+	unsigned int mRecvChunkSize;
+
+	/**
+	 * 收包确认
+	 */
+	unsigned int mRecv;
+	unsigned int mRecvAckSent;
+	unsigned int mRecvAckWindow;
+
+	/**
+	 * 上次接收到的包
+	 */
+	RtmpPacket *mChannelsIn[RTMP_CHANNELS];
+	RtmpPacket *mChannelsOut[RTMP_CHANNELS];
+
+	/**
+	 * RTMP视频包转RTP视频包
+	 */
+	RTMP2RTP_HELPER_S* mReadVideoHelper;
+
+	unsigned mIndex;
 };
 
 #endif /* RTMP_RTMPCLIENT_H_ */

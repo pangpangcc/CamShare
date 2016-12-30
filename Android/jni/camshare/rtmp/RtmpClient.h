@@ -37,6 +37,9 @@ typedef list<RtmpPacket*> MediaPacketRecvList;
 
 struct RTMP2RTP_HELPER_S;
 
+struct RTP2RTMP_HELPER_S;
+
+
 class RtmpClient;
 class ISocketHandler;
 /**
@@ -67,7 +70,7 @@ public:
 
 	const string& GetUser();
 	const string& GetDest();
-	bool IsConnected();
+	bool IsRunning();
 
 	void SetRtmpClientListener(RtmpClientListener *listener);
 	bool Connect(const string& hostName);
@@ -88,6 +91,10 @@ public:
 	RTMP_PACKET_TYPE ParseRtmpPacket(RtmpPacket* packet);
 
 	bool IsReadyPacket(RtmpPacket* packet);
+
+	// 组包
+	bool RtmpToPacketH264(unsigned char* data, unsigned int len, unsigned int timesp);
+	void HandleSendH264();
 
 private:
 	void Init();
@@ -141,8 +148,8 @@ private:
 	string mUser;
 	string mDest;
 
+	bool mbRunning;
 	bool mbConnected;
-	bool mbShutdown;
 	string mSession;
 	int miNumberInvokes;
 
@@ -210,6 +217,12 @@ private:
 	 * RTMP视频包转RTP视频包
 	 */
 	RTMP2RTP_HELPER_S* mReadVideoHelper;
+
+	/**
+	 * RTP视频包转RTMP视频包
+	 *
+	 */
+	RTP2RTMP_HELPER_S* mPacketVideoHelper;
 };
 
 #endif /* RTMP_RTMPCLIENT_H_ */

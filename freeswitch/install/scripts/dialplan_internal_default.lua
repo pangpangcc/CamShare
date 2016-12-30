@@ -7,7 +7,7 @@ local cjson = require "cjson"
 
 dofile("/usr/local/freeswitch/scripts/common.lua");
 
-freeswitch.consoleLog("CONSOLE", "# 内网拨号计划->开始\n")
+freeswitch.consoleLog("NOTICE", "# 内网拨号计划->开始\n")
 
 -- 创建拨号规则
 api = freeswitch.API();
@@ -15,7 +15,7 @@ api = freeswitch.API();
 -- 输出变量
 function logChannelVar(k, v)
   if not v then v = "nil" end
-  session:consoleLog("CONSOLE", "# [" .. k .. " : " .. v .. "]\n")
+  session:consoleLog("NOTICE", "# [" .. k .. " : " .. v .. "]\n")
 end
 
 -- 获取会话变量
@@ -54,18 +54,21 @@ if( #tables >= 3 ) then
   session:setVariable("siteId", siteId);
     
 --  发起http请求, 获取拨号计划
-  response = api:execute("curl", "http://".. local_domain_name .. ":9200" .. 
-  "/GETDIALPLAN?" .. 
-  "caller=" .. caller .. 
-  "&channelId=" .. uuid ..
-  "&conference=" .. conference .. 
-  "&serverId=" .. serverId .. 
-  "&siteId=" .. siteId .. 
-  " json connect-timeout 5 timeout 10 get");
+  local url = "http://".. local_domain_name .. ":9200" .. 
+                      "/GETDIALPLAN?" .. 
+                      "caller=" .. caller .. 
+                      "&channelId=" .. uuid ..
+                      "&conference=" .. conference .. 
+                      "&serverId=" .. serverId .. 
+                      "&siteId=" .. siteId .. 
+                      "&source=" .. source .. 
+                      " json connect-timeout 5 timeout 10 get";
+  freeswitch.consoleLog("NOTICE", "# 内网拨号计划->发起http请求 " .. url .. "\n");
+  response = api:execute("curl", url);
   
 --  解析返回
   if response ~= nil then
-    session:consoleLog("CONSOLE", "# 内网拨号计划->获取http返回:\n" .. response);
+    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回:\n" .. response);
     json = cjson.decode(response);
     body = json["body"];
     if body ~= nil then
@@ -85,25 +88,25 @@ if( #tables >= 3 ) then
 --          table.insert(ACTIONS, {"set", "enable_file_write_buffering=false"})
 --          table.insert(ACTIONS, {"record_fsv", "$${base_dir}/recordings/" .. destination_number .. "-${strftime(%Y-%m-%d-%H-%M-%S)}.fsv"})
             table.insert(ACTIONS, {"conference", conference .. "@default++flags{moderator}"})
-            session:consoleLog("CONSOLE", "# 内网拨号计划->" .. conference .. "@default++flags{moderator}\n");
+            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{moderator}\n");
         else
 --          进入别人会议室
             table.insert(ACTIONS, {"conference", conference .. "@default"})
-            session:consoleLog("CONSOLE", "# 内网拨号计划->" .. conference .. "@default\n");
+            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default\n");
         end
       else
-          session:consoleLog("CONSOLE", "# 内网拨号计划->caller解析失败\n");
+          session:consoleLog("NOTICE", "# 内网拨号计划->caller解析失败\n");
       end
 
     else
-      session:consoleLog("CONSOLE", "# 内网拨号计划->json解析失败\n");
+      session:consoleLog("NOTICE", "# 内网拨号计划->json解析失败\n");
     end
     
   else
-    session:consoleLog("CONSOLE", "# 内网拨号计划->获取http返回失败\n");
+    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回失败\n");
   end
 else
-    session:consoleLog("CONSOLE", "# 内网拨号计划->解析[用户Id]/[Livechat服务器Id]/[站点Id]错误失败\n");
+    session:consoleLog("NOTICE", "# 内网拨号计划->解析[用户Id]/[Livechat服务器Id]/[站点Id]错误失败\n");
 end
 
-session:consoleLog("CONSOLE", "# 内网拨号计划->结束\n")
+session:consoleLog("NOTICE", "# 内网拨号计划->结束\n")

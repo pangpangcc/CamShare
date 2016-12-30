@@ -1,5 +1,5 @@
 file camshare-middleware
 set args -f camshare-middleware.config
-handle SIGPIPE nostop
+handle SIGPIPE noprint
 source gdb.break
 run

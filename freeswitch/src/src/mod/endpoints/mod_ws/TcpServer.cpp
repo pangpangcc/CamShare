@@ -20,6 +20,7 @@ TcpServer::TcpServer() {
 	mpPool = NULL;
 
 	mpSocket = NULL;
+	mpSocketMutex = NULL;
 
 	mpIOThread = NULL;
 	mpPollset = NULL;
@@ -28,6 +29,7 @@ TcpServer::TcpServer() {
 
 TcpServer::~TcpServer() {
 	// TODO Auto-generated destructor stub
+	Stop();
 }
 
 void TcpServer::SetTcpServerCallback(TcpServerCallback* callback) {
@@ -35,7 +37,7 @@ void TcpServer::SetTcpServerCallback(TcpServerCallback* callback) {
 }
 
 bool TcpServer::Start(switch_memory_pool_t *pool, const char *ip, switch_port_t port) {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "TcpServer::Start( Listening on %s:%u ) \n", ip, port);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "TcpServer::Start( [Listening on %s:%u], this : %p ) \n", ip, port, this);
 
 	bool bFlag = true;
 	switch_sockaddr_t *sa;
@@ -44,6 +46,12 @@ bool TcpServer::Start(switch_memory_pool_t *pool, const char *ip, switch_port_t 
 	mpPool = pool;
 	mRunning = true;
 
+	// 创建锁
+	if( !mpSocketMutex ) {
+		switch_mutex_init(&mpSocketMutex, SWITCH_MUTEX_NESTED, mpPool);
+	}
+
+	// 创建监听Socket
 	mpSocket = Socket::Create();
 	mpSocket->SetAddress(ip, port);
 
@@ -76,17 +84,17 @@ bool TcpServer::Start(switch_memory_pool_t *pool, const char *ip, switch_port_t 
 	}
 
 	if(switch_pollset_create(&mpPollset, 10000 /* max poll fds */, pool, 0) != SWITCH_STATUS_SUCCESS) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_pollset_create failed ) \n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( [switch_pollset_create failed], this : %p ) \n", this);
 		bFlag = false;
 	}
 
 	if(switch_socket_create_pollfd(&mpPollfd, mpSocket->socket, SWITCH_POLLIN | SWITCH_POLLERR, mpSocket, pool) != SWITCH_STATUS_SUCCESS ) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_socket_create_pollfd failed ) \n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( [switch_socket_create_pollfd failed], this : %p ) \n", this);
 		bFlag = false;
 	}
 
 	if(switch_pollset_add(mpPollset, mpPollfd) != SWITCH_STATUS_SUCCESS) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( switch_pollset_add failed ) \n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::Start( [switch_pollset_add failed], this : %p ) \n", this);
 		bFlag = false;
 	}
 
@@ -99,19 +107,19 @@ bool TcpServer::Start(switch_memory_pool_t *pool, const char *ip, switch_port_t 
 	}
 
 	if( bFlag ) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( Listening on %s:%u, success ) \n", mpSocket->ip, mpSocket->port);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( [Listening on %s:%u Success], this : %p ) \n", mpSocket->ip, mpSocket->port, this);
 	} else {
 		Stop();
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( Listening on %s:%u, fail ) \n", mpSocket->ip, mpSocket->port);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Start( [Listening on %s:%u Fail], this : %p ) \n", mpSocket->ip, mpSocket->port, this);
 	}
 
 	return true;
 }
 
 void TcpServer::Stop() {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( %s:%u ) \n", mpSocket->ip, mpSocket->port);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( this : %p ) \n", this);
 
-	// 关掉监听socket
+	// 断开监听socket
 	if( mpSocket ) {
 		Disconnect(mpSocket);
 	}
@@ -122,14 +130,22 @@ void TcpServer::Stop() {
 	if( mpIOThread ) {
 		switch_status_t retval;
 		switch_thread_join(&retval, mpIOThread);
+		mpIOThread = NULL;
 	}
 
 	// 关闭监听Socket
 	if( mpSocket ) {
 		Close(mpSocket);
+		mpSocket = NULL;
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( %s:%u, finish ) \n", mpSocket->ip, mpSocket->port);
+	// 销毁锁
+	if( mpSocketMutex ) {
+		switch_mutex_destroy(mpSocketMutex);
+		mpSocketMutex = NULL;
+	}
+
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( [Success], this : %p ) \n", this);
 }
 
 bool TcpServer::IsRuning() {
@@ -145,24 +161,27 @@ bool TcpServer::Send(Socket* socket, const char *data, switch_size_t* len) {
 }
 
 void TcpServer::Disconnect(Socket* socket) {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Disconnect( socket : %p ) \n", socket);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Disconnect( this : %p, socket : %p ) \n", this, socket);
 
 	// 关掉连接socket读
 	socket->Disconnect();
 }
 
 void TcpServer::Close(Socket* socket) {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Close( socket : %p ) \n", socket);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Close( this : %p, socket : %p ) \n", this, socket);
 
 	// 关掉连接socket
+	// switch_socket_close 会操作内存池销毁方法链表, 必需同步
+	switch_mutex_lock(mpSocketMutex);
 	socket->Close();
+	switch_mutex_unlock(mpSocketMutex);
 
 	// 释放内存
 	Socket::Destroy(socket);
 }
 
 void TcpServer::IOHandleThread() {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::IOHandleThread() \n");
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::IOHandleThread( this : %p ) \n", this);
 
 	int32_t numfds = 0;
 	int32_t i = 0;
@@ -175,7 +194,7 @@ void TcpServer::IOHandleThread() {
 		status = switch_pollset_poll(mpPollset, 500000, &numfds, &fds);
 
 		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_TIMEOUT) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CRIT, "TcpServer::IOHandleThread( pollset_poll failed, status : %d ) \n", status);
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [pollset_poll failed, status : %d], this : %p ) \n", status, this);
 			continue;
 		} else if (status == SWITCH_STATUS_TIMEOUT) {
 			// sleep
@@ -189,24 +208,33 @@ void TcpServer::IOHandleThread() {
 						SWITCH_CHANNEL_LOG,
 						SWITCH_LOG_DEBUG,
 						"TcpServer::IOHandleThread( "
-						"Listener Socket Event : %d "
+						"[Listener Socket Event : %d], "
+						"this : %p "
 						") \n",
-						fds[i].rtnevents
+						fds[i].rtnevents,
+						this
 						);
 
 				// 收到请求连接
 				if (fds[i].rtnevents & SWITCH_POLLIN) {
 					switch_socket_t *newsocket;
+					// switch_socket_accept 会操作内存池销毁方法链表, 必需同步
+					switch_mutex_lock(mpSocketMutex);
 					if (switch_socket_accept(&newsocket, mpSocket->socket, mpPool) != SWITCH_STATUS_SUCCESS) {
+						switch_mutex_unlock(mpSocketMutex);
 						switch_log_printf(
 								SWITCH_CHANNEL_LOG,
 								SWITCH_LOG_ERROR,
 								"TcpServer::IOHandleThread( "
-								"Socket Accept Error : %s"
-								" ) \n",
-								strerror(errno)
+								"[Socket Accept Error : %s], "
+								"this : %p "
+								") \n",
+								strerror(errno),
+								this
 								);
 					} else {
+						switch_mutex_unlock(mpSocketMutex);
+
 						Socket* socket = Socket::Create();
 						socket->socket = newsocket;
 
@@ -222,11 +250,13 @@ void TcpServer::IOHandleThread() {
 								SWITCH_CHANNEL_LOG,
 								SWITCH_LOG_INFO,
 								"TcpServer::IOHandleThread( "
-								"Socket Accept : %p, "
+								"[Socket Accept : %p], "
+								"this : %p, "
 								"ip : %s, "
 								"port : %d "
 								") \n",
 								socket,
+								this,
 								socket->ip,
 								socket->port
 								);
@@ -235,29 +265,29 @@ void TcpServer::IOHandleThread() {
 							// 创建新连接
 							ret = switch_socket_opt_set(newsocket, SWITCH_SO_NONBLOCK, TRUE);
 							if (ret != 0) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't set socket as non-blocking ) \n");
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't set socket as non-blocking], this : %p ) \n", this);
 							}
 							ret = switch_socket_opt_set(newsocket, SWITCH_SO_TCP_NODELAY, TRUE);
 							if (ret != 0) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't disable Nagle. ) \n");
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't disable Nagle], this : %p ) \n", this);
 							}
 							ret = switch_socket_opt_set(newsocket, SWITCH_SO_KEEPALIVE, TRUE);
 							if (ret != 0) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't set socket KEEPALIVE, ret:%d. ) \n", ret);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't set socket KEEPALIVE, ret:%d], this : %p ) \n", ret);
 							}
 							// 间隔idle秒没有数据包，则发送keepalive包；若对端回复，则等idle秒再发keepalive包
 							ret = switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPIDLE, 60);
 							if (ret != 0) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't set socket KEEPIDLE, ret:%d. ) \n", ret);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't set socket KEEPIDLE, ret:%d], this : %p ) \n", ret, this);
 							}
 							// 若发送keepalive对端没有回复，则间隔intvl秒再发送keepalive包
 							ret = switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPINTVL, 20);
 							if (ret != 0) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't set socket KEEPINTVL, ret:%d. ) \n", ret);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't set socket KEEPINTVL, ret:%d], this : %p ) \n", ret, this);
 							}
 							// 若发送keepalive包，超过keepcnt次没有回复就认为断线
 							if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_KEEPCNT, 3)) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( Couldn't set socket KEEPCNT. )\n");
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "TcpServer::IOHandleThread( [Couldn't set socket KEEPCNT], this : %p)\n", this);
 							}
 
 							// 开始监听接收事件
@@ -270,13 +300,6 @@ void TcpServer::IOHandleThread() {
 							// 关闭连接
 							Close(socket);
 						}
-					}
-				} else if (fds[i].rtnevents & (SWITCH_POLLERR|SWITCH_POLLHUP|SWITCH_POLLNVAL)) {
-					if (mRunning) {
-						/* Don't spam the logs if we are shutting down */
-						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "TcpServer::IOHandleThread( Socket Listen Error [%s] ) \n", strerror(errno));
-					} else {
-						return;
 					}
 				}
 			} else {
@@ -305,6 +328,6 @@ void TcpServer::IOHandleThread() {
 	mRunning = false;
 	switch_socket_close(mpSocket->socket);
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::IOHandleThread( exit ) \n");
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::IOHandleThread( [Exit], this : %p ) \n", this);
 
 }

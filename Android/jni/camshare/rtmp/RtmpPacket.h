@@ -24,8 +24,8 @@ typedef enum RTMP_CHANNEL {
 typedef enum RTMP_HEADER_CHUNK_TYPE {
 	RTMP_HEADER_CHUNK_TYPE_LARGE = 0x00,
 	RTMP_HEADER_CHUNK_TYPE_MEDIUM = 0x01,
-	RTMP_HEADER_TYPE_SMALL = 0x02,
-	RTMP_HEADER_TYPE_MINIMUM = 0x03,
+	RTMP_HEADER_CHUNK_TYPE_SMALL = 0x02,
+	RTMP_HEADER_CHUNK_TYPE_MINIMUM = 0x03,
 } RTMP_HEADER_CHUNK_TYPE;
 
 typedef enum RTMP_HEADER_MESSAGE_TYPE {
@@ -145,6 +145,10 @@ typedef struct _tagRtmpMessageHeader {
 		Reset();
 	}
 
+	_tagRtmpMessageHeader(const _tagRtmpMessageHeader& item) {
+		memcpy(buffer, item.buffer, sizeof(buffer));
+	}
+
 	_tagRtmpMessageHeader& operator=(const _tagRtmpMessageHeader& item) {
 		memcpy(buffer, item.buffer, sizeof(buffer));
 		return *this;
@@ -217,6 +221,14 @@ typedef struct _tagRtmpPacket {
 		nBytesRead = 0;
 	}
 
+	_tagRtmpPacket(const _tagRtmpPacket& item) {
+		body = NULL;
+
+		baseHeader = item.baseHeader;
+		messageHeader = item.messageHeader;
+		nBytesRead = item.nBytesRead;
+	}
+
 	_tagRtmpPacket& operator=(const _tagRtmpPacket& item) {
 		baseHeader = item.baseHeader;
 		messageHeader = item.messageHeader;
@@ -225,6 +237,11 @@ typedef struct _tagRtmpPacket {
 	}
 
 	~_tagRtmpPacket() {
+	}
+
+	void Reset() {
+		baseHeader.Reset();
+		messageHeader.Reset();
 	}
 
 	unsigned int GetMessageHeaderLength() {
@@ -236,10 +253,10 @@ typedef struct _tagRtmpPacket {
 		case RTMP_HEADER_CHUNK_TYPE_MEDIUM:{
 			length += 7;
 		}break;
-		case RTMP_HEADER_TYPE_SMALL:{
+		case RTMP_HEADER_CHUNK_TYPE_SMALL:{
 			length += 3;
 		}break;
-		case RTMP_HEADER_TYPE_MINIMUM:{
+		case RTMP_HEADER_CHUNK_TYPE_MINIMUM:{
 			length += 0;
 		}break;
 		default:{

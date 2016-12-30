@@ -135,6 +135,7 @@ WebSocketServer::WebSocketServer() {
 	ws_endpoint_interface = NULL;
 	mpChannelHash = NULL;
 	mpHashrwlock = NULL;
+	mRunning = false;
 	mAsyncIOServer.SetAsyncIOServerCallback(this);
 }
 
@@ -156,6 +157,16 @@ bool WebSocketServer::Load(switch_memory_pool_t *pool, switch_loadable_module_in
 		ws_endpoint_interface->io_routines = &ws_io_routines;
 		ws_endpoint_interface->state_handler = &ws_state_handlers;
 		bFlag = true;
+	}
+
+	if( bFlag ) {
+		// 注册事件
+		if (switch_event_reserve_subclass(WS_EVENT_MAINT) != SWITCH_STATUS_SUCCESS) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "WebSocketServer::Load( Couldn't register subclass %s ) \n", WS_EVENT_MAINT);
+			bFlag = false;
+		} else {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Load( register subclass %s ) \n", WS_EVENT_MAINT);
+		}
 	}
 
 	if( bFlag ) {
@@ -206,6 +217,8 @@ void WebSocketServer::Shutdown() {
 		switch_core_hash_destroy(&mpChannelHash);
 	}
 
+	switch_event_free_subclass(WS_EVENT_MAINT);
+
 	mRunning = false;
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "WebSocketServer::Shutdown( finish ) \n");
@@ -222,20 +235,24 @@ void WebSocketServer::OnAccept(Client *client) {
 	client->parser = parser;
 
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 			SWITCH_LOG_NOTICE,
 			"WebSocketServer::OnAccept( "
 			"client : %p, "
-			"parser : %p "
+			"parser : %p, "
+			"uuid : %s "
 			") \n",
 			client,
-			parser
+			parser,
+			parser->GetUUID()
 			);
 }
 
 void WebSocketServer::OnDisconnect(Client* client) {
+	WSClientParser* parser = (WSClientParser *)client->parser;
+
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_LOG,
 			SWITCH_LOG_NOTICE,
 			"WebSocketServer::OnDisconnect( "
 			"client : %p, "
@@ -245,28 +262,37 @@ void WebSocketServer::OnDisconnect(Client* client) {
 			client->parser
 			);
 
-	WSClientParser* parser = (WSClientParser *)client->parser;
 	if( parser ) {
-		parser->SetClient(NULL);
+		WSChannel* wsChannel = NULL;
 		// Hang up if make call already
 		parser->Lock();
-		switch_core_session_t* session = parser->DestroyChannel(true);
+		// Mark client Disconnected
 		parser->Disconnected();
+		// Mark client Null
+		parser->SetClient(NULL);
+		// Mark parser destroy call
+		wsChannel = parser->DestroyCall();
 		parser->Unlock();
 
-		if( !session ) {
+		if( !wsChannel ) {
 			// 会话不存在
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 					SWITCH_LOG_NOTICE,
 					"WebSocketServer::OnDisconnect( "
-					"Real delete parser, "
+					"[Real delete parser], "
 					"client : %p, "
-					"parser : %p "
+					"parser : %p, "
+					"user : '%s', "
+					"domain : '%s' "
 					") \n",
 					client,
-					client->parser
+					parser,
+					parser->GetUser(),
+					parser->GetDomain()
 					);
+//			// 销毁计时器
+//			switch_core_timer_destroy(&wsChannel->timer);
 
 			// 释放内存
 			delete parser;
@@ -275,18 +301,27 @@ void WebSocketServer::OnDisconnect(Client* client) {
 		} else {
 			// 存在会话
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 					SWITCH_LOG_NOTICE,
 					"WebSocketServer::OnDisconnect( "
-					"Waiting for session destroy, "
+					"[Waiting for session destroy], "
 					"client : %p, "
 					"parser : %p, "
-					"session : %p "
+					"wsChannel : %p, "
+					"user : '%s', "
+					"domain : '%s' "
 					") \n",
 					client,
-					client->parser,
-					session
+					parser,
+					wsChannel,
+					parser->GetUser(),
+					parser->GetDomain()
 					);
+			// 临时解决, 延迟3秒挂断, 否则会导致会议室模块死锁
+			switch_yield(3 * 1000);
+
+			// 挂断会话
+			DestroyCall(parser, wsChannel);
 		}
 
 	}
@@ -295,12 +330,18 @@ void WebSocketServer::OnDisconnect(Client* client) {
 void WebSocketServer::OnWSClientParserHandshake(WSClientParser* parser) {
 	Client* client = (Client *)parser->GetClient();
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 			SWITCH_LOG_NOTICE,
 			"WebSocketServer::OnWSClientParserHandshake( "
-			"parser : %p "
+			"parser : %p, "
+			"client : %p, "
+			"user : '%s', "
+			"domain : '%s' "
 			") \n",
-			parser
+			parser,
+			client,
+			parser->GetUser(),
+			parser->GetDomain()
 			);
 
 	// HankShake respond
@@ -317,35 +358,58 @@ void WebSocketServer::OnWSClientParserHandshake(WSClientParser* parser) {
 		mAsyncIOServer.Send(client, data, &len);
 	}
 
-	// Make call
+	bool bFlag = false;
+	bool bDelete = false;
+
 	parser->Lock();
-	CreateCall(parser/*, "WW0|||PC0|||1"*/);
+	bFlag = parser->Login();
+	if( bFlag ) {
+		bFlag = CreateCall(parser);
+	}
+
+	if( !bFlag ) {
+		// 断开连接
+		bDelete = Disconnect(parser);
+	}
 	parser->Unlock();
+
+	if( bDelete ) {
+		// 释放内存
+		delete parser;
+	}
 }
 
 void WebSocketServer::OnWSClientParserData(WSClientParser* parser, const char* buffer, int len) {
 	Client* client = (Client *)parser->GetClient();
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 			SWITCH_LOG_NOTICE,
 			"WebSocketServer::OnWSClientParserData( "
 			"parser : %p, "
-			"len : %d "
+			"len : %d, "
+			"user : '%s', "
+			"domain : '%s' "
 			") \n",
 			parser,
-			len
+			len,
+			parser->GetUser(),
+			parser->GetDomain()
 			);
 }
 
 void WebSocketServer::OnWSClientDisconected(WSClientParser* parser) {
 	Client* client = (Client *)parser->GetClient();
 	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(client->uuid),
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 			SWITCH_LOG_NOTICE,
 			"WebSocketServer::OnWSClientDisconected( "
-			"parser : %p "
+			"parser : %p, "
+			"user : '%s', "
+			"domain : '%s' "
 			") \n",
-			parser
+			parser,
+			parser->GetUser(),
+			parser->GetDomain()
 			);
 
 	mAsyncIOServer.Disconnect(client);
@@ -475,20 +539,26 @@ bool WebSocketServer::LoadProfile(WSProfile* profile, switch_xml_t* x_profile, s
 	return bFlag;
 }
 
-bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/) {
+bool WebSocketServer::CreateCall(WSClientParser* parser) {
 	bool bFlag = false;
 
 	Client* client = (Client *)parser->GetClient();
-//	switch_log_printf(
-//			SWITCH_CHANNEL_UUID_LOG(client->uuid),
-//			SWITCH_LOG_NOTICE,
-//			"WebSocketServer::CreateCall( "
-//			"parser : %p "
-//			/*"number : %s "*/
-//			") \n",
-//			parser
-//			/*number*/
-//			);
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::CreateCall( "
+			"parser : %p, "
+			"client : %p, "
+			"user : '%s', "
+			"domain : '%s', "
+			"number : '%s' "
+			") \n",
+			parser,
+			client,
+			parser->GetUser(),
+			parser->GetDomain(),
+			parser->GetDestNumber()
+			);
 
 	switch_core_session_t *newsession = NULL;
 	switch_channel_t* channel = NULL;
@@ -504,14 +574,21 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 	// 创建会话
 	if( bFlag ) {
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 				SWITCH_LOG_NOTICE,
 				"WebSocketServer::CreateCall( "
+				"[New FreeSWITCH session created], "
 				"parser : %p, "
-				"New FreeSWITCH session created : %s "
+				"session : '%s', "
+				"user : '%s', "
+				"domain : '%s', "
+				"number : '%s' "
 				") \n",
 				parser,
-				switch_core_session_get_uuid(newsession)
+				switch_core_session_get_uuid(newsession),
+				parser->GetUser(),
+				parser->GetDomain(),
+				parser->GetDestNumber()
 				);
 		switch_core_session_set_private(newsession, (void *)this);
 
@@ -527,57 +604,255 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 
 		if( wsChannel != NULL ) {
 			bFlag = true;
+		} else {
+			bFlag = false;
 		}
 	}
 
-	// 启动会话线程
 	if( bFlag ) {
+		// 插入会话列表
+		switch_core_hash_insert_wrlock(mpChannelHash, switch_core_session_get_uuid(newsession), wsChannel, mpHashrwlock);
+
+		// 启动会话线程
 		if (switch_core_session_thread_launch(newsession) == SWITCH_STATUS_FALSE) {
 			switch_log_printf(
-					SWITCH_CHANNEL_UUID_LOG(client->uuid),
+					SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 					SWITCH_LOG_ERROR,
 					"WebSocketServer::CreateCall( "
-					"Couldn't spawn thread "
-					")\n"
+					"[Couldn't spawn thread], "
+					"parser : %p, "
+					"session : '%s', "
+					"user : '%s', "
+					"domain : '%s', "
+					"number : '%s' "
+					")\n",
+					parser,
+					switch_core_session_get_uuid(newsession),
+					parser->GetUser(),
+					parser->GetDomain(),
+					parser->GetDestNumber()
 					);
 			bFlag = false;
 		}
 	}
 
-	// 插入会话列表
-	if( bFlag ) {
-		switch_core_hash_insert_wrlock(mpChannelHash, switch_core_session_get_uuid(newsession), wsChannel, mpHashrwlock);
-	}
-
 	// 创建会话失败
 	if( !bFlag ) {
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 				SWITCH_LOG_ERROR,
 				"WebSocketServer::CreateCall( "
+				"[Fail], "
 				"parser : %p, "
-				"fail "
+				"user : '%s', "
+				"domain : '%s', "
+				"number : '%s' "
 				") \n",
-				parser
+				parser,
+				parser->GetUser(),
+				parser->GetDomain(),
+				parser->GetDestNumber()
 				);
-
+		// 停止会话线程
 		if( newsession ) {
 			if (!switch_core_session_running(newsession) && !switch_core_session_started(newsession)) {
+				switch_log_printf(
+						SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+						SWITCH_LOG_ERROR,
+						"WebSocketServer::CreateCall( "
+						"[Fail, session thread not launch], "
+						"parser : %p, "
+						"session : '%s', "
+						"user : '%s', "
+						"domain : '%s', "
+						"number : '%s' "
+						")\n",
+						parser,
+						switch_core_session_get_uuid(newsession),
+						parser->GetUser(),
+						parser->GetDomain(),
+						parser->GetDestNumber()
+						);
+
+				// 会话线程没有启动
 				switch_core_session_destroy(&newsession);
+
+				// 从会话列表删除
+				switch_core_hash_delete_wrlock(mpChannelHash, switch_core_session_get_uuid(newsession), mpHashrwlock);
+
+			} else {
+				// 会话线程已经启动, 挂断会话
+				switch_log_printf(
+						SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+						SWITCH_LOG_ERROR,
+						"WebSocketServer::CreateCall( "
+						"[Fail, session thread already launch, hangup], "
+						"parser : %p, "
+						"session : '%s', "
+						"user : '%s', "
+						"domain : '%s', "
+						"number : '%s' "
+						")\n",
+						parser,
+						switch_core_session_get_uuid(newsession),
+						parser->GetUser(),
+						parser->GetDomain(),
+						parser->GetDestNumber()
+						);
 			}
 		}
 
 	} else {
 		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(client->uuid),
+				SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
 				SWITCH_LOG_NOTICE,
 				"WebSocketServer::CreateCall( "
+				"[Success], "
 				"parser : %p, "
+				"session : '%s', "
 				"wsChannel : %p, "
-				"success "
+				"user : '%s', "
+				"domain : '%s', "
+				"number : '%s' "
 				") \n",
 				parser,
-				wsChannel
+				switch_core_session_get_uuid(newsession),
+				wsChannel,
+				parser->GetUser(),
+				parser->GetDomain(),
+				parser->GetDestNumber()
+				);
+	}
+
+	return bFlag;
+}
+
+bool WebSocketServer::DestroyCall(WSClientParser* parser, WSChannel* wsChannel) {
+	switch_core_session_t* session = NULL;
+
+	// 挂断会话
+	char* uuid = wsChannel->uuid_str;
+
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::DestroyCall( "
+			"[Start], "
+			"wsChannel : %p, "
+			"parser : %p, "
+			"session : '%s' "
+			") \n",
+			wsChannel,
+			parser,
+			uuid
+			);
+
+	if( uuid ) {
+		// 挂断会话
+		session = switch_core_session_locate(uuid);
+		if ( session != NULL )  {
+			switch_channel_t* channel = switch_core_session_get_channel(session);
+			if( channel ) {
+				switch_log_printf(
+						SWITCH_CHANNEL_SESSION_LOG(session),
+						SWITCH_LOG_NOTICE,
+						"WebSocketServer::DestroyCall( "
+						"[Channel hang up], "
+						"parser : %p, "
+						"session : '%s' "
+						") \n",
+						parser,
+						switch_core_session_get_uuid(session)
+						);
+				switch_channel_hangup(channel, SWITCH_CAUSE_DESTINATION_OUT_OF_ORDER);
+			} else {
+				switch_log_printf(
+						SWITCH_CHANNEL_SESSION_LOG(session),
+						SWITCH_LOG_NOTICE,
+						"WebSocketServer::DestroyCall( "
+						"[No channel to hang up], "
+						"parser : %p, "
+						"session : '%s' "
+						") \n",
+						parser,
+						switch_core_session_get_uuid(session)
+						);
+			}
+			switch_core_session_rwunlock(session);
+		}
+	}
+
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+			SWITCH_LOG_NOTICE,
+			"WebSocketServer::DestroyCall( "
+			"[Success], "
+			"wsChannel : %p, "
+			"parser : %p, "
+			"session : '%s' "
+			") \n",
+			wsChannel,
+			parser,
+			uuid
+			);
+
+	return (session != NULL);
+}
+
+bool WebSocketServer::Disconnect(WSClientParser* parser) {
+	bool bFlag = false;
+	Client* client = NULL;
+	if( parser ) {
+		client = (Client *)parser->GetClient();
+		// 销毁频道
+		parser->DestroyCall();
+		if( !parser->IsConnected() ) {
+			// 连接已经断开
+			switch_log_printf(
+					SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::Disconnect( "
+					"[Real delete parser], "
+					"parser : %p, "
+					"client : %p, "
+					"user : '%s', "
+					"domain : '%s' "
+					") \n",
+					parser,
+					client,
+					parser->GetUser(),
+					parser->GetDomain()
+					);
+
+			bFlag = true;
+
+		} else {
+			// 连接还没断开
+			switch_log_printf(
+					SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::Disconnect( "
+					"[Disconnect for hangup], "
+					"parser : %p, "
+					"client : %p, "
+					"user : '%s', "
+					"domain : '%s' "
+					") \n",
+					parser,
+					client,
+					parser->GetUser(),
+					parser->GetDomain()
+					);
+			mAsyncIOServer.Disconnect(client);
+		}
+
+	} else {
+		switch_log_printf(
+				SWITCH_CHANNEL_LOG,
+				SWITCH_LOG_ERROR,
+				"WebSocketServer::Disconnect( "
+				"[Disconnect error parser] "
+				") \n"
 				);
 	}
 
@@ -586,113 +861,141 @@ bool WebSocketServer::CreateCall(WSClientParser* parser/*, const char *number*/)
 
 /***************************** 频道路由和状态接口 **************************************/
 switch_status_t WebSocketServer::WSOnInit(switch_core_session_t *session) {
-	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-	switch_log_printf(
-			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_NOTICE,
-			"WebSocketServer::WSOnInit( "
-			"parser : %p, "
-			"wsChannel : %p, "
-			"session : %p "
-			") \n",
-			wsChannel->parser,
-			wsChannel,
-			session
-			);
-
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 	switch_channel_set_flag(channel, CF_CNG_PLC);
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
+
+	switch_log_printf(
+			SWITCH_CHANNEL_SESSION_LOG(session),
+			SWITCH_LOG_INFO,
+			"WebSocketServer::WSOnInit( "
+			"parser : %p, "
+			"channel : %p "
+			") \n",
+			wsChannel->parser,
+			wsChannel
+			);
+
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
+			parser->Lock();
+			switch_log_printf(
+					SWITCH_CHANNEL_SESSION_LOG(session),
+					SWITCH_LOG_NOTICE,
+					"WebSocketServer::WSOnInit( "
+					"parser : %p, "
+					"channel : %p, "
+					"user : '%s', "
+					"domain : '%s' "
+					") \n",
+					parser,
+					wsChannel,
+					parser->GetUser(),
+					parser->GetDomain()
+					);
+			parser->Unlock();
+		}
+	}
 
 	return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t WebSocketServer::WSOnHangup(switch_core_session_t *session) {
+	switch_channel_t *channel = switch_core_session_get_channel(session);
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
+
 	switch_log_printf(
 			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_NOTICE,
+			SWITCH_LOG_INFO,
 			"WebSocketServer::WSOnHangup( "
 			"parser : %p, "
-			"wsChannel : %p, "
-			"session : %p "
+			"channel : %p "
 			") \n",
 			wsChannel->parser,
-			wsChannel,
-			session
+			channel
 			);
 
-	switch_channel_t *channel = switch_core_session_get_channel(session);
+//	WSClientParser* parser = NULL;
+//	if( wsChannel ) {
+//		parser = (WSClientParser *)wsChannel->parser;
+//		if( parser ) {
+//			switch_log_printf(
+//					SWITCH_CHANNEL_SESSION_LOG(session),
+//					SWITCH_LOG_NOTICE,
+//					"WebSocketServer::WSOnHangup( "
+//					"parser : %p, "
+//					"channel : %p, "
+//					"user : '%s', "
+//					"domain : '%s' "
+//					") \n",
+//					parser,
+//					wsChannel,
+//					parser->GetUser(),
+//					parser->GetDomain()
+//					);
+//
+//			// 断开连接
+//			Disconnect(parser);
+//		}
+//	}
+//
+//	// 从会话列表删除
+//	switch_core_hash_delete_wrlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 
 	return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t WebSocketServer::WSOnDestroy(switch_core_session_t *session) {
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
+
 	switch_log_printf(
 			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_NOTICE,
+			SWITCH_LOG_INFO,
 			"WebSocketServer::WSOnDestroy( "
 			"parser : %p, "
-			"wsChannel : %p, "
-			"session : %p "
+			"channel : %p "
 			") \n",
 			wsChannel->parser,
-			wsChannel,
-			session
+			wsChannel
 			);
 
-//	switch_channel_t *channel = switch_core_session_get_channel(session);
-
-	// 从会话列表删除
-	switch_thread_rwlock_wrlock(mpHashrwlock);
-	switch_core_hash_delete(mpChannelHash, switch_core_session_get_uuid(session));
-	switch_thread_rwlock_unlock(mpHashrwlock);
-
-	WSClientParser* parser = (WSClientParser *)wsChannel->parser;
-	if( parser ) {
-		parser->Lock();
-
-		// 销毁频道
-		parser->DestroyChannel(wsChannel, false);
-		if( !parser->IsConnected() ) {
-			parser->Unlock();
-
-			// 连接已经断开
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
 			switch_log_printf(
 					SWITCH_CHANNEL_SESSION_LOG(session),
 					SWITCH_LOG_NOTICE,
 					"WebSocketServer::WSOnDestroy( "
-					"Real delete parser, "
-					"client : %p, "
-					"parser : %p "
+					"parser : %p, "
+					"channel : %p, "
+					"user : '%s', "
+					"domain : '%s' "
 					") \n",
-					client,
-					parser
+					parser,
+					wsChannel,
+					parser->GetUser(),
+					parser->GetDomain()
 					);
 
-			// 释放内存
-			delete parser;
+			bool bDelete = false;
 
-		} else {
-			// 连接还没断开
-			switch_log_printf(
-					SWITCH_CHANNEL_SESSION_LOG(session),
-					SWITCH_LOG_NOTICE,
-					"WebSocketServer::WSOnDestroy( "
-					"Disconnect for hangup, "
-					"client : %p, "
-					"parser : %p "
-					") \n",
-					client,
-					parser
-					);
-			mAsyncIOServer.Disconnect(client);
+			// 断开连接
+			parser->Lock();
+			bDelete = Disconnect(parser);
 			parser->Unlock();
+
+			if( bDelete ) {
+				// 释放内存
+				delete parser;
+			}
 		}
 	}
+
+	// 从会话列表删除
+	switch_core_hash_delete_wrlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 
 	return SWITCH_STATUS_SUCCESS;
 }
@@ -709,19 +1012,23 @@ switch_call_cause_t WebSocketServer::WSOutgoingChannel(
 		switch_call_cause_t *cancel_cause
 		) {
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-	switch_log_printf(
-			SWITCH_CHANNEL_SESSION_LOG(session),
-			SWITCH_LOG_NOTICE,
-			"WebSocketServer::WSOutgoingChannel( "
-			"parser : %p, "
-			"wsChannel : %p, "
-			"session : %p "
-			") \n",
-			wsChannel->parser,
-			wsChannel,
-			session
-			);
+//	Client* client = (Client *)wsChannel->parser->GetClient();
+//	switch_log_printf(
+//			SWITCH_CHANNEL_SESSION_LOG(session),
+//			SWITCH_LOG_NOTICE,
+//			"WebSocketServer::WSOutgoingChannel( "
+//			"parser : %p, "
+//			"wsChannel : %p, "
+//			"session : %p, "
+//			"user : '%s', "
+//			"domain : '%s' "
+//			") \n",
+//			wsChannel->parser,
+//			wsChannel,
+//			session,
+//			wsChannel->parser->GetUser(),
+//			wsChannel->parser->GetDomain()
+//			);
 
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 
@@ -730,22 +1037,6 @@ switch_call_cause_t WebSocketServer::WSOutgoingChannel(
 
 switch_status_t WebSocketServer::WSReceiveMessage(switch_core_session_t *session, switch_core_session_message_t *msg) {
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_DEBUG,
-//			"WebSocketServer::WSReceiveMessage( "
-//			"parser : %p, "
-//			"wsChannel : %p, "
-//			"session : %p, "
-//			"msg->message_id : %d "
-//			") \n",
-//			wsChannel->parser,
-//			wsChannel,
-//			session,
-//			msg->message_id
-//			);
-
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 
 	switch (msg->message_id) {
@@ -766,7 +1057,7 @@ switch_status_t WebSocketServer::WSReceiveMessage(switch_core_session_t *session
 				SWITCH_CHANNEL_SESSION_LOG(session),
 				SWITCH_LOG_NOTICE,
 				"WebSocketServer::WSReceiveMessage( "
-				"Flushing read buffer "
+				"[Flushing read buffer] "
 				") \n"
 				);
 
@@ -811,146 +1102,113 @@ switch_status_t WebSocketServer::WSReceiveMessage(switch_core_session_t *session
 }
 
 switch_status_t WebSocketServer::WSReadFrame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
-	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_NOTICE,
-//			"WebSocketServer::WSReadFrame( "
-//			"parser : %p, "
-//			"wsChannel : %p, "
-//			"session : %p "
-//			") \n",
-//			wsChannel->parser,
-//			wsChannel,
-//			session
-//			);
-
 	switch_channel_t *channel = switch_core_session_get_channel(session);
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 
-	wsChannel->read_frame.codec = &wsChannel->read_codec;
+	Client* client = NULL;
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
+		}
 
-	switch_core_timer_next(&wsChannel->timer);
+		wsChannel->read_frame.codec = &wsChannel->read_codec;
 
-	wsChannel->read_frame.datalen = 2;
-	switch_byte_t* data = (switch_byte_t *)wsChannel->read_frame.data;
-	data[0] = 65;
-	data[1] = 0;
+//		switch_core_timer_next(&wsChannel->timer);
 
-	*frame = &wsChannel->read_frame;
+		wsChannel->read_frame.datalen = 2;
+		switch_byte_t* data = (switch_byte_t *)wsChannel->read_frame.data;
+		data[0] = 65;
+		data[1] = 0;
+
+		*frame = &wsChannel->read_frame;
+	}
+
+	switch_yield(20000);
 
 	return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t WebSocketServer::WSWriteFrame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
 	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_NOTICE,
-//			"WebSocketServer::WSWriteFrame( "
-//			"parser : %p, "
-//			"wsChannel : %p, "
-//			"session : %p "
-//			") \n",
-//			wsChannel->parser,
-//			wsChannel,
-//			session
-//			);
+
+	Client* client = NULL;
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
+		}
+	}
 
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 	return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t WebSocketServer::WSReadVideoFrame(switch_core_session_t *session, switch_frame_t **frame, switch_io_flag_t flags, int stream_id) {
-	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	Client* client = (Client *)wsChannel->parser->GetClient();
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_NOTICE,
-//			"WebSocketServer::WSReadVideoFrame( "
-//			"parser : %p, "
-//			"wsChannel : %p, "
-//			"session : %p "
-//			") \n",
-//			wsChannel->parser,
-//			wsChannel,
-//			session
-//			);
-
 	switch_channel_t *channel = switch_core_session_get_channel(session);
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 
-	wsChannel->video_read_frame.datalen = 0;
-	wsChannel->video_read_frame.flags = SFF_CNG;
-	wsChannel->video_read_frame.codec = &wsChannel->video_read_codec;
+	Client* client = NULL;
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
+		}
+
+		wsChannel->video_read_frame.datalen = 0;
+		wsChannel->video_read_frame.flags = SFF_CNG;
+		wsChannel->video_read_frame.codec = &wsChannel->video_read_codec;
+
+		*frame = &wsChannel->video_read_frame;
+	}
 
 	switch_yield(20000);
-
-	*frame = &wsChannel->video_read_frame;
 
 	return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t WebSocketServer::WSWriteVideoFrame(switch_core_session_t *session, switch_frame_t *frame, switch_io_flag_t flags, int stream_id) {
-	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
-	WSClientParser *parser = wsChannel->parser;
-	Client* client = (Client *)wsChannel->parser->GetClient();
-	switch_byte_t *payload = (switch_byte_t *)frame->data;
-	int nalType = payload[0] & 0x1f;
-//	switch_log_printf(
-//			SWITCH_CHANNEL_SESSION_LOG(session),
-//			SWITCH_LOG_NOTICE,
-//			"WebSocketServer::WSWriteVideoFrame( "
-//			"parser : %p, "
-//			"wsChannel : %p, "
-//			"session : %p, "
-//			"frame->datalen : %u, "
-//			"nalType : %u "
-//			") \n",
-//			wsChannel->parser,
-//			wsChannel,
-//			session,
-//			frame->datalen,
-//			nalType
-//			);
-
 	switch_channel_t *channel = switch_core_session_get_channel(session);
-	const char* data = NULL;
-	switch_size_t len = 0;
-	switch_size_t dataLen = 0;
+	WSChannel* wsChannel = (WSChannel *)switch_core_hash_find_rdlock(mpChannelHash, switch_core_session_get_uuid(session), mpHashrwlock);
 
-	// Get H264 frame
-	if( parser->GetFrame(frame, &data, &dataLen) ) {
-		// Get frame success
-//		switch_log_printf(
-//				SWITCH_CHANNEL_SESSION_LOG(session),
-//				SWITCH_LOG_NOTICE,
-//				"WebSocketServer::WSWriteVideoFrame( "
-//				"parser : %p, "
-//				"wsChannel : %p, "
-//				"session : %p, "
-//				"real datalen : %u "
-//				") \n",
-//				wsChannel->parser,
-//				wsChannel,
-//				session,
-//				dataLen
-//				);
+	Client* client = NULL;
+	WSClientParser* parser = NULL;
+	if( wsChannel ) {
+		parser = (WSClientParser *)wsChannel->parser;
+		if( parser ) {
+			parser->Lock();
+			client = (Client *)parser->GetClient();
 
-		// Get WebSocket packet
-		char header[WS_HEADER_MAX_LEN] = {0};
-		WSPacket* packet = (WSPacket *)header;
-		parser->GetPacket(packet, dataLen);
+			switch_byte_t *payload = (switch_byte_t *)frame->data;
+			int nalType = payload[0] & 0x1f;
 
-		// Send WebSocket header
-		len = packet->GetHeaderLength();
-		if( mAsyncIOServer.Send(client, (const char *)packet, &len) ) {
-			// Send playload
-			mAsyncIOServer.Send(client, data, &dataLen);
+			const char* data = NULL;
+			switch_size_t len = 0;
+			switch_size_t dataLen = 0;
+
+			// Get H264 frame
+			if( parser->GetFrame(frame, &data, &dataLen) ) {
+				// Get frame success
+
+				// Get WebSocket packet
+				char header[WS_HEADER_MAX_LEN] = {0};
+				WSPacket* packet = (WSPacket *)header;
+				parser->GetPacket(packet, dataLen);
+
+				// Send WebSocket header
+				len = packet->GetHeaderLength();
+				if( client ) {
+					if( mAsyncIOServer.Send(client, (const char *)packet, &len) ) {
+						// Send playload
+						mAsyncIOServer.Send(client, data, &dataLen);
+					}
+				}
+
+				// Release video buffer
+				parser->DestroyVideoBuffer();
+			}
+			parser->Unlock();
 		}
-
-		// Release video buffer
-		parser->DestroyVideoBuffer();
 	}
 
 	return SWITCH_STATUS_SUCCESS;
