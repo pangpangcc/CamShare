@@ -55,6 +55,11 @@ typedef struct Client {
 	}
 
 	void Create(switch_memory_pool_t* pool, Socket *socket) {
+		recvHandleCount = 0;
+		disconnected = false;
+		parser = NULL;
+		data = NULL;
+
 		this->pool = pool;
 		this->socket = socket;
 
@@ -66,9 +71,6 @@ typedef struct Client {
 		if( !clientMutex ) {
 			switch_mutex_init(&clientMutex, SWITCH_MUTEX_NESTED, pool);
 		}
-
-		recvHandleCount = 0;
-		disconnected = false;
 
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,

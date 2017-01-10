@@ -33,7 +33,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.0.9"
+#define VERSION_STRING "1.1.0"
 
 typedef struct SiteConfig {
 	SiteConfig() {

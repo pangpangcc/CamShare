@@ -83,9 +83,9 @@ private:
 	bool CreateCall(WSClientParser* parser);
 
 	/**
-	 * 销毁会话
+	 * 挂断会话
 	 */
-	bool DestroyCall(WSClientParser* parser, WSChannel* wsChannel);
+	bool HangupCall(WSClientParser* parser);
 
 	/**
 	 * 断开连接

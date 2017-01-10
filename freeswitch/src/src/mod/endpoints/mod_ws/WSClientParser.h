@@ -19,6 +19,18 @@
 
 class WSClientParser;
 typedef struct WSChannel {
+	WSChannel() {
+		parser = NULL;
+		session = NULL;
+
+		video_max_bandwidth_out = NULL;
+		video_readbuf = NULL;
+		video_readbuf_mutex = NULL;
+		media_handle = NULL;
+
+		uuid_str = NULL;
+	}
+
 	WSClientParser* parser;
 	switch_core_session_t *session;
 
@@ -73,6 +85,7 @@ public:
 	WSClientParser();
 	virtual ~WSClientParser();
 
+	// 解析WebSocket协议
 	int ParseData(char* buffer, int len);
 	bool GetHandShakeRespond(char** sendBuffer, int& len);
 	bool GetPacket(WSPacket* packet, unsigned long long dataLen);
@@ -90,14 +103,30 @@ public:
 	WSChannel* CreateCall(
 			switch_core_session_t *session,
 			const char *profileName,
-//			const char *destNumber,
 			const char *profileContext,
 			const char *profileDialplan,
 			const char* ip
 			);
-	WSChannel* DestroyCall();
+	/**
+	 * 销毁会话
+	 */
+	void DestroyCall();
 
+	/**
+	 * 是否存在会话
+	 */
+	bool IsAlreadyCall();
+
+	/**
+	 * 挂断会话
+	 */
+	bool HangupCall();
+
+	/**
+	 * 状态管理函数
+	 */
 	bool IsConnected();
+	void Connected();
 	void Disconnected();
 
 	void SetClient(Client *client);
@@ -115,8 +144,12 @@ public:
 	const char* GetDestNumber();
 
 private:
+	// 频道管理
 	WSChannel* CreateChannel(switch_core_session_t *session);
+	void DestroyChannel(WSChannel* wsChannel);
 	bool InitChannel(WSChannel* wsChannel);
+
+	// 解析WebSocket协议
 	bool ParseFirstLine(char* line);
 	void ParseHeader(char* line);
 	bool CheckHandShake();
@@ -124,6 +157,7 @@ private:
 	/**
 	 * 用于发送事件的函数
 	 */
+	bool ws_connect();
 	bool ws_login();
 	bool ws_disconnect();
 

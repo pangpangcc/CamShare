@@ -56,24 +56,25 @@ bool AsyncIOServer::Start(
 			);
 
 	mRunning = true;
+	mpPool = pool;
 
 	// 创建处理队列
-	switch_queue_create(&mpHandleQueue, SWITCH_CORE_QUEUE_LEN, pool);
+	switch_queue_create(&mpHandleQueue, SWITCH_CORE_QUEUE_LEN, mpPool);
 
 	// 创建处理线程
 	switch_threadattr_t *thd_handle_attr = NULL;
-	switch_threadattr_create(&thd_handle_attr, pool);
+	switch_threadattr_create(&thd_handle_attr, mpPool);
 	switch_threadattr_detach_set(thd_handle_attr, 1);
 	switch_threadattr_stacksize_set(thd_handle_attr, SWITCH_THREAD_STACKSIZE);
 	switch_threadattr_priority_set(thd_handle_attr, SWITCH_PRI_IMPORTANT);
 
-	mpHandleThreads = (switch_thread_t**)switch_core_alloc(pool, mThreadCount * sizeof(switch_thread_t*));
+	mpHandleThreads = (switch_thread_t**)switch_core_alloc(mpPool, mThreadCount * sizeof(switch_thread_t*));
 	for(int i = 0; i < mThreadCount; i++) {
-		switch_thread_create(&mpHandleThreads[i], thd_handle_attr, ws_handle_thread, this, pool);
+		switch_thread_create(&mpHandleThreads[i], thd_handle_attr, ws_handle_thread, this, mpPool);
 	}
 
 	// 开始监听socket
-	bFlag = mTcpServer.Start(pool, ip, port);
+	bFlag = mTcpServer.Start(mpPool, ip, port);
 
 	if( bFlag ) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "AsyncIOServer::Start( success ) \n");
@@ -112,6 +113,8 @@ void AsyncIOServer::Stop() {
 		}
 	}
 
+	mpPool = NULL;
+
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "AsyncIOServer::Stop( finish ) \n");
 }
 
@@ -120,16 +123,16 @@ bool AsyncIOServer::IsRuning() {
 }
 
 bool AsyncIOServer::Send(Client* client, const char* buffer, switch_size_t* len) {
-	switch_log_printf(
-			SWITCH_CHANNEL_LOG,
-			SWITCH_LOG_DEBUG,
-			"AsyncIOServer::Send( "
-			"client : %p, "
-			"len : %d "
-			") \n",
-			client,
-			*len
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_LOG,
+//			SWITCH_LOG_DEBUG,
+//			"AsyncIOServer::Send( "
+//			"client : %p, "
+//			"len : %d "
+//			") \n",
+//			client,
+//			*len
+//			);
 	bool bFlag = false;
 
 	if( client ) {
@@ -190,13 +193,13 @@ bool AsyncIOServer::OnAccept(Socket* socket) {
 void AsyncIOServer::OnRecvEvent(Socket* socket) {
 	Client* client = (Client *)(socket->data);
 	if( client != NULL ) {
-		switch_log_printf(
-				SWITCH_CHANNEL_LOG,
-				SWITCH_LOG_DEBUG,
-				"AsyncIOServer::OnRecvEvent( client : %p, socket : %p ) \n",
-				client,
-				socket
-				);
+//		switch_log_printf(
+//				SWITCH_CHANNEL_LOG,
+//				SWITCH_LOG_DEBUG,
+//				"AsyncIOServer::OnRecvEvent( client : %p, socket : %p ) \n",
+//				client,
+//				socket
+//				);
 
 		// 尝试读取数据
 		char buf[READ_BUFFER_SIZE];
@@ -211,23 +214,23 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 //				status = switch_socket_recv(socket->socket, (char *)buf, &len);
 				if( status == SWITCH_STATUS_SUCCESS ) {
 					// 读取数据成功, 缓存到客户端
-					switch_log_printf(
-							SWITCH_CHANNEL_LOG,
-							SWITCH_LOG_DEBUG,
-							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read ok ) \n",
-							client,
-							socket
-							);
+//					switch_log_printf(
+//							SWITCH_CHANNEL_LOG,
+//							SWITCH_LOG_DEBUG,
+//							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read ok ) \n",
+//							client,
+//							socket
+//							);
 
 					if( client->Write(buf, len) ) {
 						// 放到处理队列
-						switch_log_printf(
-								SWITCH_CHANNEL_LOG,
-								SWITCH_LOG_DEBUG,
-								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, client write buffer ok ) \n",
-								client,
-								socket
-								);
+//						switch_log_printf(
+//								SWITCH_CHANNEL_LOG,
+//								SWITCH_LOG_DEBUG,
+//								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, client write buffer ok ) \n",
+//								client,
+//								socket
+//								);
 
 						RecvHandle(client);
 
@@ -245,13 +248,13 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 					}
 				} else if( SWITCH_STATUS_IS_BREAK(status) /*|| (status == SWITCH_STATUS_INTR)*/ ) {
 					// 没有数据可读超时返回, 不处理
-					switch_log_printf(
-							SWITCH_CHANNEL_LOG,
-							SWITCH_LOG_DEBUG,
-							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, nothing to read ) \n",
-							client,
-							socket
-							);
+//					switch_log_printf(
+//							SWITCH_CHANNEL_LOG,
+//							SWITCH_LOG_DEBUG,
+//							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, nothing to read ) \n",
+//							client,
+//							socket
+//							);
 					break;
 				} else {
 					// 读取数据出错, 断开
@@ -349,14 +352,14 @@ void AsyncIOServer::RecvHandleThread() {
 		if ( SWITCH_STATUS_SUCCESS == switch_queue_pop_timeout(mpHandleQueue, &pop, timeout) ) {
 			Client* client = (Client *)pop;
 
-			switch_log_printf(
-					SWITCH_CHANNEL_LOG,
-					SWITCH_LOG_DEBUG,
-					"AsyncIOServer::RecvHandleThread( "
-					"client : %p "
-					") \n",
-					client
-					);
+//			switch_log_printf(
+//					SWITCH_CHANNEL_LOG,
+//					SWITCH_LOG_DEBUG,
+//					"AsyncIOServer::RecvHandleThread( "
+//					"client : %p "
+//					") \n",
+//					client
+//					);
 
 			switch_mutex_lock(client->clientMutex);
 			// 开始处理

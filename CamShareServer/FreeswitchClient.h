@@ -350,6 +350,10 @@ private:
 	 */
 	void FreeswitchEventRtmpDestory(const Json::Value& root);
 	/**
+	 * 事件处理, websocket终端连接
+	 */
+	void FreeswitchEventWebsocketConnect(const Json::Value& root);
+	/**
 	 * 事件处理, websocket终端登陆
 	 */
 	void FreeswitchEventWebsocketLogin(const Json::Value& root);

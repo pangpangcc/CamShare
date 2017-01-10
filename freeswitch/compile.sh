@@ -25,7 +25,12 @@ else
   ./bootstrap.sh || exit 1
   chmod +x ./configure || exit 1
   ./configure --enable-core-odbc-support=no || exit 1
-  make clean
+  
+  if [ ! -f "first_build_test" ]; then
+    touch first_build_test
+  else
+    make clean
+  fi
 fi
 
 make || exit 1

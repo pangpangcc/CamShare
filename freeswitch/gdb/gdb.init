@@ -1,0 +1,5 @@
+file /usr/local/freeswitch/bin/freeswitch
+handle SIGPIPE noprint
+source gdb.break
+source print_event_nodes
+run

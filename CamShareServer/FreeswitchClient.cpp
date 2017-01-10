@@ -24,6 +24,7 @@
 #define RTMP_EVENT_DISCONNECT_FUNCTION "rtmp_real_session_destroy"
 
 #define WS_EVENT_MAINT "ws::maintenance"
+#define WS_EVENT_CONNECT_FUNCTION "ws_connect"
 #define WS_EVENT_LOGIN_FUNCTION "ws_login"
 #define WS_EVENT_DISCONNECT_FUNCTION "ws_disconnect"
 
@@ -232,6 +233,9 @@ bool FreeswitchClient::Proceed(
 	mRtmpSessionMap.Clear();
 	mRtmpUserMap.Clear();
 	mRtmpSessionMap.Unlock();
+
+	// 清空WebSocket登录数
+	mWebSocketUserCount = 0;
 
 	mConnectedMutex.unlock();
 
@@ -1686,6 +1690,10 @@ void FreeswitchClient::FreeswitchEventHandle(esl_event_t *event) {
 						// rtmp销毁成功
 						FreeswitchEventRtmpDestory(root);
 
+					} else if( function == WS_EVENT_CONNECT_FUNCTION ) {
+						// websocket连接成功
+						FreeswitchEventWebsocketConnect(root);
+
 					} else if( function == WS_EVENT_LOGIN_FUNCTION ) {
 						// websocket登陆成功
 						FreeswitchEventWebsocketLogin(root);
@@ -1845,13 +1853,22 @@ void FreeswitchClient::FreeswitchEventRtmpDestory(const Json::Value& root) {
     }
 }
 
+void FreeswitchClient::FreeswitchEventWebsocketConnect(const Json::Value& root) {
+	mWebSocketUserCount++;
+
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"FreeswitchClient::FreeswitchEventWebsocketConnect( "
+			"[Freeswitch, 事件处理, websocket终端连接] "
+			")"
+			);
+}
+
 void FreeswitchClient::FreeswitchEventWebsocketLogin(const Json::Value& root) {
 	string user;
     if( root["User"].isString() ) {
     	user = root["User"].asString();
     }
-
-    mWebSocketUserCount++;
 
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
@@ -1869,7 +1886,7 @@ void FreeswitchClient::FreeswitchEventWebsocketDestory(const Json::Value& root) 
     	user = root["User"].asString();
     }
 
-    mWebSocketUserCount--;
+	mWebSocketUserCount--;
 
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,

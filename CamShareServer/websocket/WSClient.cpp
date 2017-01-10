@@ -273,7 +273,7 @@ bool WSClient::HandShake() {
 
 	memset(buffer, '0', sizeof(buffer));
 	sprintf(buffer,
-			"GET /%s/%s/%s HTTP/1.1\r\n"
+			"GET /%s/%s/%s/1/SID=12346&USERTYPE=1 HTTP/1.1\r\n"
 			"Host: %s:%d"
 			"Connection: Upgrade\r\n"
 			"Pragma: no-cache\r\n"

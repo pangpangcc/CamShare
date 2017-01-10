@@ -36,6 +36,12 @@ typedef struct Socket {
 	};
 
 	void Create(switch_memory_pool_t* pool) {
+		socket = NULL;
+		pollfd = NULL;
+		ip = NULL;
+		port = 0;
+		data = NULL;
+
 		this->pool = pool;
 	}
 

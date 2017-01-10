@@ -145,6 +145,8 @@ void TcpServer::Stop() {
 		mpSocketMutex = NULL;
 	}
 
+	mpPool = NULL;
+
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::Stop( [Success], this : %p ) \n", this);
 }
 
@@ -218,9 +220,12 @@ void TcpServer::IOHandleThread() {
 				// 收到请求连接
 				if (fds[i].rtnevents & SWITCH_POLLIN) {
 					switch_socket_t *newsocket;
+					// 申请内存池
+					Socket* socket = Socket::Create();
+
 					// switch_socket_accept 会操作内存池销毁方法链表, 必需同步
 					switch_mutex_lock(mpSocketMutex);
-					if (switch_socket_accept(&newsocket, mpSocket->socket, mpPool) != SWITCH_STATUS_SUCCESS) {
+					if (switch_socket_accept(&newsocket, mpSocket->socket, socket->pool) != SWITCH_STATUS_SUCCESS) {
 						switch_mutex_unlock(mpSocketMutex);
 						switch_log_printf(
 								SWITCH_CHANNEL_LOG,
@@ -232,10 +237,12 @@ void TcpServer::IOHandleThread() {
 								strerror(errno),
 								this
 								);
+						// 释放内存池
+						Close(socket);
+
 					} else {
 						switch_mutex_unlock(mpSocketMutex);
 
-						Socket* socket = Socket::Create();
 						socket->socket = newsocket;
 
 						switch_sockaddr_t *addr = NULL;

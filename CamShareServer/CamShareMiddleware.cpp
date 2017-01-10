@@ -1010,9 +1010,9 @@ void CamShareMiddleware::UploadRecordsHandle() {
 				mDBHandler.RemoveRecord(records[i]);
 
 				if( bFlag ) {
-					// 发送成功
+					// 发送成功, 并解析返回成功
 					if( !success ) {
-						// 服务器返回失败
+						// 服务器返回, 上传失败错误
 						mDBHandler.InsertErrorRecord(records[i], errorCode);
 					}
 
@@ -1022,9 +1022,9 @@ void CamShareMiddleware::UploadRecordsHandle() {
 						// 不是本地参数错误
 						// 有效记录, 插回本地库
 						mDBHandler.InsertRecord(records[i]);
-					}
 
-					sleep(miUploadTime);
+						sleep(miUploadTime);
+					}
 				}
 			}
 		} else {
@@ -2062,9 +2062,7 @@ bool CamShareMiddleware::SendRecordFinish(
 	}
 
 	if( !errorRecord && client->Request(url.c_str(), &httpEntiy) ) {
-		// 发送成功
-		bFlag = true;
-
+		// 解析返回
 		client->GetBody(&respond, respondSize);
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
@@ -2081,18 +2079,23 @@ bool CamShareMiddleware::SendRecordFinish(
 			Json::Value root;
 			Json::Reader reader;
 			if( reader.parse(respond, root, false) ) {
+				// 解析协议成功, 标记为发送成功
+				bFlag = true;
+
 				if( root["result"].isInt() ) {
 					int result = root["result"].asInt();
 					switch(result) {
 					case 0:{
 						// 上传失败
 						if( root["errno"].isString() ) {
+							// 解析错误码
 							errorCode = root["errno"].asString();
 						}
 					}break;
 					case 1:{
 						// 上传成功
 						success = true;
+
 					}break;
 					}
 				}

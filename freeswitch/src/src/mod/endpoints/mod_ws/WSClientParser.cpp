@@ -22,9 +22,7 @@ static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 
 #define HTTP_URL_MAX_PATH 2048
 #define HTTP_URL_FIRSTLINE_PARAM_COUNT 3
-//#define HTTP_URL_PATH_PARAM_COUNT 5
-// 临时解决, 不做PHP用户验证
-#define HTTP_URL_PATH_PARAM_COUNT 3
+#define HTTP_URL_PATH_PARAM_COUNT 5
 
 #define HTTP_PARAM_SEP ":"
 #define HTTP_LINE_SEP "\r\n"
@@ -114,6 +112,8 @@ WSClientParser::WSClientParser() {
 
 WSClientParser::~WSClientParser() {
 	// TODO Auto-generated destructor stub
+	DestroyCall();
+
 	switch_mutex_destroy(clientMutex);
 
 	switch_core_destroy_memory_pool(&mpPool);
@@ -126,7 +126,7 @@ int WSClientParser::ParseData(char* buffer, int len) {
 			SWITCH_CHANNEL_UUID_LOG(this->uuid),
 			SWITCH_LOG_DEBUG,
 			"WSClientParser::ParseData( "
-			"parser : %p, "
+			"this : %p, "
 			"len : %d "
 //			"buffer : \n%s\n"
 			") \n",
@@ -155,7 +155,7 @@ int WSClientParser::ParseData(char* buffer, int len) {
 					SWITCH_LOG_INFO,
 					"WSClientParser::ParseData( "
 					"[HandShake], "
-					"parser : %p, "
+					"this : %p, "
 					"len : %d, "
 					"buffer : \n%s\n"
 					") \n",
@@ -177,8 +177,8 @@ int WSClientParser::ParseData(char* buffer, int len) {
 
 						if( lineNumber == 0 ) {
 							// Get First Line
-							if( ParseFirstLine(line) ) {
-
+							if( !ParseFirstLine(line) ) {
+								break;
 							}
 						} else {
 							ParseHeader(line);
@@ -309,7 +309,7 @@ bool WSClientParser::GetHandShakeRespond(char** buffer, int& len) {
 				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_INFO,
 				"WSClientParser::GetHandShakeRespond( "
-				"parser : %p, "
+				"this : %p, "
 				"len : %d, "
 				"buffer : \n%s\n"
 				") \n",
@@ -337,7 +337,7 @@ bool WSClientParser::GetPacket(WSPacket* packet, unsigned long long dataLen) {
 				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_DEBUG,
 				"WSClientParser::GetPacket( "
-				"parser : %p, "
+				"this : %p, "
 				"dataLen : %lld, "
 				"packet->Fin : %s, "
 				"packet->RSV : %u, "
@@ -370,7 +370,7 @@ void WSClientParser::SetWSClientParserCallback(WSClientParserCallback* callback)
 bool WSClientParser::Login() {
 	switch_log_printf(
 			SWITCH_CHANNEL_UUID_LOG(this->uuid),
-			SWITCH_LOG_NOTICE,
+			SWITCH_LOG_INFO,
 			"WSClientParser::Login( "
 			"this : %p, "
 			"user : '%s', "
@@ -385,31 +385,31 @@ bool WSClientParser::Login() {
 			mpCustom
 			);
 
-// 临时解决, 不做PHP用户验证
-//	switch_event_t *locate_params;
-//	switch_xml_t xml = NULL;
-//
-//	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
-//	switch_assert(locate_params);
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
-//
-//	/* Locate user */
-//	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
-//		switch_log_printf(
-//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
-//				SWITCH_LOG_WARNING,
-//				"WSClientParser::Login( "
-//				"this : %p, "
-//				"user : '%s', "
-//				"domain : '%s' ",
-//				this,
-//				mpUser,
-//				mpDomain
-//				);
-//		return false;
-//	}
+	switch_event_t *locate_params;
+	switch_xml_t xml = NULL;
+
+	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
+	switch_assert(locate_params);
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
+
+	/* Locate user */
+	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::Login( "
+				"[Fail], "
+				"this : %p, "
+				"user : '%s', "
+				"domain : '%s' ",
+				this,
+				mpUser,
+				mpDomain
+				);
+		return false;
+	}
 
 	// 发送登录成功事件
 	ws_login();
@@ -420,11 +420,12 @@ bool WSClientParser::Login() {
 WSChannel* WSClientParser::CreateCall(
 		switch_core_session_t *session,
 		const char *profileName,
-//		const char *destNumber,
 		const char *profileContext,
 		const char *profileDialplan,
 		const char* ip
 		) {
+	WSChannel *wsChannel = NULL;
+
 	switch_memory_pool_t *pool = NULL;
 	switch_channel_t* channel = NULL;
 	switch_caller_profile_t *caller_profile = NULL;
@@ -434,26 +435,49 @@ WSChannel* WSClientParser::CreateCall(
 	const char *destNumber = mpDestNumber;
 	const char *context = NULL;
 	const char *dialplan = NULL;
-	switch_status_t status = SWITCH_STATUS_FALSE;
+	switch_status_t status = SWITCH_STATUS_SUCCESS;
 
-	if ( !user || !domain || !destNumber ) {
-		return NULL;
-	}
-
-	pool = switch_core_session_get_pool(session);
-	channel = switch_core_session_get_channel(session);
-	switch_channel_set_name(
-			channel,
-			switch_core_session_sprintf(session, "ws/%s/%s/%s", profileName, user, destNumber)
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+			SWITCH_LOG_INFO,
+			"WSClientParser::CreateCall( "
+			"this : %p, "
+			"profileName : '%s', "
+			"profileContext : '%s', "
+			"profileDialplan : '%s', "
+			"ip : '%s' "
+			") \n",
+			this,
+			profileName,
+			profileContext,
+			profileDialplan,
+			ip
 			);
 
-	if (!zstr(user) && !zstr(domain)) {
-		const char *ivrUser = switch_core_session_sprintf(session, "%s@%s", user, domain);
-//		status = switch_ivr_set_user(session, ivrUser);
-		// 临时解决, 不做PHP用户验证
-		switch_ivr_set_user(session, ivrUser);
-		status = SWITCH_STATUS_SUCCESS;
+	// 参数不能为空
+	if ( !user || !domain || !destNumber ) {
+		status = SWITCH_STATUS_FALSE;
 	}
+
+	// 不允许一个连接创建多个会话
+	if( status == SWITCH_STATUS_SUCCESS && mpChannel ) {
+		status = SWITCH_STATUS_FALSE;
+	}
+
+	if( status == SWITCH_STATUS_SUCCESS ) {
+		pool = switch_core_session_get_pool(session);
+		channel = switch_core_session_get_channel(session);
+		switch_channel_set_name(
+				channel,
+				switch_core_session_sprintf(session, "ws/%s/%s/%s", profileName, user, destNumber)
+				);
+	}
+
+//	if ( status == SWITCH_STATUS_SUCCESS && !zstr(user) && !zstr(domain)) {
+//		// 拨号不做验证
+//		const char *ivrUser = switch_core_session_sprintf(session, "%s@%s", user, domain);
+//		status = switch_ivr_set_user(session, ivrUser);
+//	}
 
 	if( status == SWITCH_STATUS_SUCCESS ) {
 		if (!(context = switch_channel_get_variable(channel, "user_context"))) {
@@ -499,19 +523,50 @@ WSChannel* WSClientParser::CreateCall(
 		switch_channel_set_variable(channel, "caller", user);
 		switch_channel_set_state(channel, CS_INIT);
 
-		return CreateChannel(session);
+		wsChannel = CreateChannel(session);
 	}
 
-	return NULL;
+	if( wsChannel ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+				SWITCH_LOG_INFO,
+				"WSClientParser::CreateCall( "
+				"[Success], "
+				"this : %p, "
+				"wsChannel : %p, "
+				"profileName : '%s', "
+				"profileContext : '%s', "
+				"profileDialplan : '%s', "
+				"ip : '%s' "
+				") \n",
+				this,
+				wsChannel,
+				profileName,
+				profileContext,
+				profileDialplan,
+				ip
+				);
+	} else {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::CreateCall( "
+				"[Fail], "
+				"this : %p "
+				") \n",
+				this,
+				profileName,
+				profileContext,
+				profileDialplan,
+				ip
+				);
+	}
+
+	return wsChannel;
 }
 
 WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 	WSChannel *wsChannel = NULL;
-
-	if( mState != WSClientState_Disconnected ) {
-		// 连接还没被销毁
-		DestroyCall();
-	}
 
 	// 创建channel
 //	switch_memory_pool_t *pool = switch_core_session_get_pool(session);
@@ -520,21 +575,177 @@ WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 	wsChannel->parser = this;
 	wsChannel->uuid_str = switch_core_strdup(mpPool, switch_core_session_get_uuid(session));
 
-	// 创建计时器
-//	switch_core_timer_init(&wsChannel->timer, "soft", 20, (16000 / (1000 / 20)), mpPool);
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+			SWITCH_LOG_INFO,
+			"WSClientParser::CreateChannel( "
+			"this : %p, "
+			"wsChannel : %p "
+			") \n",
+			this,
+			wsChannel
+			);
 
 	if( InitChannel(wsChannel) ) {
 		mpChannel = wsChannel;
+	} else {
+		DestroyChannel(wsChannel);
 	}
 
 	return wsChannel;
 }
 
-WSChannel* WSClientParser::DestroyCall() {
-	WSChannel* wsChannel = NULL;
-	wsChannel = mpChannel;
-	mpChannel = NULL;
-	return wsChannel;
+void WSClientParser::DestroyCall() {
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+			SWITCH_LOG_INFO,
+			"WSClientParser::DestroyCall( "
+			"this : %p, "
+			"mpChannel : %p "
+			") \n",
+			this,
+			mpChannel
+			);
+
+	if( mpChannel ) {
+		DestroyChannel(mpChannel);
+		mpChannel = NULL;
+	}
+}
+
+void WSClientParser::DestroyChannel(WSChannel* wsChannel) {
+	switch_log_printf(
+			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+			SWITCH_LOG_INFO,
+			"WSClientParser::DestroyChannel( "
+			"this : %p, "
+			"wsChannel : %p "
+			") \n",
+			this,
+			mpChannel
+			);
+
+	if( wsChannel ) {
+		// Audio
+		if (switch_core_codec_ready(&wsChannel->read_codec)) {
+			switch_core_codec_destroy(&wsChannel->read_codec);
+		}
+
+		if (switch_core_codec_ready(&wsChannel->write_codec)) {
+			switch_core_codec_destroy(&wsChannel->write_codec);
+		}
+
+		// Video
+		if (switch_core_codec_ready(&wsChannel->video_read_codec)) {
+			switch_core_codec_destroy(&wsChannel->video_read_codec);
+		}
+
+		if (switch_core_codec_ready(&wsChannel->video_write_codec)) {
+			switch_core_codec_destroy(&wsChannel->video_write_codec);
+		}
+
+		if( wsChannel->video_readbuf_mutex ) {
+			switch_mutex_destroy(wsChannel->video_readbuf_mutex);
+			wsChannel->video_readbuf_mutex = NULL;
+		}
+
+		if( wsChannel->session ) {
+			switch_media_handle_destroy(wsChannel->session);
+			wsChannel->session = NULL;
+		}
+
+		if( wsChannel->video_readbuf ) {
+			switch_buffer_destroy(&wsChannel->video_readbuf);
+			wsChannel->video_readbuf = NULL;
+		}
+	}
+}
+
+bool WSClientParser::IsAlreadyCall() {
+	bool bFlag = false;
+	// 存在会话
+	if( mpChannel ) {
+		bFlag = true;
+	}
+	return bFlag;
+}
+
+bool WSClientParser::HangupCall() {
+	switch_core_session_t* session = NULL;
+
+	if( mpChannel ) {
+		// 挂断会话
+		char* uuid = mpChannel->uuid_str;
+
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+				SWITCH_LOG_INFO,
+				"WSClientParser::HangupCall( "
+				"[Start], "
+				"this : %p, "
+				"wsChannel : %p, "
+				"session : '%s' "
+				") \n",
+				this,
+				mpChannel,
+				uuid
+				);
+
+		if( uuid ) {
+			// 挂断会话
+			session = switch_core_session_locate(uuid);
+			if ( session != NULL )  {
+				switch_channel_t* channel = switch_core_session_get_channel(session);
+				if( channel ) {
+					switch_log_printf(
+							SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+							SWITCH_LOG_INFO,
+							"WSClientParser::HangupCall( "
+							"[Channel hang up], "
+							"this : %p, "
+							"wsChannel : %p, "
+							"session : '%s' "
+							") \n",
+							this,
+							mpChannel,
+							switch_core_session_get_uuid(session)
+							);
+					switch_channel_hangup(channel, SWITCH_CAUSE_DESTINATION_OUT_OF_ORDER);
+				} else {
+					switch_log_printf(
+							SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+							SWITCH_LOG_INFO,
+							"WSClientParser::HangupCall( "
+							"[No channel to hang up], "
+							"this : %p, "
+							"wsChannel : %p, "
+							"session : '%s' "
+							") \n",
+							this,
+							mpChannel,
+							switch_core_session_get_uuid(session)
+							);
+				}
+				switch_core_session_rwunlock(session);
+			}
+		}
+
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
+				SWITCH_LOG_INFO,
+				"WSClientParser::HangupCall( "
+				"[Success], "
+				"this : %p, "
+				"wsChannel : %p, "
+				"session : '%s' "
+				") \n",
+				this,
+				mpChannel,
+				uuid
+				);
+	}
+
+	return (session != NULL);
 }
 
 bool WSClientParser::InitChannel(WSChannel* wsChannel) {
@@ -560,8 +771,12 @@ bool WSClientParser::InitChannel(WSChannel* wsChannel) {
 				SWITCH_CHANNEL_SESSION_LOG(session),
 				SWITCH_LOG_ERROR,
 				"WSClientParser::InitChannel( "
-				"Can't initialize read codec "
-				")\n"
+				"[Fail, Can't initialize read codec], "
+				"this : %p, "
+				"wsChannel : %p "
+				")\n",
+				this,
+				wsChannel
 				);
 
 		return false;
@@ -581,8 +796,12 @@ bool WSClientParser::InitChannel(WSChannel* wsChannel) {
 				SWITCH_CHANNEL_SESSION_LOG(session),
 				SWITCH_LOG_ERROR, ""
 				"WSClientParser::InitChannel( "
-				"Can't initialize write codec "
-				")\n"
+				"[Fail, Can't initialize write codec], "
+				"this : %p, "
+				"wsChannel : %p "
+				")\n",
+				this,
+				wsChannel
 				);
 
 		return false;
@@ -616,8 +835,12 @@ bool WSClientParser::InitChannel(WSChannel* wsChannel) {
 				SWITCH_CHANNEL_SESSION_LOG(session),
 				SWITCH_LOG_ERROR,
 				"WSClientParser::InitChannel( "
-				"Can't initialize video read codec "
-				") \n"
+				"[Fail, Can't initialize video read codec], "
+				"this : %p, "
+				"wsChannel : %p "
+				") \n",
+				this,
+				wsChannel
 				);
 
 		return false;
@@ -641,8 +864,12 @@ bool WSClientParser::InitChannel(WSChannel* wsChannel) {
 				SWITCH_CHANNEL_SESSION_LOG(session),
 				SWITCH_LOG_ERROR,
 				"WSClientParser::InitChannel( "
-				"Can't initialize write codec "
-				") \n"
+				"[Fail, Can't initialize write codec], "
+				"this : %p, "
+				"wsChannel : %p "
+				") \n",
+				this,
+				wsChannel
 				);
 		return false;
 	}
@@ -669,6 +896,11 @@ bool WSClientParser::InitChannel(WSChannel* wsChannel) {
 
 bool WSClientParser::IsConnected() {
 	return mState != WSClientState_Disconnected;
+}
+
+void WSClientParser::Connected() {
+	ws_connect();
+	mState = WSClientState_UnKnow;
 }
 
 void WSClientParser::Disconnected() {
@@ -722,10 +954,10 @@ bool WSClientParser::ParseFirstLine(char* line) {
 	// Get Param
 	char* p = line;
 	char* delim = " ";
+	char decodeUrl[HTTP_URL_MAX_PATH] = {0};
 
 	char *array[10];
 	if( switch_separate_string_string(p, delim, array, HTTP_URL_FIRSTLINE_PARAM_COUNT) == HTTP_URL_FIRSTLINE_PARAM_COUNT ) {
-		char decodeUrl[HTTP_URL_MAX_PATH] = {0};
 		Arithmetic ac;
 		ac.decode_url(array[1], strlen(array[1]), decodeUrl);
 
@@ -733,7 +965,7 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				SWITCH_CHANNEL_UUID_LOG(this->uuid),
 				SWITCH_LOG_INFO,
 				"WSClientParser::ParseFirstLine( "
-				"parser : %p, "
+				"this : %p, "
 				"decodeUrl : '%s' "
 				") \n",
 				this,
@@ -750,17 +982,14 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				mpUser = switch_core_strdup(mpPool, array[0]);
 				mpDomain = switch_core_strdup(mpPool, array[1]);
 				mpDestNumber = switch_core_strdup(mpPool, array[2]);
-//				mpSite = switch_core_strdup(mpPool, array[3]);
-//				mpCustom = switch_core_strdup(mpPool, array[4]);
-				// 临时解决, 不做PHP用户验证
-				mpSite = switch_core_strdup(mpPool, "");
-				mpCustom = switch_core_strdup(mpPool, "");
+				mpSite = switch_core_strdup(mpPool, array[3]);
+				mpCustom = switch_core_strdup(mpPool, array[4]);
 
 				switch_log_printf(
 						SWITCH_CHANNEL_UUID_LOG(this->uuid),
 						SWITCH_LOG_INFO,
 						"WSClientParser::ParseFirstLine( "
-						"parser : %p, "
+						"this : %p, "
 						"user : '%s', "
 						"domain : '%s', "
 						"destnumber : '%s', "
@@ -774,10 +1003,24 @@ bool WSClientParser::ParseFirstLine(char* line) {
 						mpSite,
 						mpCustom
 						);
+
+				bFlag = true;
 			}
 		}
+	}
 
-		bFlag = true;
+	if( !bFlag ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::ParseFirstLine( "
+				"[Fail], "
+				"this : %p, "
+				"decodeUrl : %s "
+				") \n",
+				this,
+				line
+				);
 	}
 
 	return bFlag;
@@ -814,6 +1057,30 @@ bool WSClientParser::CheckHandShake() {
 		bFlag = true;
 	}
 	return bFlag;
+}
+
+bool WSClientParser::ws_connect() {
+	switch_status_t status = SWITCH_STATUS_FALSE;
+	switch_event_t *event;
+	if ( (status = switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, WS_EVENT_MAINT)) == SWITCH_STATUS_SUCCESS) {
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "User", mpUser);
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Domain", mpDomain);
+		status = switch_event_fire(&event);
+	}
+
+	if( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::ws_connect( "
+				"[Send event Fail], "
+				"this : %p "
+				") \n",
+				this
+				);
+	}
+
+	return status == SWITCH_STATUS_SUCCESS;
 }
 
 bool WSClientParser::ws_login() {

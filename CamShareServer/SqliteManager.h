@@ -35,6 +35,7 @@ public:
 	virtual ~SqliteManager();
 
 	bool Init(const string& dbname);
+	bool Close();
 	bool Query(char* sql, char*** result, int* iRow, int* iColumn);
 	void FinishQuery(char** result);
 	bool ExecSQL(const char* sql);
@@ -44,7 +45,7 @@ private:
 	bool QuerySQL(sqlite3 *db, const char* sql, char*** result, int* iRow, int* iColumn, char** msg);
 
 	sqlite3* mdb;
-
+	string mDbname;
 };
 
 #endif /* SQLITEMANAGER_H_ */

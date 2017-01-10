@@ -9,11 +9,14 @@
 SqliteManager::SqliteManager() {
 	// TODO Auto-generated constructor stub
 	mdb = NULL;
+	mDbname = "";
+
 	sqlite3_config(SQLITE_CONFIG_MEMSTATUS, false);
 }
 
 SqliteManager::~SqliteManager() {
 	// TODO Auto-generated destructor stub
+	Close();
 }
 
 bool SqliteManager::Init(const string& dbname) {
@@ -24,10 +27,40 @@ bool SqliteManager::Init(const string& dbname) {
 
 	ret = sqlite3_open(dbname.c_str(), &mdb);
 	if( ret == SQLITE_OK ) {
+		mDbname = dbname;
 		bFlag = ExecSQL(mdb, (char*)"PRAGMA synchronous = OFF;", 0);
 	}
 
-	printf("# SqliteManager initialize %s OK. \n", dbname.c_str());
+	if( bFlag ) {
+		printf("# SqliteManager initialize %s OK. \n", dbname.c_str());
+	} else {
+		printf("# SqliteManager initialize %s Fail. \n", dbname.c_str());
+		Close();
+	}
+
+	return bFlag;
+}
+
+bool SqliteManager::Close() {
+	bool bFlag = false;
+
+	printf("# SqliteManager close %s ... \n", mDbname.c_str());
+
+	if( mdb ) {
+		if( sqlite3_close(mdb) == SQLITE_OK ) {
+			bFlag = true;
+			mdb = NULL;
+			mDbname = "";
+		}
+	} else {
+		bFlag = true;
+	}
+
+	if( bFlag ) {
+		printf("# SqliteManager close %s OK. \n", mDbname.c_str());
+	} else {
+		printf("# SqliteManager close %s Fail. \n", mDbname.c_str());
+	}
 
 	return bFlag;
 }
