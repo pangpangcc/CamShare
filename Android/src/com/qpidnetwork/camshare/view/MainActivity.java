@@ -58,7 +58,15 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 		File path = Environment.getExternalStorageDirectory();
 		String filePath = path.getAbsolutePath();
 		Log.i("CamshareClientJava", "filePath : " + filePath);
-		
+
+        Runtime runtime = Runtime.getRuntime();
+		try {
+			runtime.exec("rm -rf " + filePath + "/camshare");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        
 		CrashHandlerJni.SetCrashLogDirectory(filePath + "/camshare/crash");
 		CamshareClient.SetLogDirPath(filePath + "/camshare/log");
 		
@@ -84,8 +92,8 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
 //				camshareClient.Login("MM1", "192.168.88.152", "1", "SESSION123456", UserType.Man);
-//				camshareClient.Login("MM1", "172.25.10.31", "1", "SESSION123456", UserType.Man);
-				camshareClient.Login("MM2", "52.196.96.7", "1", "SESSION123456", UserType.Man);
+				camshareClient.Login("MM211", "172.25.10.31", "1", "SESSION123456", UserType.Man);
+//				camshareClient.Login("MM2", "52.196.96.7", "1", "SESSION123456", UserType.Man);
 				//camshareClient.Login("WW1", "52.196.96.7", "1", "SESSION123456", UserType.Lady);
 			}
 		});
@@ -95,9 +103,10 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 			@Override
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
-				//camshareClient.MakeCall("MM1", "PC0");
-				camshareClient.Login("MM1", "52.196.96.7", "1", "SESSION123456", UserType.Man);
-				StartCapture(320,240,10);
+				camshareClient.MakeCall("WW1", "PC0");
+//				camshareClient.Login("WW1", "52.196.96.7", "1", "SESSION123456", UserType.Man);
+//				StartCapture(320,240,10);
+//				camshareClient.Login("WW1", "192.168.88.152", "1", "SESSION123456", UserType.Man);
 				//camshareClient.StartCapture();
 			}
 		});
@@ -108,7 +117,7 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
 				camshareClient.Hangup();
-				StopCapture();
+//				StopCapture();
 				//camshareClient.StopCapture();
 			}
 		});
@@ -119,7 +128,7 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
 				camshareClient.Stop();
-				StopCapture();
+//				StopCapture();
 				
 			}
 		});
@@ -130,7 +139,7 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 		// TODO Auto-generated method stub
 		if( success ) {
 			//camshareClient.MakeCall("WW1", "PC0");
-			camshareClient.MakeCall("MM1", "PC0");
+			camshareClient.MakeCall("WW1", "PC0");
 		}
 
 	}

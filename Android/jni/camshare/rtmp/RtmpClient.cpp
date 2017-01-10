@@ -21,6 +21,7 @@
 
 #define RTMP_SIG_SIZE 1536
 #define RTMP_DEFAULT_CHUNKSIZE	128
+#define RTMP_MAX_CHUNKSIZE		65536
 #define RTMP_DEFAULT_ACK_WINDOW 0x200000
 
 #define MAX_RTP_PAYLOAD_SIZE 1400
@@ -222,14 +223,13 @@ void RtmpClient::SetRtmpClientListener(RtmpClientListener *listener) {
 bool RtmpClient::Connect(const string& hostName) {
 	FileLog("RtmpClient",
 			"RtmpClient::Connect( "
-			"hostName : %s, "
-			"mbRunning : %s "
+			"hostName : %s "
 			")",
-			hostName.c_str(),
-			mbRunning?"true":"false"
+			hostName.c_str()
 			);
 	bool bFlag = false;
 
+	mClientMutex.lock();
 	if( mbRunning ) {
 		FileLog("RtmpClient",
 				"RtmpClient::Connect( "
@@ -238,31 +238,39 @@ bool RtmpClient::Connect(const string& hostName) {
 				")",
 				hostName.c_str()
 				);
-		return false;
+		bFlag = false;
+
+	} else {
+		Init();
+		mbRunning = true;
+		bFlag = true;
 	}
+	mClientMutex.unlock();
 
-	Init();
-
-	mbRunning = true;
-	this->hostName = hostName;
-	if( hostName.length() > 0 ) {
-		bFlag = m_socketHandler->Create();
-		bFlag = bFlag & m_socketHandler->Connect(hostName, port, 10 * 1000) == SOCKET_RESULT_SUCCESS;
-		if( bFlag ) {
-			m_socketHandler->SetBlock(true);
-			bFlag = HandShake();
+	if( bFlag ) {
+		bFlag = false;
+		this->hostName = hostName;
+		if( hostName.length() > 0 ) {
+			bFlag = m_socketHandler->Create();
+			bFlag = bFlag & m_socketHandler->Connect(hostName, port, 10 * 1000) == SOCKET_RESULT_SUCCESS;
 			if( bFlag ) {
-				mbConnected = true;
-				bFlag = SendConnectPacket();
+				m_socketHandler->SetBlock(true);
+				bFlag = HandShake();
+				if( bFlag ) {
+					mClientMutex.lock();
+					mbConnected = true;
+					mClientMutex.unlock();
+					bFlag = SendConnectPacket();
+				}
+			} else {
+				FileLog("RtmpClient",
+						"RtmpClient::Connect( "
+						"[Tcp connect fail], "
+						"hostName : '%s' "
+						")",
+						hostName.c_str()
+						);
 			}
-		} else {
-			FileLog("RtmpClient",
-					"RtmpClient::Connect( "
-					"[Tcp connect fail], "
-					"hostName : '%s' "
-					")",
-					hostName.c_str()
-					);
 		}
 	}
 
@@ -274,7 +282,8 @@ bool RtmpClient::Connect(const string& hostName) {
 				")",
 				hostName.c_str()
 				);
-		mbRunning = false;
+		Close();
+
 	} else {
 		FileLog("RtmpClient",
 				"RtmpClient::Connect( "
@@ -291,17 +300,16 @@ bool RtmpClient::Connect(const string& hostName) {
 void RtmpClient::Shutdown() {
 	FileLog("RtmpClient",
 			"RtmpClient::Shutdown( "
-			"mbConnected : %s, "
 			"port : %u, "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
-			mbConnected?"true":"false",
 			port,
 			mUser.c_str(),
 			mDest.c_str()
 			);
 
+	mClientMutex.lock();
 	if( !mbConnected ) {
 		if( m_socketHandler ) {
 			m_socketHandler->Shutdown();
@@ -312,24 +320,26 @@ void RtmpClient::Shutdown() {
 			m_socketHandler->Shutdown();
 		}
 	}
+	mClientMutex.unlock();
 
 }
 
 void RtmpClient::Close() {
 	FileLog("RtmpClient",
 			"RtmpClient::Close( "
-			"mbRunning : %s, "
 			"port : %u, "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
-			mbRunning?"true":"false",
 			port,
 			mUser.c_str(),
 			mDest.c_str()
 			);
 
+	mClientMutex.lock();
 	if( mbRunning ) {
+		mbRunning = false;
+
 		if( m_socketHandler ) {
 			m_socketHandler->Shutdown();
 			m_socketHandler->Close();
@@ -354,19 +364,18 @@ void RtmpClient::Close() {
 			mReadVideoHelper = NULL;
 		}
 
-		if(mPacketVideoHelper){
+		if( mPacketVideoHelper ){
 			delete mPacketVideoHelper;
 			mPacketVideoHelper = NULL;
 		}
 	}
-
-	mbRunning = false;
+	mClientMutex.unlock();
 }
 
 bool RtmpClient::Login(const string& user, const string& password, const string& site, const string& custom) {
 	FileLog("RtmpClient",
 			"RtmpClient::Login( "
-			"user : '%s, "
+			"user : '%s', "
 			"password : %s, "
 			"site : %s, "
 			"custom : %s "
@@ -413,7 +422,7 @@ bool RtmpClient::Login(const string& user, const string& password, const string&
 bool RtmpClient::MakeCall(const string& dest) {
 	FileLog("RtmpClient",
 			"RtmpClient::MakeCall( "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
 			mUser.c_str(),
@@ -428,7 +437,7 @@ bool RtmpClient::MakeCall(const string& dest) {
 		FileLog("RtmpClient",
 				"RtmpClient::MakeCall( "
 				"[Success], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -442,7 +451,6 @@ bool RtmpClient::MakeCall(const string& dest) {
 		}
 		mReadVideoHelper = new RTMP2RTP_HELPER_T();
 
-
 		// 创建视频打包器
 		if( mPacketVideoHelper ) {
 			delete mPacketVideoHelper;
@@ -454,7 +462,7 @@ bool RtmpClient::MakeCall(const string& dest) {
 		FileLog("RtmpClient",
 				"RtmpClient::MakeCall( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -467,7 +475,7 @@ bool RtmpClient::MakeCall(const string& dest) {
 bool RtmpClient::Hangup() {
 	FileLog("RtmpClient",
 			"RtmpClient::Hangup( "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
 			mUser.c_str(),
@@ -481,7 +489,7 @@ bool RtmpClient::Hangup() {
 		FileLog("RtmpClient",
 				"RtmpClient::Hangup( "
 				"[Success], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -491,7 +499,7 @@ bool RtmpClient::Hangup() {
 		FileLog("RtmpClient",
 				"RtmpClient::Hangup( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -504,7 +512,7 @@ bool RtmpClient::Hangup() {
 bool RtmpClient::CreatePublishStream() {
 	FileLog("RtmpClient",
 			"RtmpClient::CreatePublishStream( "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
 			mUser.c_str(),
@@ -519,7 +527,7 @@ bool RtmpClient::CreatePublishStream() {
 		FileLog("RtmpClient",
 				"RtmpClient::CreatePublishStream( "
 				"[Success], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -529,7 +537,7 @@ bool RtmpClient::CreatePublishStream() {
 		FileLog("RtmpClient",
 				"RtmpClient::CreatePublishStream( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -543,7 +551,7 @@ bool RtmpClient::CreatePublishStream() {
 bool RtmpClient::CreateReceiveStream() {
 	FileLog("RtmpClient",
 			"RtmpClient::CreateReceiveStream( "
-			"user : '%s, "
+			"user : '%s', "
 			"dest : '%s' "
 			")",
 			mUser.c_str(),
@@ -558,7 +566,7 @@ bool RtmpClient::CreateReceiveStream() {
 		FileLog("RtmpClient",
 				"RtmpClient::CreateReceiveStream( "
 				"[Success], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -569,7 +577,7 @@ bool RtmpClient::CreateReceiveStream() {
 		FileLog("RtmpClient",
 				"RtmpClient::CreateReceiveStream( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -667,6 +675,9 @@ void RtmpClient::Init() {
 	mRecv = 0;
 	mRecvAckSent = 0;
 	mRecvAckWindow = RTMP_DEFAULT_ACK_WINDOW;
+
+	mpVideoPacket = NULL;
+	mUnknowBytes = 0;
 
 	mReadVideoHelper = NULL;
 
@@ -780,15 +791,15 @@ bool RtmpClient::HandShake() {
 	}
 
 	if( bFlag ) {
-		bMatch = (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
-		if (!bMatch) {
-			FileLog("RtmpClient",
-					"RtmpClient::HandShake( "
-					"[Handshake check fail] "
-					")"
-					);
-			bFlag = false;
-		}
+//		bMatch = (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
+//		if (!bMatch) {
+//			FileLog("RtmpClient",
+//					"RtmpClient::HandShake( "
+//					"[Handshake check fail] "
+//					")"
+//					);
+//			bFlag = false;
+//		}
 	}
 	mSendMutex.unlock();
 
@@ -889,7 +900,7 @@ bool RtmpClient::SendCreateStream(STAND_INVOKE_TYPE type) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendCreateStream( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -940,7 +951,7 @@ bool RtmpClient::SendPublishPacket(unsigned int streamId) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendPublishPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -982,7 +993,7 @@ bool RtmpClient::SendReceiveVideoPacket(unsigned int streamId) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendReceiveVideoPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -1023,7 +1034,7 @@ bool RtmpClient::SendPlayPacket() {
 		FileLog("RtmpClient",
 				"RtmpClient::SendPlayPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -1075,7 +1086,7 @@ bool RtmpClient::SendLoginPacket(const string& user, const string& auth, const s
 		FileLog("RtmpClient",
 				"RtmpClient::SendLoginPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				")",
 				mUser.c_str()
 				);
@@ -1133,7 +1144,7 @@ bool RtmpClient::SendMakeCallPacket(const string& dest) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendMakeCallPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -1178,7 +1189,7 @@ bool RtmpClient::SendHangupPacket() {
 		FileLog("RtmpClient",
 				"RtmpClient::SendHangupPacket( "
 				"[Fail], "
-				"user : '%s, "
+				"user : '%s', "
 				"dest : '%s' "
 				")",
 				mUser.c_str(),
@@ -1269,7 +1280,7 @@ bool RtmpClient::SendAckPacket() {
 
 bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 	FileLog("RtmpClient",
-			"Jni::RtmpClient::SendRtmpPacket( "
+			"RtmpClient::SendRtmpPacket( "
 			"####################### Send ####################### "
 			")"
 			);
@@ -1278,156 +1289,129 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 
 	bool bFlag = true;
 
-//	if( !mbConnected || mbShutdown ) {
-//		FileLog("RtmpClient",
-//				"RtmpClient::SendRtmpPacket( "
-//				"[Not connected] "
-//				")"
-//				);
-//		return false;
-//	}
-
-	unsigned int timestamp = 0;
-//	// Change to Absolute Timestamp
-//	unsigned int timestamp = packet->messageHeader.GetTimestamp() + (GetTime() - mTimestamp);
-//	packet->messageHeader.SetTimestamp(timestamp);
-
-	unsigned int chunkId = -1;
-	unsigned int streamId = -1;
-	unsigned int lastTimestamp = 0;
-
-	mSendMutex.lock();
-
-	RtmpPacket* pLastSendPacket = mChannelsOut[packet->baseHeader.GetChunkId()];
-	if( pLastSendPacket != NULL ) {
-		chunkId = pLastSendPacket->baseHeader.GetChunkId();
-		streamId = pLastSendPacket->messageHeader.GetStreamId();
-		lastTimestamp = pLastSendPacket->messageHeader.GetTimestamp();
-
-	} else {
-		// New Last Send Packet
-		pLastSendPacket = new RtmpPacket();
-		mChannelsOut[packet->baseHeader.GetChunkId()] = pLastSendPacket;
-	}
-
-
-	// Record Last Send Packet
-	*pLastSendPacket = *packet;
-
-	// Same Chunk && Same Stream
-	if( chunkId == packet->baseHeader.GetChunkId() && streamId == packet->messageHeader.GetStreamId() ) {
-		// Modify ChunkType to Medium
-		packet->baseHeader.SetChunkType(RTMP_HEADER_CHUNK_TYPE_MEDIUM);
-
-		// Calculate Timestamp delta
-		timestamp = packet->messageHeader.GetTimestamp() - lastTimestamp;
-
-			FileLog("RtmpClient",
-					"RtmpClient::SendRtmpPacket( "
-					"timestamp ：%d"
-					")",
-					timestamp
-					);
-		// Modify to delta Timestamp
-		packet->messageHeader.SetTimestamp(timestamp);
-	}
-
-
-//	FileLog("RtmpClient",
-//			"RtmpClient::SendRtmpPacket( "
-//			"[Dump Send Packet] "
-//			")"
-//			);
-	// Dump Send Packet
-	DumpRtmpPacket(packet);
-
-	// Send Header
-	ISocketHandler::HANDLE_RESULT result = ISocketHandler::HANDLE_FAIL;
-	result = m_socketHandler->Send((void *)packet, packet->GetHeaderLength());
-	if (result == ISocketHandler::HANDLE_FAIL) {
+	mClientMutex.lock();
+	if( !mbConnected ) {
 		FileLog("RtmpClient",
-				"Jni::RtmpClient::SendRtmpPacket( "
-				"[Send Header Fail] "
+				"RtmpClient::SendRtmpPacket( "
+				"[Not connected] "
 				")"
 				);
-		Shutdown();
-//		if( mpRtmpClientListener != NULL ) {
-//			mpRtmpClientListener->OnDisconnect(this);
-//		}
 		bFlag = false;
 	}
-
-//	unsigned char *p = (unsigned char *)packet;
-//	if( p != NULL && packet->GetHeaderLength() > 0 ) {
-//		printf("############################## RTMP RAW #############################\n");
-//		for(int i = 0; i < packet->GetHeaderLength(); i++) {
-//			printf("%02x ", p[i]);
-//		}
-//	}
-//
-//	if( packet->body != NULL && packet->messageHeader.GetBodySize() > 0 ) {
-//		for(int i = 0; i < packet->messageHeader.GetBodySize(); i++) {
-//			printf("%02x ", ((unsigned char*)packet->body)[i]);
-//		}
-//		printf("\n############################## RTMP RAW #############################\n");
-//	}
+	mClientMutex.unlock();
 
 	if( bFlag ) {
-		// Send Body
-		unsigned int last = packet->messageHeader.GetBodySize();
-		unsigned int send = (mSendChunkSize < last)?mSendChunkSize:last;
-		unsigned int index = 0;
+		unsigned int timestamp = 0;
+	//	// Change to Absolute Timestamp
+	//	unsigned int timestamp = packet->messageHeader.GetTimestamp() + (GetTime() - mTimestamp);
+	//	packet->messageHeader.SetTimestamp(timestamp);
 
-		while( last > 0 ) {
-			// Send Raw Body
-			if( packet->body != NULL && index < packet->messageHeader.GetBodySize() ) {
-				result = m_socketHandler->Send((void *)(packet->body + index), send);
-				if (result == ISocketHandler::HANDLE_FAIL) {
-	//				printf("# RtmpClient::SendRtmpPacket( Send Body Fail ) \n");
-					FileLog("RtmpClient",
-							"Jni::RtmpClient::SendRtmpPacket( "
-							"[Send Body Fail] "
-							")"
-							);
-					Shutdown();
-//					if( mpRtmpClientListener != NULL ) {
-//						mpRtmpClientListener->OnDisconnect(this);
-//					}
-					bFlag = false;
-					break;
+		unsigned int chunkId = -1;
+		unsigned int streamId = -1;
+		unsigned int lastTimestamp = 0;
+
+		mSendMutex.lock();
+
+		RtmpPacket* pLastSendPacket = mChannelsOut[packet->baseHeader.GetChunkId()];
+		if( pLastSendPacket != NULL ) {
+			chunkId = pLastSendPacket->baseHeader.GetChunkId();
+			streamId = pLastSendPacket->messageHeader.GetStreamId();
+			lastTimestamp = pLastSendPacket->messageHeader.GetTimestamp();
+
+		} else {
+			// New Last Send Packet
+			pLastSendPacket = new RtmpPacket();
+			mChannelsOut[packet->baseHeader.GetChunkId()] = pLastSendPacket;
+		}
+
+
+		// Record Last Send Packet
+		*pLastSendPacket = *packet;
+
+		// Same Chunk && Same Stream
+		if( chunkId == packet->baseHeader.GetChunkId() && streamId == packet->messageHeader.GetStreamId() ) {
+			// Modify ChunkType to Medium
+			packet->baseHeader.SetChunkType(RTMP_HEADER_CHUNK_TYPE_MEDIUM);
+
+			// Calculate Timestamp delta
+			timestamp = packet->messageHeader.GetTimestamp() - lastTimestamp;
+
+				FileLog("RtmpClient",
+						"RtmpClient::SendRtmpPacket( "
+						"timestamp ：%d"
+						")",
+						timestamp
+						);
+			// Modify to delta Timestamp
+			packet->messageHeader.SetTimestamp(timestamp);
+		}
+
+		// Dump Send Packet
+		DumpRtmpPacket(packet);
+
+		// Send Header
+		ISocketHandler::HANDLE_RESULT result = ISocketHandler::HANDLE_FAIL;
+		result = m_socketHandler->Send((void *)packet, packet->GetHeaderLength());
+		if (result == ISocketHandler::HANDLE_FAIL) {
+			FileLog("RtmpClient",
+					"RtmpClient::SendRtmpPacket( "
+					"[Send Header Fail] "
+					")"
+					);
+			Shutdown();
+			bFlag = false;
+		}
+
+		if( bFlag ) {
+			// Send Body
+			unsigned int last = packet->messageHeader.GetBodySize();
+			unsigned int send = (mSendChunkSize < last)?mSendChunkSize:last;
+			unsigned int index = 0;
+
+			while( last > 0 ) {
+				// Send Raw Body
+				if( packet->body != NULL && index < packet->messageHeader.GetBodySize() ) {
+					result = m_socketHandler->Send((void *)(packet->body + index), send);
+					if (result == ISocketHandler::HANDLE_FAIL) {
+						FileLog("RtmpClient",
+								"RtmpClient::SendRtmpPacket( "
+								"[Send Body Fail] "
+								")"
+								);
+						Shutdown();
+						bFlag = false;
+						break;
+					}
 				}
-			}
 
-			index += send;
-			last -= send;
-			send = (mSendChunkSize < last)?mSendChunkSize:last;
+				index += send;
+				last -= send;
+				send = (mSendChunkSize < last)?mSendChunkSize:last;
 
-			// Send Chunk Separate
-			if( last > 0 ) {
-				unsigned char c = (0xc0 | packet->baseHeader.buffer);
-				result = m_socketHandler->Send((void *)&c, 1);
-				if (result == ISocketHandler::HANDLE_FAIL) {
-					FileLog("RtmpClient",
-							"Jni::RtmpClient::SendRtmpPacket( "
-							"[Send Chunk Separate Fail] "
-							")"
-							);
-					Shutdown();
-//					if( mpRtmpClientListener != NULL ) {
-//						mpRtmpClientListener->OnDisconnect(this);
-//					}
-					bFlag = false;
-					break;
+				// Send Chunk Separate
+				if( last > 0 ) {
+					unsigned char c = (0xc0 | packet->baseHeader.buffer);
+					result = m_socketHandler->Send((void *)&c, 1);
+					if (result == ISocketHandler::HANDLE_FAIL) {
+						FileLog("RtmpClient",
+								"RtmpClient::SendRtmpPacket( "
+								"[Send Chunk Separate Fail] "
+								")"
+								);
+						Shutdown();
+						bFlag = false;
+						break;
+					}
+
+
 				}
-
-
 			}
 		}
+
+		mSendMutex.unlock();
 	}
 
-	mSendMutex.unlock();
-
-	return true;
+	return bFlag;
 }
 
 bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
@@ -1439,11 +1423,25 @@ bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 			")"
 			);
 
-	while( (bFlag = RecvRtmpChunkPacket(packet)) ) {
-		if( IsReadyPacket(packet) ) {
-			RtmpPacket* pLastRecvPacket = mChannelsIn[packet->baseHeader.GetChunkId()];
-			pLastRecvPacket->FreeBody();
-			break;
+	bool bErrorPacket = false;
+	bool bFixVideo = false;
+	while( (bFlag = RecvRtmpChunkPacket(packet, bErrorPacket, bFixVideo)) ) {
+		if( bErrorPacket ) {
+			bFixVideo = true;
+		} else {
+			bFixVideo = false;
+			if( IsReadyPacket(packet) ) {
+				RtmpPacket* pLastRecvPacket = mChannelsIn[packet->baseHeader.GetChunkId()];
+				if( pLastRecvPacket ) {
+					pLastRecvPacket->nBytesRead = 0;
+					packet->FreeBody();
+					packet->AllocBody();
+					memcpy(packet->body, pLastRecvPacket->body, pLastRecvPacket->messageHeader.GetBodySize());
+				} else {
+					packet->messageHeader.SetBodySize(0);
+				}
+				break;
+			}
 		}
 		packet->Reset();
 	}
@@ -1451,7 +1449,7 @@ bool RtmpClient::RecvRtmpPacket(RtmpPacket* packet) {
 	return bFlag;
 }
 
-bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet) {
+bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet, bool & errorPacket, bool fixVideoPacket) {
 	FileLog("RtmpClient",
 			"RtmpClient::RecvRtmpChunkPacket( "
 			"####################### Recv Chunk ####################### "
@@ -1459,42 +1457,81 @@ bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet) {
 			);
 
 	bool bFlag = true;
-	mRecvMutex.lock();
+	errorPacket = false;
+
+	RtmpPacket* pLastRecvPacket = NULL;
+	char* buffer = NULL;
+	char temp[RTMP_MAX_CHUNKSIZE];
+	buffer = temp;
 
 	ISocketHandler::HANDLE_RESULT result = ISocketHandler::HANDLE_FAIL;
 	unsigned int len = 0;
+
+	mRecvMutex.lock();
 
 	// Read Base Header
 	result = m_socketHandler->Recv((void *)&(packet->baseHeader.buffer), 1, len);
 	if( ISocketHandler::HANDLE_FAIL == result || (1 != len) ) {
 		FileLog("RtmpClient",
 				"RtmpClient::RecvRtmpChunkPacket( "
-				"[Read Base Header Header fail] "
+				"[Read Base Header Fail] "
 				")"
 				);
-		Shutdown();
-		if( mpRtmpClientListener != NULL ) {
-			mpRtmpClientListener->OnDisconnect(this);
-		}
 		bFlag = false;
 	} else {
 		mRecv += 1;
+
+		if( fixVideoPacket ) {
+			// 增加容错字节
+			mUnknowBytes++;
+
+			if( mpVideoPacket
+				&& packet->baseHeader.GetChunkType() == (RTMP_HEADER_CHUNK_TYPE_LARGE | RTMP_HEADER_CHUNK_TYPE_MEDIUM)
+				&& mpVideoPacket->baseHeader.GetChunkId() == packet->baseHeader.GetChunkId()
+				) {
+//				// 可能收到可以fix的包
+//				FileLog("RtmpClient",
+//						"RtmpClient::RecvRtmpChunkPacket( "
+//						"[Read Base Header Fix] "
+//						")"
+//						);
+			} else {
+//				FileLog("RtmpClient",
+//						"RtmpClient::RecvRtmpChunkPacket( "
+//						"[Read Base Header Not Fix], "
+//						"packet->baseHeader.GetChunkType() : %u, "
+//						"packet->baseHeader.GetChunkId() : %u, "
+//						"mpVideoPacket->baseHeader.GetChunkId() : %u "
+//						")",
+//						packet->baseHeader.GetChunkType(),
+//						packet->baseHeader.GetChunkId(),
+//						mpVideoPacket->baseHeader.GetChunkId()
+//						);
+				errorPacket = true;
+
+				if( mUnknowBytes > RTMP_MAX_CHUNKSIZE ) {
+					FileLog("RtmpClient",
+							"RtmpClient::RecvRtmpChunkPacket( "
+							"[Read Base Header Not Fix, Unknow bytes > %d] "
+							")",
+							RTMP_MAX_CHUNKSIZE
+							);
+					bFlag = false;
+				}
+			}
+		}
 	}
 
-	if( bFlag ) {
+	if( bFlag && !errorPacket ) {
 		// Read Message Header
 		if( packet->GetMessageHeaderLength() > 0 ) {
 			result = m_socketHandler->Recv((void *)&(packet->messageHeader.buffer), packet->GetMessageHeaderLength(), len);
 			if( ISocketHandler::HANDLE_FAIL == result || (packet->GetMessageHeaderLength() != len) ) {
 				FileLog("RtmpClient",
 						"RtmpClient::RecvRtmpChunkPacket( "
-						"[Read Message Header Header fail] "
+						"[Read Message Header Fail] "
 						")"
 						);
-				Shutdown();
-				if( mpRtmpClientListener != NULL ) {
-					mpRtmpClientListener->OnDisconnect(this);
-				}
 				bFlag = false;
 			} else {
 				mRecv += packet->GetMessageHeaderLength();
@@ -1502,117 +1539,184 @@ bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet) {
 		}
 	}
 
-	if( bFlag ) {
+	if( bFlag && !errorPacket ) {
 		DumpRtmpPacket(packet);
 
-		RtmpPacket* pLastRecvPacket = mChannelsIn[packet->baseHeader.GetChunkId()];
-		if( !pLastRecvPacket ) {
-			pLastRecvPacket = new RtmpPacket();
-			mChannelsIn[packet->baseHeader.GetChunkId()] = pLastRecvPacket;
-		} else {
-			packet->messageHeader.SetStreamId(pLastRecvPacket->messageHeader.GetStreamId());
-			packet->messageHeader.SetType(pLastRecvPacket->messageHeader.GetType());
-			packet->nBytesRead = pLastRecvPacket->nBytesRead;
-		}
+		pLastRecvPacket = mChannelsIn[packet->baseHeader.GetChunkId()];
 
 		// Calculate Timestamp
 		switch(packet->baseHeader.GetChunkType()) {
 		case RTMP_HEADER_CHUNK_TYPE_LARGE:{
-			packet->FreeBody();
+			if( !pLastRecvPacket ) {
+				pLastRecvPacket = new RtmpPacket();
+				mChannelsIn[packet->baseHeader.GetChunkId()] = pLastRecvPacket;
+			}
+			// 重新赋值
+			*pLastRecvPacket = *packet;
+
+			// 清空旧数据
+			pLastRecvPacket ->FreeBody();
+			// 申请空间
+			pLastRecvPacket->AllocBody();
+			buffer = pLastRecvPacket->body;
+
 		}break;
 		case RTMP_HEADER_CHUNK_TYPE_MEDIUM:{
-			packet->FreeBody();
+			if( !pLastRecvPacket ) {
+				// 错误包, 设置大小
+				packet->messageHeader.SetBodySize(mRecvChunkSize);
+				packet->nBytesRead = 0;
+				errorPacket = true;
 
-			if( pLastRecvPacket != NULL ) {
+			} else {
+				// 计算timestamp
 				unsigned int delta = packet->messageHeader.GetTimestamp();
 				unsigned int timestamp = delta + pLastRecvPacket->messageHeader.GetTimestamp();
 				packet->messageHeader.SetTimestamp(timestamp);
+
+				// 赋值bodysize
+				pLastRecvPacket->messageHeader.SetBodySize(packet->messageHeader.GetBodySize());
+
+				// 清空旧数据
+				pLastRecvPacket ->FreeBody();
+				// 申请空间
+				pLastRecvPacket->AllocBody();
+				buffer = pLastRecvPacket->body;
 			}
+
 		}break;
 		case RTMP_HEADER_CHUNK_TYPE_SMALL:{
-			if( pLastRecvPacket != NULL ) {
+			if( !pLastRecvPacket ) {
+				// 错误包, 设置大小
+				packet->messageHeader.SetBodySize(mRecvChunkSize);
+				packet->nBytesRead = 0;
+				errorPacket = true;
+
+			} else {
 				unsigned int delta = packet->messageHeader.GetTimestamp();
 				unsigned int timestamp = delta + pLastRecvPacket->messageHeader.GetTimestamp();
 				packet->messageHeader.SetTimestamp(timestamp);
 				packet->messageHeader.SetBodySize(pLastRecvPacket->messageHeader.GetBodySize());
+
+				packet->nBytesRead = pLastRecvPacket->nBytesRead;
+				buffer = pLastRecvPacket->body;
 			}
+
 		}break;
 		case RTMP_HEADER_CHUNK_TYPE_MINIMUM:{
-			if( pLastRecvPacket != NULL ) {
+			if( !pLastRecvPacket ) {
+				// 错误包, 设置大小
+				packet->messageHeader.SetBodySize(mRecvChunkSize);
+				packet->nBytesRead = 0;
+				errorPacket = true;
+
+			} else {
 				packet->messageHeader.SetTimestamp(pLastRecvPacket->messageHeader.GetTimestamp());
 				packet->messageHeader.SetBodySize(pLastRecvPacket->messageHeader.GetBodySize());
+
+				packet->nBytesRead = pLastRecvPacket->nBytesRead;
+				buffer = pLastRecvPacket->body;
 			}
+
 		}break;
 		default:break;
 		}
 
-//		FileLog("RtmpClient",
-//				"RtmpClient::RecvRtmpChunkPacket( "
-//				"####################### Recv Chunk Combine ####################### "
-//				")"
-//				);
-		DumpRtmpPacket(packet);
-
-		// Create buffer if need
-		packet->AllocBody();
-
-		// Read Body
-		if( packet->messageHeader.GetBodySize() > 0 ) {
-			unsigned int nToRead = packet->messageHeader.GetBodySize() - packet->nBytesRead;
-			nToRead = min(nToRead, mRecvChunkSize);
-
-			result = m_socketHandler->Recv((void *)(packet->body + packet->nBytesRead), nToRead, len);
-			if( ISocketHandler::HANDLE_FAIL == result || (nToRead != len) ) {
-				FileLog("RtmpClient",
-						"RtmpClient::RecvRtmpChunkPacket( "
-						"[Read Body fail], "
-						"len : %d, "
-						"nToRead : %d "
-						")",
-						len,
-						nToRead
-						);
-				Shutdown();
-				if( mpRtmpClientListener != NULL ) {
-					mpRtmpClientListener->OnDisconnect(this);
-				}
-				bFlag = false;
-			} else {
-				mRecv += nToRead;
-
-				packet->nBytesRead += nToRead;
-
-				FileLog("RtmpClient",
-						"RtmpClient::RecvRtmpChunkPacket( "
-						"[Read Chunk Body], "
-						"bodySize : %d, "
-						"nBytesRead : %d, "
-						"nToRead : %d "
-						")",
-						packet->messageHeader.GetBodySize(),
-						packet->nBytesRead,
-						nToRead
-						);
-//				Arithmetic am;
-//				string log = am.AsciiToHexWithSep((unsigned char *)packet->body + packet->nBytesRead, nToRead);
-//				FileLog("RtmpClient",
-//						"RtmpClient::RecvRtmpChunkPacket( "
-//						"[Read Chunk Body], "
-//						"%s "
-//						")",
-//						log.c_str()
-//						);
-			}
+		if( pLastRecvPacket ) {
+			packet->messageHeader.SetStreamId(pLastRecvPacket->messageHeader.GetStreamId());
+			packet->messageHeader.SetType(pLastRecvPacket->messageHeader.GetType());
 		}
 
-		// Update packet
-		*pLastRecvPacket = *packet;
+		DumpRtmpPacket(packet);
+
+		if (packet->messageHeader.GetBodySize() > RTMP_MAX_CHUNKSIZE){
+			FileLog("RtmpClient",
+					"RtmpClient::RecvRtmpChunkPacket( "
+					"[Read packet body size > %d] ",
+					RTMP_MAX_CHUNKSIZE
+					);
+			errorPacket = true;
+		}
+
+		if( !errorPacket ) {
+			// 恢复容错字节
+			mUnknowBytes = 0;
+
+			// Read Body
+			if( packet->messageHeader.GetBodySize() > 0 ) {
+				unsigned int nToRead = packet->messageHeader.GetBodySize() - packet->nBytesRead;
+				nToRead = min(nToRead, mRecvChunkSize);
+
+				result = m_socketHandler->Recv((void *)(buffer + packet->nBytesRead), nToRead, len);
+				if( ISocketHandler::HANDLE_FAIL == result || (nToRead != len) ) {
+					FileLog("RtmpClient",
+							"RtmpClient::RecvRtmpChunkPacket( "
+							"[Read Body Fail], "
+							"len : %d, "
+							"nToRead : %d, "
+							"GetBodySize : %d, "
+							"nBytesRead : %d "
+							")",
+							len,
+							nToRead,
+							packet->messageHeader.GetBodySize(),
+							packet->nBytesRead
+							);
+					bFlag = false;
+				} else {
+					mRecv += nToRead;
+					packet->nBytesRead += nToRead;
+				}
+			}
+			else {
+				FileLog("RtmpClient",
+						"RtmpClient::RecvRtmpChunkPacket( "
+						"[Body Size = 0]"
+						")"
+						);
+			}
+		} else {
+			FileLog("RtmpClient",
+					"RtmpClient::RecvRtmpChunkPacket( "
+					"[Read packet error]"
+					")"
+					);
+		}
+	}
+
+	if( bFlag ) {
+		if( !errorPacket ) {
+			if( pLastRecvPacket && packet ) {
+				// Update packet
+				FileLog("RtmpClient",
+						"RtmpClient::RecvRtmpChunkPacket( "
+						"[Update last packet] "
+						")"
+						);
+				*pLastRecvPacket = *packet;
+				DumpRtmpPacket(packet);
+			}
+		}
 	}
 
 	mRecvMutex.unlock();
 
-	/* Send an ACK if we need to */
-	SendAckPacket();
+	if( bFlag ) {
+		/* Send an ACK if we need to */
+		SendAckPacket();
+
+	} else {
+		FileLog("RtmpClient",
+				"RtmpClient::RecvRtmpChunkPacket( "
+				"[Fail] "
+				")"
+				);
+
+		Shutdown();
+		if( mpRtmpClientListener != NULL ) {
+			mpRtmpClientListener->OnDisconnect(this);
+		}
+	}
 
 	return bFlag;
 }
@@ -1817,6 +1921,9 @@ RTMP_PACKET_TYPE RtmpClient::ParseRtmpPacket(RtmpPacket* packet) {
 				"[Video] "
 				")"
 				);
+
+		// 记录最后一次视频包
+		mpVideoPacket = mChannelsIn[packet->baseHeader.GetChunkId()];
 
 		bool bFlag = Rtmp2H264((unsigned char*)packet->body, packet->messageHeader.GetBodySize());
 		while( bFlag ) {
@@ -2670,4 +2777,18 @@ skip:
 			")"
 			);
 }
+
+//void RtmpClient::SetRecordFile(const string& filePath) {
+//	mFilePath = filePath;
+//	FileLog("CamshareClient",
+//			"H264Decoder::SetRecordFile( "
+//			"this : %p, "
+//			"filePath : %s "
+//			")",
+//			this,
+//			filePath.c_str()
+//			);
+//
+//	m_socketHandler->SetRecordFile(filePath);
+//}
 

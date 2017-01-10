@@ -189,6 +189,11 @@ private:
 	unsigned int mFrameHeight;
 
 	string mFilePath;
+
+	/**
+	 * 状态锁
+	 */
+	KMutex mClientMutex;
 };
 
 #endif /* CAMSHARE_CAMSHARECLIENT_H_ */

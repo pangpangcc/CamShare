@@ -87,7 +87,7 @@ public:
 	bool SendHeartBeat();
 
 	bool RecvRtmpPacket(RtmpPacket* packet);
-	bool RecvRtmpChunkPacket(RtmpPacket* packet);
+	bool RecvRtmpChunkPacket(RtmpPacket* packet, bool & errorPacket, bool fixVideoPacket = false);
 	RTMP_PACKET_TYPE ParseRtmpPacket(RtmpPacket* packet);
 
 	bool IsReadyPacket(RtmpPacket* packet);
@@ -167,6 +167,11 @@ private:
 	StandInvokeMap mpStandInvokeMap;
 
 	/**
+	 * 状态锁
+	 */
+	KMutex mClientMutex;
+
+	/**
 	 * 收包锁
 	 */
 	KMutex mRecvMutex;
@@ -212,6 +217,12 @@ private:
 	 */
 	RtmpPacket *mChannelsIn[RTMP_CHANNELS];
 	RtmpPacket *mChannelsOut[RTMP_CHANNELS];
+
+	/**
+	 * 上次收到的视频包
+	 */
+	RtmpPacket *mpVideoPacket;
+	unsigned int mUnknowBytes;
 
 	/**
 	 * RTMP视频包转RTP视频包

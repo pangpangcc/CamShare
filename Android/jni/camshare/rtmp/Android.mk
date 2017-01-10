@@ -5,7 +5,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := rtmp
 
 LOCAL_CPPFLAGS  := -std=c++11
-LOCAL_CPPFLAGS	+= -fpermissive -Wno-write-strings
+LOCAL_CPPFLAGS	+= -fpermissive -Wno-write-strings 
+# For test file
+#LOCAL_CPPFLAGS	+= -DFILE_TEST
 
 LOCAL_C_INCLUDES := $(LIBRARY_PATH)
 

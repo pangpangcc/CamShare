@@ -296,7 +296,7 @@ class CamshareClientListenerImp : public CamshareClientListener {
 	void OnDisconnect(CamshareClient* client) {
 		FileLog("CamshareClient",
 				"Jni::OnDisconnect( "
-				"client : %p, "
+				"client : %p "
 				")",
 				client
 				);

@@ -161,6 +161,158 @@ private:
 	bool	m_block;
 };
 
+#elif FILE_TEST
+class FileSocketHandler : public ISocketHandler
+{
+public:
+	FileSocketHandler() {
+		file = NULL;
+	}
+	virtual ~FileSocketHandler() {
+		Close();
+	}
+
+public:
+	// 创建socket
+	virtual bool Create(bool supportIpv6)
+	{
+		file = fopen("/storage/emulated/0/rtmpt.txt", "r");
+		if( file != NULL ) {
+			FileLog("RtmpClient",
+					"FileSocketHandler::Create( "
+					"[Success] "
+					")"
+					);
+			return true;
+		}
+		FileLog("RtmpClient",
+				"FileSocketHandler::Create( "
+				"[Fail] "
+				")"
+				);
+		return false;
+	}
+
+	// 停止socket
+	virtual void Shutdown()
+	{
+	}
+
+	// 关闭socket
+	virtual void Close()
+	{
+		if( file != NULL ) {
+			fclose(file);
+			file = NULL;
+		}
+	}
+
+	// 绑定ip
+	virtual bool Bind(const string& ip, unsigned int port)
+	{
+		return true;
+	}
+
+	unsigned int GetPort() {
+		return 1935;
+	}
+
+	// 连接（msTimeout：超时时间(毫秒)，不大于0表示使用默认超时）
+	virtual SOCKET_RESULT_CODE Connect(const string& ip, unsigned int port, int msTimeout)
+	{
+		SOCKET_RESULT_CODE result = SOCKET_RESULT_SUCCESS;
+		return result;
+	}
+
+	// 发送
+	virtual HANDLE_RESULT Send(void* data, unsigned int dataLen)
+	{
+		HANDLE_RESULT result = HANDLE_SUCCESS;
+		return result;
+	}
+
+	// 接收
+	virtual HANDLE_RESULT Recv(void* data, unsigned int dataSize, unsigned int& dataLen)
+	{
+		HANDLE_RESULT result = HANDLE_FAIL;
+		if( file != NULL ) {
+			size_t ret = fread(data, 1, dataSize, file);
+			FileLog("RtmpClient",
+					"FileSocketHandler::Recv( "
+					"dataSize : %d, "
+					"ret : %d "
+					")",
+					dataSize,
+					ret
+					);
+			dataLen = ret;
+			if( ret != dataSize ) {
+				if( !feof(file) ) {
+					if( dataLen > 0 ) {
+						string str = Arithmetic::AsciiToHexWithSep(data, dataLen);
+						FileLog("RtmpClient",
+								"FileSocketHandler::Recv( "
+								"str : %s "
+								")",
+								str.c_str()
+								);
+					}
+					FileLog("RtmpClient",
+							"FileSocketHandler::Recv( "
+							"[Success, !feof(file)] "
+							")"
+							);
+					result = HANDLE_SUCCESS;
+
+				} else {
+					FileLog("RtmpClient",
+							"FileSocketHandler::Recv( "
+							"[Fail] "
+							")"
+							);
+				}
+			} else {
+				if( dataLen > 0 ) {
+					string str = Arithmetic::AsciiToHexWithSep(data, dataLen);
+					FileLog("RtmpClient",
+							"FileSocketHandler::Recv( "
+							"str : %s "
+							")",
+							str.c_str()
+							);
+				}
+				FileLog("RtmpClient",
+						"FileSocketHandler::Recv( "
+						"[Success] "
+						")"
+						);
+				result = HANDLE_SUCCESS;
+			}
+		}
+		return result;
+	}
+
+    // 获取当前连接状态
+    virtual CONNNECTION_STATUS GetConnectionStatus() const
+    {
+        return CONNECTION_STATUS_CONNECTED;
+    }
+
+	// blocking设置
+	virtual bool SetBlock(bool block)
+	{
+		return true;
+	}
+
+	// 判断当前是否blocking状态
+	bool IsBlock()
+	{
+		return true;
+	}
+
+private:
+	FILE* file;
+};
 #else
 class LinuxTcpSocketHandler : public ISocketHandler
 {
@@ -539,7 +691,6 @@ private:
 	bool    m_supportIpv6;
     CONNNECTION_STATUS m_connStatus;
 };
-
 #endif
 
 bool ISocketHandler::InitEnvironment()
@@ -547,6 +698,7 @@ bool ISocketHandler::InitEnvironment()
 #ifdef WIN32
 	WSADATA wsaData;
 	return WSAStartup(MAKEWORD(2,2), &wsaData) == NO_ERROR;
+#elif FILE_TEST
 #else
 	return true;
 #endif
@@ -568,6 +720,8 @@ ISocketHandler* ISocketHandler::CreateSocketHandler(SOCKET_TYPE type)
 	if (TCP_SOCKET == type) {
 #ifdef WIN32
 		handler = new WinTcpSocketHandler();
+#elif FILE_TEST
+		handler = new FileSocketHandler();
 #else
 		handler = new LinuxTcpSocketHandler();
 #endif

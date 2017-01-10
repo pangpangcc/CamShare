@@ -46,8 +46,10 @@ protected:
 		if( mContainer->mRtmpClient.Connect(mContainer->hostName) ) {
 			RtmpPacket recvPacket;
 			while( mContainer->mRtmpClient.RecvRtmpPacket(&recvPacket) ) {
+
 				RTMP_PACKET_TYPE type = mContainer->mRtmpClient.ParseRtmpPacket(&recvPacket);
 				recvPacket.FreeBody();
+				recvPacket.Reset();
 			}
 
 			FileLog("CamshareClient",
@@ -62,9 +64,6 @@ protected:
 				mContainer->mpCamshareClientListener->OnDisconnect(mContainer);
 			}
 		}
-
-		// 断开连接
-		mContainer->Stop();
 	}
 
 private:
@@ -97,7 +96,7 @@ CamshareClient::CamshareClient() {
 	mVideoDataThread = NULL;
 	mVideoDataThreadStart = false;
 	mCaptureVideoStart    = false;
-	mEncodeTimeInterval   = 1000/8;
+	mEncodeTimeInterval   = 1000/6;
 }
 
 CamshareClient::~CamshareClient() {
@@ -141,8 +140,11 @@ bool CamshareClient::Start(
 			userType
 			);
 
-	if( IsRunning() ) {
+	mClientMutex.lock();
+	if( mbRunning ) {
+		mClientMutex.unlock();
 		Stop(true);
+		mClientMutex.lock();
 	}
 
 	mbRunning = true;
@@ -153,9 +155,7 @@ bool CamshareClient::Start(
 	// Create encoder
 	bFlag = mH264Encoder.Create();
 
-
 	bFlag = StartVideoDataThread();
-
 
 	this->hostName = hostName;
 	this->user = user;
@@ -166,6 +166,8 @@ bool CamshareClient::Start(
 
 	// Create rtmp client thread
 	mClientThread.start(mpRunnable);
+
+	mClientMutex.unlock();
 
 	FileLog("CamshareClient",
 			"CamshareClient::Start( "
@@ -188,7 +190,6 @@ void CamshareClient::Stop(bool bWait) {
 			"CamshareClient::Stop( "
 			"this : %p, "
 			"bWait : %s, "
-			"mbRunning : %s, "
 			"hostName : %s, "
 			"user : %s, "
 			"site : %s, "
@@ -197,7 +198,6 @@ void CamshareClient::Stop(bool bWait) {
 			")",
 			this,
 			bWait?"true":"false",
-			mbRunning?"true":"false",
 			hostName.c_str(),
 			user.c_str(),
 			site.c_str(),
@@ -205,51 +205,47 @@ void CamshareClient::Stop(bool bWait) {
 			userType
 			);
 
-	if( !IsRunning() ) {
-		return;
+	mClientMutex.lock();
+	if( mbRunning ) {
+		mbRunning = false;
+
+		mRtmpClient.Shutdown();
+
+		if( bWait ) {
+			mClientThread.stop();
+		}
+
+		mH264Decoder.Destroy();
+
+		StopCapture();
+		StopVideoDataThread();
+		mH264Encoder.Destroy();
+
+		// 关闭socket
+		mRtmpClient.Close();
+
+		FileLog("CamshareClient",
+				"CamshareClient::Stop( "
+				"[Finish], "
+				"this : %p, "
+				"bWait : %s, "
+				"hostName : %s, "
+				"user : %s, "
+				"site : %s, "
+				"sid : %s, "
+				"userType : %d "
+				")",
+				this,
+				bWait?"true":"false",
+				hostName.c_str(),
+				user.c_str(),
+				site.c_str(),
+				sid.c_str(),
+				userType
+				);
 	}
 
-	mRtmpClient.Shutdown();
-
-
-
-	if( bWait ) {
-		mClientThread.stop();
-	}
-
-	FileLog("CamshareClient",
-			"CamshareClient::Stop( "
-			"finish, "
-			"this : %p, "
-			"bWait : %s, "
-			"mbRunning : %s, "
-			"hostName : %s, "
-			"user : %s, "
-			"site : %s, "
-			"sid : %s, "
-			"userType : %d "
-			")",
-			this,
-			bWait?"true":"false",
-			mbRunning?"true":"false",
-			hostName.c_str(),
-			user.c_str(),
-			site.c_str(),
-			sid.c_str(),
-			userType
-			);
-
-	mH264Decoder.Destroy();
-
-	StopCapture();
-	StopVideoDataThread();
-	mH264Encoder.Destroy();
-
-
-	mRtmpClient.Close();
-
-
-	mbRunning = false;
+	mClientMutex.unlock();
 }
 
 bool CamshareClient::MakeCall(const string& dest, const string serverId) {
@@ -307,6 +303,11 @@ void CamshareClient::SetCamshareClientListener(CamshareClientListener *listener)
 void CamshareClient::SetRecordFilePath(const string& filePath) {
 	mFilePath = filePath;
 	MakeDir(mFilePath);
+
+//	// 设置录制文件
+//	char Path[1024] = {'\0'};
+//	snprintf(Path, sizeof(Path), "%s/rtmpt.txt", mFilePath.c_str());
+//	mRtmpClient.SetRecordFile(Path);
 }
 
 
@@ -571,8 +572,12 @@ void CamshareClient::OnMakeCall(RtmpClient* client, bool success, const string& 
 			snprintf(pTimeBuffer, 64, "%d%02d%02d_%02d%02d%02d",
 					tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
-			snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264", mFilePath.c_str(), this->user.c_str(), this->dest.c_str(), pTimeBuffer);
-			mH264Decoder.SetRecordFile(filePath);
+			//snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264", mFilePath.c_str(), this->user.c_str(), this->dest.c_str(), pTimeBuffer);
+			//mH264Decoder.SetRecordFile(filePath);
+
+			//snprintf(filePath, sizeof(filePath), "%s/rtmpt.txt", mFilePath.c_str());
+			//mRtmpClient.SetRecordFile(filePath);
+
 			StopCapture();
 		}
 
@@ -610,7 +615,7 @@ void CamshareClient::OnRecvAudio(RtmpClient* client, const char* data, unsigned 
 
 void CamshareClient::OnRecvVideo(RtmpClient* client, const char* data, unsigned int size, unsigned int timestamp) {
 	FileLog("CamshareClient",
-			"CamshareClient::OnRecvVideo( "
+			"CamshareClient::OnRecvVideo( start"
 			"this : %p, "
 			"size : %u "
 			")",
@@ -632,7 +637,7 @@ void CamshareClient::OnRecvVideo(RtmpClient* client, const char* data, unsigned 
 		}
 
 			FileLog("CamshareClient",
-					"CamshareClient::OnRecvVideo( "
+					"CamshareClient::OnRecvVideo( end"
 					"this : %p, "
 					"frameLen : %d "
 					"timestamp : %d "
@@ -643,6 +648,8 @@ void CamshareClient::OnRecvVideo(RtmpClient* client, const char* data, unsigned 
 					);
 		mpCamshareClientListener->OnRecvVideo(this, frame, frameLen, timestamp);
 	}
+
+
 	delete[] frame;
 
 }
