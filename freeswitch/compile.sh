@@ -2,7 +2,7 @@
 
 echo "# install dependent tools ..."
 #sudo yum install -y http://files.freeswitch.org/freeswitch-release-1-6.noarch.rpm epel-release
-#sudo yum install -y gcc-c++ gdb autoconf automake libtool wget python ncurses-devel zlib-devel libjpeg-devel openssl-devel e2fsprogs-devel sqlite-devel libcurl-devel pcre-devel speex-devel ldns-devel libedit-devel libxml2-devel libyuv-devel opus-devel libvpx-devel libvpx2* libdb4* libidn-devel unbound-devel libuuid-devel lua-devel libsndfile-devel yasm-devel
+#sudo yum install -y gcc-c++ gdb autoconf automake libtool wget python ncurses-devel zlib-devel libjpeg-devel openssl-devel e2fsprogs-devel sqlite-devel libcurl-devel pcre-devel speex-devel ldns-devel libedit-devel libxml2-devel libyuv-devel opus-devel libvpx-devel libvpx2* libdb4* libidn-devel unbound-devel libuuid-devel lua-devel libsndfile-devel yasm-devel libpng-devel
 REBUILDALL=0
 if [ -d "freeswitch" ]; then
   echo "# dont decompression freeswitch source ..."

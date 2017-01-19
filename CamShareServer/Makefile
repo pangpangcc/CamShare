@@ -1,4 +1,4 @@
-# Copyright (C) 2015 The CamShareMiddleware
+# Copyright (C) 2015 The CamShareServer
 # CamShareMiddleware Makefile
 #
 # Created on: 2015/10/10
@@ -26,7 +26,7 @@ LIBS =		-L. \
 			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 
 COMMON  	=	common/LogFile.o common/md5.o common/KThread.o common/ConfFile.o common/Arithmetic.o common/aes.o\
-				common/IAutoLock.o common/CommonFunc.o
+				common/IAutoLock.o common/CommonFunc.o common/LogManager.o
 				
 JSON    	=	json/json_reader.o json/json_value.o json/json_writer.o
 
@@ -37,6 +37,10 @@ XML			=   xml/tinystr.o xml/tinyxml.o xml/tinyxmlerror.o xml/tinyxmlparser.o
 CHECKER		=	simulatorchecker/SimulatorProtocolTool.o
 
 HTTPCLIENT	=	httpclient/HttpClient.o httpclient/HttpEntiy.o
+
+SERVER		= 	server/TcpServer.o server/AsyncIOServer.o
+
+PARSER		= 	parser/DataParser.o parser/HttpParser.o 
 
 REQUEST 	=	request/BaseRequest.o request/EnterConferenceRequest.o request/SendMsgExitConferenceRequest.o \
 				request/SendMsgEnterConferenceRequest.o
@@ -53,8 +57,8 @@ LIVECHAT	=	livechat/Counter.o livechat/ILiveChatClient.o livechat/ISocketHandler
 				livechat/task/SendEnterConferenceTask.o livechat/task/SendMsgTask.o \
 				livechat/task/HearbeatTask.o
 				
-OBJS 		=	server.o CamShareMiddleware.o TcpServer.o MessageList.o LogManager.o Client.o\
-				DataHttpParser.o DataParser.o Session.o FreeswitchClient.o SessionManager.o \
+OBJS 		=	main.o CamShareMiddleware.o  \
+				Session.o FreeswitchClient.o SessionManager.o \
 				SqliteManager.o DBHandler.o
 		
 OBJS +=		$(COMMON)
@@ -63,6 +67,8 @@ OBJS +=		$(AMF)
 OBJS +=		$(XML)
 OBJS +=		$(CHECKER)
 OBJS +=		$(HTTPCLIENT)
+OBJS +=		$(SERVER)
+OBJS +=		$(PARSER)
 OBJS +=		$(REQUEST)
 OBJS +=     $(RESPOND)
 OBJS +=		$(LIVECHAT)

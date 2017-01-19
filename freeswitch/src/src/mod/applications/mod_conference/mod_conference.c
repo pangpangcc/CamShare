@@ -768,10 +768,11 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 
 	/* Wait till everybody is out */
 	conference_utils_clear_flag_locked(conference, CFLAG_RUNNING);
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock ON\n");
-	switch_thread_rwlock_wrlock(conference->rwlock);
-	switch_thread_rwlock_unlock(conference->rwlock);
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock OFF\n");
+	// Modify by Max 2017/01/19
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock ON\n");
+//	switch_thread_rwlock_wrlock(conference->rwlock);
+//	switch_thread_rwlock_unlock(conference->rwlock);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock OFF\n");
 
 	if (conference->la) {
 		switch_live_array_destroy(&conference->la);

@@ -8,6 +8,11 @@
 
 #include "HttpClient.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
 #include <common/KLog.h>
 
 #define USER_AGENT	"Mozil1a/4.0 (compatible; MS1E 7.0; Windows NT 6.1; WOW64; )"
@@ -404,6 +409,9 @@ void HttpClient::DestroyBuffer() {
 }
 
 void HttpClient::ResetBuffer() {
+	if( mpRespondBuffer ) {
+		mpRespondBuffer[0] = '\0';
+	}
 	miCurrentSize = 0;
 }
 

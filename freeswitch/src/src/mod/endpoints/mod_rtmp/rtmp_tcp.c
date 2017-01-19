@@ -31,25 +31,8 @@
  */
 
 #include "mod_rtmp.h"
-
-// add by Samson 2016-05-30
-#include <sys/time.h>
-#include <unistd.h>
-
-long long GetTickCount()
-{
-	long long result = 0;
-	struct timeval tv;
-	gettimeofday(&tv,NULL);
-	result =  (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-	return result;
-}
-
-long long DiffTime(long long start, long long end)
-{
-    return end - start;
-//	return (end > start ? end - start : (unsigned long)-1 - end + start);
-}
+// Add by Max 2017-01-12
+#include "rtmp_common.h"
 
 #define RETRY_READ_MAXTIMES		2
 // ------------------------
@@ -211,10 +194,7 @@ static switch_status_t rtmp_tcp_close(rtmp_session_t *rsession)
 static void add_to_timeout_list(rtmp_io_tcp_t* io, rtmp_session_t* rsession)
 {
 	switch_list_lock(io->timeout_list);
-	if (!rsession->check_timeout) {
-		rsession->check_timeout = 1;
-		switch_list_pushback(io->timeout_list, NULL, rsession);
-	}
+	switch_list_pushback(io->timeout_list, NULL, rsession);
 	switch_list_unlock(io->timeout_list);
 
 //	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
@@ -230,29 +210,24 @@ static void remove_from_timeout_list(rtmp_io_tcp_t* io, rtmp_session_t* rsession
 //	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //			, "list:%p, rsession:%p, check_timeout:%d\n"
 //			, (void*)io->timeout_list, (void*)rsession, rsession->check_timeout);
-
-	if (rsession->check_timeout) {
-		switch_list_lock(io->timeout_list);
-		while (1) {
-			switch_list_get_next(io->timeout_list, node, &node);
-			if (NULL != node) {
-				switch_list_get_node_data(io->timeout_list, node, (void**)&node_rsession);
-				if (node_rsession == rsession) {
-					switch_list_remove(io->timeout_list, node, NULL);
-					rsession->check_timeout = 0;
-
+	switch_list_lock(io->timeout_list);
+	while (1) {
+		switch_list_get_next(io->timeout_list, node, &node);
+		if (NULL != node) {
+			switch_list_get_node_data(io->timeout_list, node, (void**)&node_rsession);
+			if (node_rsession == rsession) {
+				switch_list_remove(io->timeout_list, node, NULL);
 //					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //							, "list:%p, rsession:%p, check_timeout:%d, node:%p\n"
 //							, (void*)io->timeout_list, (void*)rsession, rsession->check_timeout, (void*)node);
-					break;
-				}
-			}
-			else {
 				break;
 			}
 		}
-		switch_list_unlock(io->timeout_list);
+		else {
+			break;
+		}
 	}
+	switch_list_unlock(io->timeout_list);
 }
 
 void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj)
@@ -261,6 +236,7 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 	switch_list_node_t* node = NULL;
 	rtmp_session_t *rsession = NULL;
 	long long nowTime = 0;
+	const char* user = NULL;
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s: Check Connection Timeout Thread starting\n", io->base.profile->name);
 
@@ -269,18 +245,53 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 
 		switch_list_lock(io->timeout_list);
 		nowTime = GetTickCount();
+
 		while (1) {
 			switch_list_get_next(io->timeout_list, node, &node);
 			if (NULL != node) {
 				switch_list_get_node_data(io->timeout_list, node, (void**)&rsession);
-				if (nowTime >= (rsession->connect_time + io->base.profile->connection_timeout)) {
-					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "check_timeout_thread() shutdown, node:%p\n"
-							, (void*)node);
+				/*
+				 * Add by Max 2017-01-12
+				 * 1.配置心跳检测时间大于0
+				 * 2.RTMP连接心跳时间大于配置时间
+				 */
+				if( rsession ) {
+					user = NULL;
+					if( rsession->account ) {
+						user = rsession->account->user;
+					}
 
-					rtmp_session_shutdown(&rsession);
-				}
-				else {
-					break;
+//					switch_log_printf(
+//							SWITCH_CHANNEL_UUID_LOG(rsession->uuid),
+//							SWITCH_LOG_INFO,
+//							"check_timeout_thread() check time, "
+//							"user : '%s', "
+//							"check_timeout : %d, "
+//							"active_time : %lld, "
+//							"nowTime : %lld \n",
+//							user,
+//							rsession->check_timeout,
+//							rsession->active_time,
+//							nowTime
+//							);
+
+					if( io->base.profile->active_timeout > 0 && rsession->check_timeout ) {
+						if (nowTime >= (rsession->active_time + io->base.profile->active_timeout)) {
+							switch_log_printf(
+									SWITCH_CHANNEL_UUID_LOG(rsession->uuid),
+									SWITCH_LOG_WARNING,
+									"check_timeout_thread() shutdown, "
+									"user : '%s' ",
+									user
+									);
+							// 断开连接
+							rsession->check_timeout = 0;
+							rtmp_session_shutdown(&rsession);
+						}
+	//					else {
+	//						break;
+	//					}
+					}
 				}
 			}
 			else {
@@ -386,8 +397,9 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 							switch_sockaddr_t *addr = NULL;
 							char ipbuf[200];
 
-							// add to timeout list
-							rsession->connect_time = GetTickCount();
+							// Add by Max 4 update timeout
+							rsession->active_time = GetTickCount();
+							rsession->check_timeout = 1;
 							add_to_timeout_list(io, rsession);
 
 							/* Create out private data and attach it to the rtmp session structure */
@@ -482,7 +494,7 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 					}
 				}
 				else if (fds[i].rtnevents & SWITCH_POLLIN) {
-					remove_from_timeout_list(io, rsession);
+//					remove_from_timeout_list(io, rsession);
 
 					switch_mutex_lock(rsession->handle_count_mutex);
 					if (rsession->handle_count == 0) {
@@ -763,6 +775,7 @@ fail:
 switch_status_t rtmp_tcp_release(rtmp_profile_t *profile)
 {
 	rtmp_io_tcp_t *io_tcp = (rtmp_io_tcp_t*)profile->io;
+	switch_list_node_t* node = NULL;
 
 	if (NULL != io_tcp) {
 		// wait timeout thread exit
@@ -770,6 +783,20 @@ switch_status_t rtmp_tcp_release(rtmp_profile_t *profile)
 			switch_status_t st;
 			switch_thread_join(&st, io_tcp->timeout_thread);
 		}
+
+		// clear timeout list
+		switch_list_lock(io_tcp->timeout_list);
+		while (1) {
+			switch_list_get_next(io_tcp->timeout_list, node, &node);
+			if (NULL != node) {
+				switch_list_remove(io_tcp->timeout_list, node, NULL);
+				node = NULL;
+			}
+			else {
+				break;
+			}
+		}
+		switch_list_unlock(io_tcp->timeout_list);
 
 		// wait handle thread exit
 		if (NULL != io_tcp->handle_thread) {

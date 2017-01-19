@@ -36,6 +36,9 @@
 #include "io.h"
 #include "types.h"
 
+// Add by Max 2017-01-12
+#include "rtmp_common.h"
+
 /* RTMP_INVOKE_FUNCTION is a macro that expands to:
 switch_status_t function(rtmp_session_t *rsession, rtmp_state_t *state, int amfnumber, int transaction_id, int argc, amf0_data *argv[])
 */
@@ -883,6 +886,9 @@ RTMP_INVOKE_FUNCTION(rtmp_i_setActive)
 		amf0_number_new(0),
 		amf0_null_new(),
 		NULL);
+
+	// Add by Max 4 update timeout
+	rsession->active_time = GetTickCount();
 
 	return SWITCH_STATUS_SUCCESS;
 }

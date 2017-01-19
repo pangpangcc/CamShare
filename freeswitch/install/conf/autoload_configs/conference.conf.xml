@@ -104,7 +104,9 @@
       <!-- Default Caller ID Number for outbound calls -->
       <param name="caller-id-number" value="$${outbound_caller_id}"/>
       <!-- Suppress start and stop talking events -->
+      <!-- Modify by Max for fix dead lock 2017/01/19 -->
       <!-- <param name="suppress-events" value="start-talking,stop-talking"/> -->
+      <param name="suppress-events" value="start-talking,stop-talking,mute-detect,mute-member,unmute-member,floor-change"/>
       <!-- enable comfort noise generation -->
       <param name="comfort-noise" value="true"/>
       <!-- Uncomment auto-record to toggle recording every conference call. -->

@@ -343,7 +343,6 @@ protected:
 				")",
 				mContainer->GetIndex()
 				);
-		mContainer->Shutdown();
 	}
 private:
 	RtmpClient *mContainer;
@@ -453,9 +452,12 @@ protected:
 					);
 
 			if( mContainer->Connect(ip) ) {
-//				// 开始心跳线程
-//				SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(client);
-//				heartBeatThread[client->GetIndex()].start(pHeartBeatRunable);
+//				bool bHeartBeat = (mContainer->GetIndex() % 2 == 0);
+//				if( bHeartBeat ) {
+//					// 开始心跳线程
+//					SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(mContainer);
+//					heartBeatThread[mContainer->GetIndex()].start(pHeartBeatRunable);
+//				}
 
 				RtmpPacket recvPacket;
 				while( mContainer->RecvRtmpPacket(&recvPacket) ) {
@@ -463,10 +465,13 @@ protected:
 					recvPacket.FreeBody();
 				}
 
-//				// 停止心跳线程
-//				pRunable = heartBeatThread[mContainer->GetIndex()].stop();
-//				if( pRunable ) {
-//					delete pRunable;
+//				if( bHeartBeat ) {
+//					// 停止心跳线程
+//					KRunnable* pRunable = heartBeatThread[mContainer->GetIndex()].stop();
+//					if( pRunable ) {
+//						delete pRunable;
+//						pRunable = NULL;
+//					}
 //				}
 
 				LogManager::GetLogManager()->Log(

@@ -9,24 +9,18 @@
 #define SESSIONMANAGER_H_
 
 #include "Session.h"
-#include "Client.h"
 
 #include <request/IRequest.h>
 #include <respond/IRespond.h>
 
 #include <livechat/ILiveChatClient.h>
 
-// client -> session
-typedef KSafeMap<Client*, Session*> Client2SessionMap;
-
 // livechat client -> session
 typedef KSafeMap<ILiveChatClient*, Session*> LiveChat2SessionMap;
 
 class SessionManagerListener {
 public:
-	SessionManagerListener() {};
 	virtual ~SessionManagerListener() {};
-	virtual void OnSessionManagerClientShouldClose(Client* client) = 0;
 };
 
 class SessionManager {
@@ -92,13 +86,6 @@ public:
 			ILiveChatClient* livechat,
 			const string& customIdentify
 			);
-
-//	/**
-//	 * 内部服务(HTTP), 关闭会话
-//	 * @param client	客户端
-//	 * @return true:发送成功/false:发送失败
-//	 */
-//	bool CloseSessionByClient(Client* client);
 
 	/**
 	 * 外部服务(LiveChat), 关闭会话

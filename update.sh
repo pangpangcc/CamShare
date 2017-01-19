@@ -37,14 +37,15 @@ chmod +x $updatedir/update.sh
 
 # ---- copy freeswitch files
 # copy all ./lib & ./mod files
+mkdir -p $updatefiledir/lib
+cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
 #mkdir -p $updatefiledir/mod
 #cp -f /usr/local/freeswitch/mod/* $updatefiledir/mod/
-#mkdir -p $updatefiledir/lib
-#cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
 
 # copy common configs
 #cp -f /usr/local/freeswitch/conf/autoload_configs/modules.conf.xml $updatefiledir/
-cp -f /usr/local/freeswitch/conf/vars.xml $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/switch.conf.xml $updatefiledir/
+#cp -f /usr/local/freeswitch/conf/vars.xml $updatefiledir/
 
 # copy lua configs
 cp -f /usr/local/freeswitch/conf/autoload_configs/lua.conf.xml $updatefiledir/
@@ -61,15 +62,16 @@ cp -f /usr/local/freeswitch/conf/autoload_configs/lua.conf.xml $updatefiledir/
 # copy mod_conference files
 cp -f /usr/local/freeswitch/mod/mod_conference.so $updatefiledir/
 cp -f /usr/local/freeswitch/mod/mod_conference.la $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/conference.conf.xml $updatefiledir/
 
 # copy mod_file_recorder files
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
-#cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $updatefiledir/
 
 # copy mod_rtmp files
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/rtmp.conf.xml $updatefiledir/
 
 # copy mod_ws files
@@ -82,9 +84,11 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 
 # copy freeswitch scripts
 #cp -f ./freeswitch/install/scripts/common.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
 #cp -f ./freeswitch/install/scripts/event_file_recorder.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/event_file_recorder_luarun.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/event_conference.lua $updatefiledir/
 
 # remove freeswitch scripts config
 #rm -f $updatefiledir/site_config*.lua
@@ -101,18 +105,22 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 cp -f ./CamShareServer/camshare-middleware $updatefiledir/
 
 # copy configure file
-#if [ "$env" == "develop" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.develop $updatefiledir/camshare-middleware.config
-#elif [ "$env" == "demo" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.demo $updatefiledir/camshare-middleware.config
-#elif [ "$env" == "operating" ]; then
-#  cp -f ./CamShareServer/camshare-middleware.config.operating $updatefiledir/camshare-middleware.config
-#fi
+if [ "$env" == "develop" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.develop $updatefiledir/camshare-middleware.config
+elif [ "$env" == "demo" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.demo $updatefiledir/camshare-middleware.config
+elif [ "$env" == "operating" ]; then
+  cp -f ./CamShareServer/camshare-middleware.config.operating $updatefiledir/camshare-middleware.config
+fi
+
+# ---- copy camshare executor files
+cp -f ./CamShareServer/executor/camshare-executor $updatefiledir/
+cp -f ./CamShareServer/executor/camshare-executor.config $updatefiledir/
 
 # copy camshare shell
-#cp -f ./CamShareServer/bin/run.sh $updatefiledir/
-#cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
-#cp -f ./CamShareServer/bin/check_run.sh $updatefiledir/
+cp -f ./CamShareServer/bin/run.sh $updatefiledir/
+cp -f ./CamShareServer/bin/stop.sh $updatefiledir/
+cp -f ./CamShareServer/bin/check_run.sh $updatefiledir/
 #cp -f ./CamShareServer/bin/dump_crash_log.sh $updatefiledir/
 
 # copy camshare clean shell

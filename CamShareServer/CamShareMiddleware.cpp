@@ -120,6 +120,8 @@ private:
 
 CamShareMiddleware::CamShareMiddleware() {
 	// TODO Auto-generated constructor stub
+	mAsyncIOServer.SetAsyncIOServerCallback(this);
+
 	// 处理线程
 	mpStateRunnable = new StateRunnable(this);
 	mpConnectLiveChatRunnable = new ConnectLiveChatRunnable(this);
@@ -166,7 +168,7 @@ CamShareMiddleware::CamShareMiddleware() {
 	mMakeCallTotal = 0;
 
 	// 其他
-	mIsRunning = false;
+	mRunning = false;
 
 	mFreeswitch.SetFreeswitchClientListener(this);
 }
@@ -201,13 +203,13 @@ CamShareMiddleware::~CamShareMiddleware() {
 	}
 }
 
-bool CamShareMiddleware::Run(const string& config) {
+bool CamShareMiddleware::Start(const string& config) {
 	if( config.length() > 0 ) {
 		mConfigFile = config;
 
 		// LoadConfig config
 		if( LoadConfig() ) {
-			return Run();
+			return Start();
 
 		} else {
 			printf("# CamShareMiddleware can not load config file exit. \n");
@@ -220,32 +222,27 @@ bool CamShareMiddleware::Run(const string& config) {
 	return false;
 }
 
-bool CamShareMiddleware::Run() {
-	/* log system */
+bool CamShareMiddleware::Start() {
+	bool bFlag = false;
+
 	LogManager::GetLogManager()->Start(miLogLevel, mLogDir);
 	LogManager::GetLogManager()->SetDebugMode(miDebugMode);
 	LogManager::GetLogManager()->LogSetFlushBuffer(1 * BUFFER_SIZE_1K * BUFFER_SIZE_1K);
 
 	LogManager::GetLogManager()->Log(
 			LOG_ERR_SYS,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
 			"############## CamShare Middleware ############## "
 			")"
 			);
 
 	LogManager::GetLogManager()->Log(
 			LOG_ERR_SYS,
-			"CamShareMiddleware::Run( "
-			"Version : %s "
-			")",
-			VERSION_STRING
-			);
-
-	LogManager::GetLogManager()->Log(
-			LOG_ERR_SYS,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
+			"Version : %s, "
 			"Build date : %s %s "
 			")",
+			VERSION_STRING,
 			__DATE__,
 			__TIME__
 			);
@@ -253,7 +250,7 @@ bool CamShareMiddleware::Run() {
 	// 基本参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
 			"miPort : %d, "
 			"miMaxClient : %d, "
 			"miMaxHandleThread : %d, "
@@ -274,7 +271,7 @@ bool CamShareMiddleware::Run() {
 	// 日志参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
 			"miDebugMode : %d, "
 			"miLogLevel : %d, "
 			"mlogDir : %s "
@@ -287,7 +284,7 @@ bool CamShareMiddleware::Run() {
 	// Livechat参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
 			"miLivechatPort : %d, "
 			"mLivechatIp : %s, "
 			"mLivechatName : %s "
@@ -300,7 +297,7 @@ bool CamShareMiddleware::Run() {
 	// Freeswitch参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::Run( "
+			"CamShareMiddleware::Start( "
 			"miFreeswitchPort : %d, "
 			"mFreeswitchIp : %s, "
 			"mFreeswitchUser : %s, "
@@ -321,7 +318,7 @@ bool CamShareMiddleware::Run() {
 	// 站点参数
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::LoadConfig( "
+			"CamShareMiddleware::Start( "
 			"miSiteCount : %d, "
 			"miUploadTime : %d "
 			")",
@@ -329,121 +326,163 @@ bool CamShareMiddleware::Run() {
 			miUploadTime
 			);
 
+	mServerMutex.lock();
+	if( mRunning ) {
+		Stop();
+	}
+	mRunning = true;
+
 	// 创建HTTP client
 	HttpClient::Init();
 
 	// 创建请求缓存数据持久化实例
-	if( !mDBHandler.Init() ) {
-		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Run( [创建sqlite数据库, 失败] )");
-		return false;
-	}
-	LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [创建sqlite数据库, 成功] )");
-
-	/**
-	 * 创建客户端解析包缓存buffer
-	 */
-	for(int i = 0; i < miMaxClient; i++) {
-		/* create idle buffers */
-		Message *m = new Message();
-		mIdleMessageList.PushBack(m);
+	bFlag = mDBHandler.Init();
+	if( bFlag ) {
+		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [创建sqlite数据库, 成功] )");
+	} else {
+		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [创建sqlite数据库, 失败] )");
 	}
 
-	/**
-	 * 创建会话管理器
-	 * 设置超时
-	 */
-	mSessionManager.SetRequestTimeout(miFlashTimeout);
+	if( bFlag ) {
+		/**
+		 * 创建会话管理器
+		 * 设置超时
+		 */
+		mSessionManager.SetRequestTimeout(miFlashTimeout);
+	}
 
 	// 创建HTTP server
-	/**
-	 * 预估相应时间, 内存数目*超时间隔*每秒处理的任务
-	 */
-	mClientTcpServer.SetTcpServerObserver(this);
-	mClientTcpServer.SetHandleSize(miTimeout * miMaxQueryPerThread);
-	if( !mClientTcpServer.Start(miMaxClient, miPort, miMaxHandleThread) ) {
-		LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Run( [创建内部服务(HTTP), 失败] )");
-		return false;
+	if( bFlag ) {
+		bFlag = mAsyncIOServer.Start(miPort, miMaxClient, miMaxHandleThread);
+		if( bFlag ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [创建内部服务(HTTP), 成功] )");
+
+		} else {
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [创建内部服务(HTTP), 失败] )");
+		}
 	}
-	LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [创建内部服务(HTTP), 成功] )");
 
 	// 初始化LiveChat server
-	for(int i = 0; i < miSiteCount; i++) {
-		SiteConfig* pConfig = &(mpSiteConfig[i]);
+	if( bFlag ) {
+		for(int i = 0; i < miSiteCount; i++) {
+			SiteConfig* pConfig = &(mpSiteConfig[i]);
 
-		// 插入LiveChat Client
-		mLiveChatClientMap.Lock();
-		list<string> ips;
-		ips.push_back(mLivechatIp);
-		ILiveChatClient* livechat = ILiveChatClient::CreateClient();
-		livechat->Init(ips, miLivechatPort, this);
-		mLiveChatClientMap.Insert(pConfig->siteId, livechat);
-		mLiveChatClientMap.Unlock();
+			// 插入LiveChat Client
+			mLiveChatClientMap.Lock();
+			list<string> ips;
+			ips.push_back(mLivechatIp);
+			ILiveChatClient* livechat = ILiveChatClient::CreateClient();
+			livechat->Init(ips, miLivechatPort, this);
+			mLiveChatClientMap.Insert(pConfig->siteId, livechat);
+			mLiveChatClientMap.Unlock();
 
-		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
-				"CamShareMiddleware::Run( "
-				"[插入外部服务(LiveChat)], "
-				"livechat : %p, "
-				"siteId : '%s' "
-				")",
-				livechat,
-				pConfig->siteId.c_str()
-				);
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"CamShareMiddleware::Start( "
+					"[插入外部服务(LiveChat)], "
+					"livechat : %p, "
+					"siteId : '%s' "
+					")",
+					livechat,
+					pConfig->siteId.c_str()
+					);
 
-		// 插入配置
-		mSiteConfigMap.Lock();
-		mSiteConfigMap.Insert(pConfig->siteId, pConfig);
-		mSiteConfigMap.Unlock();
+			// 插入配置
+			mSiteConfigMap.Lock();
+			mSiteConfigMap.Insert(pConfig->siteId, pConfig);
+			mSiteConfigMap.Unlock();
 
-		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
-				"CamShareMiddleware::Run( "
-				"[插入外部服务(PHP)配置], "
-				"siteId : '%s', "
-				"recordFinishUrl : '%s' "
-				")",
-				pConfig->siteId.c_str(),
-				pConfig->recordFinishUrl.c_str()
-				);
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"CamShareMiddleware::Start( "
+					"[插入外部服务(PHP)配置], "
+					"siteId : '%s', "
+					"recordFinishUrl : '%s' "
+					")",
+					pConfig->siteId.c_str(),
+					pConfig->recordFinishUrl.c_str()
+					);
+		}
 	}
 
-	/**
-	 * 初始化Freeswitch
-	 */
-	mFreeswitch.SetRecording(mbFreeswitchIsRecording, mFreeswitchRecordingPath);
-
-	mIsRunning = true;
+	// 初始化Freeswitch
+	if( bFlag ) {
+		mFreeswitch.SetRecording(mbFreeswitchIsRecording, mFreeswitchRecordingPath);
+	}
 
 	// 开始状态监视线程
-	if( mStateThread.start(mpStateRunnable) != 0 ) {
-		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始状态监视线程] )");
+	if( bFlag ) {
+		if( mStateThread.start(mpStateRunnable) != 0 ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [开始状态监视线程] )");
+		} else {
+			bFlag = false;
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [开始状态监视线程, 失败] )");
+		}
 	}
 
 	// 开始LiveChat连接线程
-	if( mLiveChatConnectThread.start(mpConnectLiveChatRunnable) != 0 ) {
-		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始LiveChat连接线程] )");
+	if( bFlag ) {
+		if( mLiveChatConnectThread.start(mpConnectLiveChatRunnable) != 0 ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [开始LiveChat连接线程] )");
+		} else {
+			bFlag = false;
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [开始LiveChat连接线程, 失败] )");
+		}
 	}
 
 	// 开始Freeswitch连接线程
-	if( mConnectFreeswitchThread.start(mpConnectFreeswitchRunnable) != 0 ) {
-		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始Freeswitch连接线程] )");
+	if( bFlag ) {
+		if( mConnectFreeswitchThread.start(mpConnectFreeswitchRunnable) != 0 ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [开始Freeswitch连接线程] )");
+		} else {
+			bFlag = false;
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [开始Freeswitch连接线程, 失败] )");
+		}
 	}
 
 	// 开始定时验证会议室用户权限线程
-	if( mCheckConferenceThread.start(mpCheckConferenceRunnable) != 0 ) {
-		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始定时验证会议室用户权限线程] )");
+	if( bFlag ) {
+		if( mCheckConferenceThread.start(mpCheckConferenceRunnable) != 0 ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [开始定时验证会议室用户权限线程] )");
+		} else {
+			bFlag = false;
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [开始定时验证会议室用户权限线程, 失败] )");
+		}
 	}
 
 	// 开始同步本地录制完成记录线程
-	if( mUploadRecordsThread.start(mpUploadRecordsRunnable) != 0 ) {
-		LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Run( [开始同步本地录制完成记录线程] )");
+	if( bFlag ) {
+		if( mUploadRecordsThread.start(mpUploadRecordsRunnable) != 0 ) {
+			LogManager::GetLogManager()->Log(LOG_WARNING, "CamShareMiddleware::Start( [开始同步本地录制完成记录线程] )");
+		} else {
+			bFlag = false;
+			LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Start( [开始同步本地录制完成记录线程, 失败] )");
+		}
 	}
 
-	// 服务启动成功
-	printf("# CamShareMiddleware start OK. \n");
-	LogManager::GetLogManager()->Log(LOG_ERR_SYS, "CamShareMiddleware::Run( [启动成功] )");
+	if( bFlag ) {
+		// 服务启动成功
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"CamShareMiddleware::Start( "
+				"[OK] "
+				")"
+				);
+		printf("# CamShareMiddleware start OK. \n");
 
-	return true;
+	} else {
+		// 服务启动失败
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_SYS,
+				"CamShareMiddleware::Start( "
+				"[Fail] "
+				")"
+				);
+		Stop();
+	}
+	mServerMutex.unlock();
+
+	return bFlag;
 }
 
 bool CamShareMiddleware::LoadConfig() {
@@ -462,7 +501,7 @@ bool CamShareMiddleware::LoadConfig() {
 			miFlashTimeout = atoi(conf.GetPrivate("BASE", "FLASH_TIMEOUT", "5").c_str());
 			miStateTime = atoi(conf.GetPrivate("BASE", "STATETIME", "30").c_str());
 
-			mClientTcpServer.SetHandleSize(miTimeout * miMaxQueryPerThread);
+//			mClientTcpServer.SetHandleSize(miTimeout * miMaxQueryPerThread);
 
 			// 日志参数
 			miLogLevel = atoi(conf.GetPrivate("LOG", "LOGLEVEL", "5").c_str());
@@ -536,259 +575,48 @@ bool CamShareMiddleware::ReloadLogConfig() {
 }
 
 bool CamShareMiddleware::IsRunning() {
-	return mIsRunning;
+	return mRunning;
 }
 
 bool CamShareMiddleware::Stop() {
-	mIsRunning = false;
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::Stop( "
+			")"
+			);
 
-	mLiveChatConnectThread.stop();
-	mConnectFreeswitchThread.stop();
-	mCheckConferenceThread.stop();
-	mUploadRecordsThread.stop();
-	mStateThread.stop();
+	mServerMutex.lock();
 
-	if( mpSiteConfig ) {
-		delete[] mpSiteConfig;
-		mpSiteConfig = NULL;
+	if( mRunning ) {
+		mRunning = false;
+
+		// 停止监听socket
+		mAsyncIOServer.Stop();
+
+		mLiveChatConnectThread.stop();
+		mConnectFreeswitchThread.stop();
+		mCheckConferenceThread.stop();
+		mUploadRecordsThread.stop();
+		mStateThread.stop();
+
+		if( mpSiteConfig ) {
+			delete[] mpSiteConfig;
+			mpSiteConfig = NULL;
+		}
 	}
+
+	mServerMutex.unlock();
+
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareExecutor::Stop( "
+			"[OK] "
+			")"
+			);
 
 	LogManager::GetLogManager()->Stop();
 
 	return true;
-}
-
-/***************************** TcpServer回调 **************************************/
-bool CamShareMiddleware::OnAccept(TcpServer *ts, int fd, char* ip) {
-	if( ts == &mClientTcpServer ) {
-		Client *client = new Client();
-		client->SetClientCallback(this);
-		client->SetMessageList(&mIdleMessageList);
-		client->fd = fd;
-		client->ip = ip;
-		client->isOnline = true;
-
-		// 记录在线客户端
-		mClientMap.Lock();
-		mClientMap.Insert(fd, client);
-		mClientMap.Unlock();
-
-		// 统计请求
-		mCountMutex.lock();
-		mTotal++;
-		mCountMutex.unlock();
-
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"CamShareMiddleware::OnAccept( "
-				"[内部服务(HTTP), 建立连接], "
-				"fd : [%d], "
-				"client : %p "
-				")",
-				fd,
-				client
-				);
-
-	}
-
-	return true;
-}
-
-void CamShareMiddleware::OnDisconnect(TcpServer *ts, int fd) {
-	if( ts == &mClientTcpServer ) {
-		// 标记下线
-		mClientMap.Lock();
-		ClientMap::iterator itr = mClientMap.Find(fd);
-		if( itr != mClientMap.End() ) {
-			Client* client = itr->second;
-			if( client != NULL ) {
-				client->isOnline = false;
-
-				LogManager::GetLogManager()->Log(
-						LOG_MSG,
-						"CamShareMiddleware::OnDisconnect( "
-						"[内部服务(HTTP), 断开连接, 找到对应连接], "
-						"fd : [%d], "
-						"client : %p "
-						")",
-						fd,
-						client
-						);
-
-			} else {
-				LogManager::GetLogManager()->Log(
-						LOG_MSG,
-						"CamShareMiddleware::OnDisconnect( "
-						"[内部服务(HTTP), 断开连接, 找不到对应连接, client ==  NULL], "
-						"fd : [%d] "
-						")",
-						fd
-						);
-			}
-		} else {
-			LogManager::GetLogManager()->Log(
-					LOG_MSG,
-					"CamShareMiddleware::OnDisconnect( "
-					"[内部服务(HTTP), 断开连接, 找不到对应连接], "
-					"fd : [%d] "
-					")",
-					fd
-					);
-		}
-		mClientMap.Unlock();
-
-	}
-}
-
-void CamShareMiddleware::OnClose(TcpServer *ts, int fd) {
-	if( ts == &mClientTcpServer ) {
-		// 释放资源下线
-		mClientMap.Lock();
-		ClientMap::iterator itr = mClientMap.Find(fd);
-		if( itr != mClientMap.End() ) {
-			Client* client = itr->second;
-
-			if( client != NULL ) {
-				LogManager::GetLogManager()->Log(
-						LOG_MSG,
-						"CamShareMiddleware::OnClose( "
-						"[内部服务(HTTP), 关闭socket, 找到对应连接], "
-						"fd : [%d], "
-						"client : %p "
-						")",
-						fd,
-						client
-						);
-
-				delete client;
-			} else {
-				LogManager::GetLogManager()->Log(
-						LOG_MSG,
-						"CamShareMiddleware::OnClose( "
-						"[内部服务(HTTP), 关闭socket, 找不到对应连接, client ==  NULL], "
-						"fd : [%d] "
-						")",
-						fd
-						);
-			}
-
-			mClientMap.Erase(itr);
-
-		} else {
-			LogManager::GetLogManager()->Log(
-					LOG_MSG,
-					"CamShareMiddleware::OnClose( "
-					"[内部服务(HTTP), 关闭socket, 找不到对应连接], "
-					"fd : [%d] "
-					")",
-					fd
-					);
-		}
-		mClientMap.Unlock();
-
-	}
-}
-
-void CamShareMiddleware::OnRecvMessage(TcpServer *ts, Message *m) {
-	if( &mClientTcpServer == ts ) {
-		// 内部服务(HTTP), 接收完成处理
-		TcpServerRecvMessageHandle(ts, m);
-
-	}
-}
-
-void CamShareMiddleware::OnSendMessage(TcpServer *ts, Message *m) {
-	if( &mClientTcpServer == ts ) {
-		// 内部服务(HTTP)
-		mClientMap.Lock();
-		ClientMap::iterator itr = mClientMap.Find(m->fd);
-		Client* client = itr->second;
-		if( client != NULL ) {
-			client->AddSentPacket();
-			if( client->IsAllPacketSent() ) {
-				// 发送完成处理
-				ts->Disconnect(m->fd);
-			}
-		}
-		mClientMap.Unlock();
-	}
-}
-
-void CamShareMiddleware::OnTimeoutMessage(TcpServer *ts, Message *m) {
-	if( &mClientTcpServer == ts ) {
-		// 内部服务(HTTP), 超时处理
-		TcpServerTimeoutMessageHandle(ts, m);
-
-	}
-
-}
-/***************************** TcpServer回调 end **************************************/
-
-void CamShareMiddleware::TcpServerRecvMessageHandle(TcpServer *ts, Message *m) {
-	int ret = 0;
-
-	if( m->buffer != NULL && m->len > 0 ) {
-		Client *client = NULL;
-
-		/**
-		 * 因为还有数据包处理队列中, TcpServer不会回调OnClose, 所以不怕client被释放
-		 * 放开锁就可以使多个client并发解数据包, 单个client解包只能同步解包, 在client内部加锁
-		 */
-		mClientMap.Lock();
-		ClientMap::iterator itr = mClientMap.Find(m->fd);
-		if( itr != mClientMap.End() ) {
-			client = itr->second;
-			mClientMap.Unlock();
-
-		} else {
-			mClientMap.Unlock();
-
-		}
-
-		if( client != NULL ) {
-			LogManager::GetLogManager()->Log(
-					LOG_MSG,
-					"CamShareMiddleware::TcpServerRecvMessageHandle( "
-					"[内部服务(HTTP), 客户端发起请求], "
-					"fd : [%d], "
-					"buffer : [\n%s\n]"
-					")",
-					client->fd,
-					m->buffer
-					);
-
-			ret = client->ParseData(m);
-		}
-
-	}
-
-	if( ret == -1 ) {
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"CamShareMiddleware::TcpServerRecvMessageHandle( "
-				"[内部服务(HTTP), 客户端发起请求, 请求解析失败, 断开连接], "
-				"fd : [%d] "
-				")",
-				m->fd
-				);
-
-		ts->Disconnect(m->fd);
-	}
-
-}
-
-void CamShareMiddleware::TcpServerTimeoutMessageHandle(TcpServer *ts, Message *m) {
-	LogManager::GetLogManager()->Log(
-			LOG_MSG,
-			"CamShareMiddleware::TcpServerTimeoutMessageHandle( "
-			"[请求超时], "
-			"fd : [%d] "
-			")",
-			m->fd
-			);
-
-	// 断开连接
-	ts->Disconnect(m->fd);
 }
 
 /***************************** 线程处理函数 **************************************/
@@ -1012,18 +840,20 @@ void CamShareMiddleware::UploadRecordsHandle() {
 				if( bFlag ) {
 					// 发送成功, 并解析返回成功
 					if( !success ) {
-						// 服务器返回, 上传失败错误
+						// 服务器返回, 上传失败错误, 插入到错误库
 						mDBHandler.InsertErrorRecord(records[i], errorCode);
 					}
 
 				} else {
-					// 发送失败
+					// 发送失败, 或者解析失败
 					if( !errorRecord ) {
-						// 不是本地参数错误
-						// 有效记录, 插回本地库
+						// 不是本地参数错误, 有效记录, 插回本地库
 						mDBHandler.InsertRecord(records[i]);
 
 						sleep(miUploadTime);
+					} else {
+						// 本地错误, 插入到错误库
+						mDBHandler.InsertErrorRecord(records[i], errorCode);
 					}
 				}
 			}
@@ -1035,98 +865,185 @@ void CamShareMiddleware::UploadRecordsHandle() {
 }
 /***************************** 线程处理函数 end **************************************/
 
-/***************************** 内部服务(HTTP)接口 **************************************/
-bool CamShareMiddleware::SendRespond2Client(
-		Client* client,
-		IRespond* respond
-		) {
+/***************************** 内部服务(HTTP)回调 **************************************/
+bool CamShareMiddleware::OnAccept(Client *client) {
+	HttpParser* parser = new HttpParser();
+	parser->SetCallback(this);
+	parser->custom = client;
+	client->parser = parser;
+
+	LogManager::GetLogManager()->Log(
+			LOG_MSG,
+			"CamShareMiddleware::OnAccept( "
+			"parser : %p, "
+			"client : %p "
+			")",
+			parser,
+			client
+			);
+
+	return true;
+}
+
+void CamShareMiddleware::OnDisconnect(Client* client) {
+	HttpParser* parser = (HttpParser *)client->parser;
+
+	LogManager::GetLogManager()->Log(
+			LOG_MSG,
+			"CamShareMiddleware::OnDisconnect( "
+			"parser : %p, "
+			"client : %p "
+			")",
+			parser,
+			client
+			);
+
+	if( parser ) {
+		delete parser;
+		client->parser = NULL;
+	}
+}
+
+void CamShareMiddleware::OnHttpParserHeader(HttpParser* parser) {
+	Client* client = (Client *)parser->custom;
+
+	LogManager::GetLogManager()->Log(
+			LOG_MSG,
+			"CamShareMiddleware::OnHttpParserHeader( "
+			"parser : %p, "
+			"client : %p, "
+			"path : %s "
+			")",
+			parser,
+			client,
+			parser->GetPath().c_str()
+			);
+
 	bool bFlag = false;
+
+	// 可以在这里处理超时任务
+//	mAsyncIOServer.GetHandleCount();
+
+	bFlag = HttpParseRequest(parser);
+
+	mAsyncIOServer.Disconnect(client);
+}
+
+void CamShareMiddleware::OnHttpParserError(HttpParser* parser) {
+	Client* client = (Client *)parser->custom;
 
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::SendRespond2Client( "
+			"CamShareMiddleware::OnHttpParserError( "
+			"parser : %p, "
+			"client : %p "
+			")",
+			parser,
+			client
+			);
+
+	mAsyncIOServer.Disconnect(client);
+}
+/***************************** 内部服务(HTTP)回调 End **************************************/
+
+/***************************** 内部服务(HTTP)接口 **************************************/
+bool CamShareMiddleware::HttpParseRequest(HttpParser* parser) {
+	bool bFlag = true;
+
+	if( parser->GetPath() == "/GETDIALPLAN" ) {
+		// 进入会议室
+		OnRequestGetDialplan(parser);
+
+	} else if( parser->GetPath() == "/RECORDFINISH" ) {
+		// 录制文件成功
+		OnRequestRecordFinish(parser);
+
+	} else if( parser->GetPath() == "/RELOADLOGCONFIG" ) {
+		// 重新加载日志配置
+		OnRequestReloadLogConfig(parser);
+
+	} else {
+		// 未知命令
+		OnRequestUndefinedCommand(parser);
+		bFlag = false;
+	}
+
+	return bFlag;
+}
+
+bool CamShareMiddleware::HttpSendRespond(
+		HttpParser* parser,
+		IRespond* respond
+		) {
+	bool bFlag = false;
+	Client* client = (Client *)parser->custom;
+
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::HttpSendRespond( "
 			"[内部服务(HTTP), 返回请求到客户端], "
-			"fd : [%d], "
+			"parser : %p, "
+			"client : %p, "
 			"respond : %p "
 			")",
-			client->fd,
+			parser,
+			client,
 			respond
 			);
 
 	// 发送头部
-	Message* m = mClientTcpServer.GetIdleMessageList()->PopFront();
-	if( m != NULL ) {
-		client->AddSendingPacket();
+	char buffer[MAX_BUFFER_LEN];
+	snprintf(
+			buffer,
+			MAX_BUFFER_LEN - 1,
+			"HTTP/1.1 200 OK\r\n"
+			"Connection:Keep-Alive\r\n"
+			"Content-Type:text/html; charset=utf-8\r\n"
+			"\r\n"
+			);
+	int len = strlen(buffer);
 
-		m->fd = client->fd;
-		snprintf(
-				m->buffer,
-				MAX_BUFFER_LEN - 1,
-				"HTTP/1.1 200 OK\r\n"
-				"Connection:Keep-Alive\r\n"
-				"Content-Type:text/html; charset=utf-8\r\n"
-				"\r\n"
-				);
-		m->len = strlen(m->buffer);
-
-		LogManager::GetLogManager()->Log(
-				LOG_MSG,
-				"CamShareMiddleware::SendRespond2Client( "
-				"[内部服务(HTTP), 返回请求头部到客户端], "
-				"fd : [%d], "
-				"buffer : [\n%s\n]"
-				")",
-				client->fd,
-				m->buffer
-				);
-
-		mClientTcpServer.SendMessageByQueue(m);
-	}
+	mAsyncIOServer.Send(client, buffer, len);
 
 	if( respond != NULL ) {
 		// 发送内容
 		bool more = false;
 		while( true ) {
-			Message* m = mClientTcpServer.GetIdleMessageList()->PopFront();
-			if( m != NULL ) {
-				m->fd = client->fd;
-				client->AddSendingPacket();
+			len = respond->GetData(buffer, MAX_BUFFER_LEN, more);
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"CamShareMiddleware::HttpSendRespond( "
+					"[内部服务(HTTP), 返回请求内容到客户端], "
+					"parser : %p, "
+					"client : %p, "
+					"buffer :\n%s\n"
+					")",
+					parser,
+					client,
+					buffer
+					);
 
-				m->len = respond->GetData(m->buffer, MAX_BUFFER_LEN, more);
-				LogManager::GetLogManager()->Log(
-						LOG_WARNING,
-						"CamShareMiddleware::SendRespond2Client( "
-						"[内部服务(HTTP), 返回请求内容到客户端], "
-						"fd : [%d], "
-						"buffer : [\n%s\n]"
-						")",
-						client->fd,
-						m->buffer
-						);
+			mAsyncIOServer.Send(client, buffer, len);
 
-				mClientTcpServer.SendMessageByQueue(m);
-				if( !more ) {
-					// 全部发送完成
-					bFlag = true;
-					break;
-				}
-
-			} else {
+			if( !more ) {
+				// 全部发送完成
+				bFlag = true;
 				break;
 			}
 		}
-
-		delete respond;
+//		delete respond;
 	}
 
 	if( !bFlag ) {
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
-				"CamShareMiddleware::SendRespond2Client( "
+				"CamShareMiddleware::HttpSendRespond( "
 				"[内部服务(HTTP), 返回请求到客户端, 失败], "
-				"fd : [%d] "
+				"parser : %p, "
+				"client : %p "
 				")",
-				client->fd
+				parser,
+				client
 				);
 	}
 
@@ -1135,20 +1052,21 @@ bool CamShareMiddleware::SendRespond2Client(
 /***************************** 内部服务(HTTP)接口 end **************************************/
 
 /***************************** 内部服务(HTTP) 回调处理 **************************************/
-void CamShareMiddleware::OnClientGetDialplan(
-		Client* client,
-		const string& caller,
-		const string& channelId,
-		const string& conference,
-		const string& serverId,
-		const string& siteId,
-		const string& source
+void CamShareMiddleware::OnRequestGetDialplan(
+		HttpParser* parser
 		) {
+	const string caller = parser->GetParam("caller");
+	const string channelId = parser->GetParam("channelId");
+	const string conference = parser->GetParam("conference");
+	const string serverId = parser->GetParam("serverId");
+	const string siteId = parser->GetParam("siteId");
+	const string source = parser->GetParam("source");
+
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::OnClientGetDialplan( "
+			"CamShareMiddleware::OnRequestGetDialplan( "
 			"[内部服务(HTTP), 收到命令:获取拨号计划], "
-			"fd : [%d], "
+			"parser : %p, "
 			"caller : '%s', "
 			"channelId : '%s', "
 			"conference : '%s', "
@@ -1156,7 +1074,7 @@ void CamShareMiddleware::OnClientGetDialplan(
 			"siteId : '%s', "
 			"source : '%s' "
 			")",
-			client->fd,
+			parser,
 			caller.c_str(),
 			channelId.c_str(),
 			conference.c_str(),
@@ -1179,7 +1097,6 @@ void CamShareMiddleware::OnClientGetDialplan(
     			LOG_ERR_USER,
     			"CamShareMiddleware::OnClientGetDialplan( "
     			"[内部服务(HTTP), 收到命令:获取拨号计划, 失败], "
-    			"fd : [%d], "
     			"caller : '%s', "
     			"channelId : '%s', "
     			"conference : '%s', "
@@ -1187,7 +1104,6 @@ void CamShareMiddleware::OnClientGetDialplan(
     			"siteId : '%s', "
     			"source : '%s' "
     			")",
-    			client->fd,
     			caller.c_str(),
     			channelId.c_str(),
     			conference.c_str(),
@@ -1198,31 +1114,32 @@ void CamShareMiddleware::OnClientGetDialplan(
     }
 
 	// 马上返回数据
-	DialplanRespond* respond = new DialplanRespond();
-	respond->SetParam(bFlag);
-	SendRespond2Client(client, respond);
+	DialplanRespond respond;// = new DialplanRespond();
+	respond.SetParam(bFlag);
+	HttpSendRespond(parser, &respond);
 }
 
-void CamShareMiddleware::OnClientRecordFinish(
-		Client* client,
-		const string& conference,
-		const string& siteId,
-		const string& filePath,
-		const string& startTime,
-		const string& endTime
+void CamShareMiddleware::OnRequestRecordFinish(
+		HttpParser* parser
 		) {
+	const string conference = parser->GetParam("userId");
+	const string siteId = parser->GetParam("siteId");
+	const string filePath = parser->GetParam("fileName");
+	const string startTime = parser->GetParam("startTime");
+	const string endTime = parser->GetParam("endTime");
+
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::OnClientRecordFinish( "
+			"CamShareMiddleware::OnRequestRecordFinish( "
 			"[内部服务(HTTP), 收到命令:录制文件成功], "
-			"fd : [%d], "
+			"parser : %p, "
 			"conference : '%s', "
 			"siteId : '%s', "
 			"filePath : '%s', "
 			"startTime : '%s', "
 			"endTime : '%s' "
 			")",
-			client->fd,
+			parser,
 			conference.c_str(),
 			siteId.c_str(),
 			filePath.c_str(),
@@ -1234,38 +1151,36 @@ void CamShareMiddleware::OnClientRecordFinish(
 	mDBHandler.InsertRecord(record);
 
 	// 马上返回数据
-	RecordFinishRespond* respond = new RecordFinishRespond();
-	SendRespond2Client(client, respond);
+	RecordFinishRespond respond;// = new RecordFinishRespond();
+	HttpSendRespond(parser, &respond);
 }
 
-void CamShareMiddleware::OnClientReloadLogConfig(Client* client) {
+void CamShareMiddleware::OnRequestReloadLogConfig(HttpParser* parser) {
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::OnClientReloadLogConfig( "
+			"CamShareMiddleware::OnRequestReloadLogConfig( "
 			"[内部服务(HTTP), 收到命令:重新加载日志配置], "
-			"fd : [%d] "
+			"parser : %p "
 			")",
-			client->fd
+			parser
 			);
 	// 重新加载日志配置
 	ReloadLogConfig();
 
 	// 马上返回数据
-	BaseRespond* respond = new BaseRespond();
-	SendRespond2Client(client, respond);
+	BaseRespond respond;// = new BaseRespond();
+	HttpSendRespond(parser, &respond);
 }
 
-void CamShareMiddleware::OnClientUndefinedCommand(Client* client) {
+void CamShareMiddleware::OnRequestUndefinedCommand(HttpParser* parser) {
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
-			"CamShareMiddleware::OnClientUndefinedCommand( "
+			"CamShareMiddleware::OnRequestUndefinedCommand( "
 			"[内部服务(HTTP), 收到命令:未知命令], "
-			"fd : [%d] "
+			"parser : %p "
 			")",
-			client->fd
+			parser
 			);
-
-	mClientTcpServer.Disconnect(client->fd);
 }
 /***************************** 内部服务(HTTP) 回调处理 end **************************************/
 
@@ -2042,6 +1957,7 @@ bool CamShareMiddleware::SendRecordFinish(
 			"CamShareMiddleware::SendRecordFinish( "
 			"[发送录制文件完成记录到服务器], "
 			"url : '%s', "
+			"id : '%s', "
 			"conference : '%s', "
 			"siteId : '%s', "
 			"filePath : '%s', "
@@ -2049,6 +1965,7 @@ bool CamShareMiddleware::SendRecordFinish(
 			"endTime : '%s' "
 			")",
 			url.c_str(),
+			record.id.c_str(),
 			record.conference.c_str(),
 			record.siteId.c_str(),
 			record.filePath.c_str(),
@@ -2068,10 +1985,24 @@ bool CamShareMiddleware::SendRecordFinish(
 				LOG_WARNING,
 				"CamShareMiddleware::SendRecordFinish( "
 				"[发送录制文件完成记录到服务器, 返回], "
+				"url : '%s', "
+				"id : '%s', "
+				"conference : '%s', "
+				"siteId : '%s', "
 				"filePath : '%s', "
+				"startTime : '%s', "
+				"endTime : '%s', "
+				"respondSize : '%d', "
 				"respond : '%s' "
 				")",
+				url.c_str(),
+				record.id.c_str(),
+				record.conference.c_str(),
+				record.siteId.c_str(),
 				record.filePath.c_str(),
+				record.startTime.c_str(),
+				record.endTime.c_str(),
+				respondSize,
 				respond
 				);
 		if( respondSize > 0 ) {
@@ -2109,19 +2040,23 @@ bool CamShareMiddleware::SendRecordFinish(
 				"CamShareMiddleware::SendRecordFinish( "
 				"[发送录制文件完成记录到服务器, 失败], "
 				"url : '%s', "
+				"id : '%s', "
 				"conference : '%s', "
 				"siteId : '%s', "
 				"filePath : '%s', "
 				"startTime : '%s', "
 				"endTime : '%s', "
+				"respondSize : '%d', "
 				"respond : '%s' "
 				")",
 				url.c_str(),
+				record.id.c_str(),
 				record.conference.c_str(),
 				record.siteId.c_str(),
 				record.filePath.c_str(),
 				record.startTime.c_str(),
 				record.endTime.c_str(),
+				respondSize,
 				respond
 				);
 	}

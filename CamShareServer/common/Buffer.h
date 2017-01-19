@@ -12,22 +12,71 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LOG_BUFFER_LEN 8192
 #define MAX_BUFFER_LEN 4096
 
-typedef struct Buffer {
-	int		len;
-	char	buffer[MAX_BUFFER_LEN];
-
+class Buffer {
+public:
 	Buffer() {
+		size = MAX_BUFFER_LEN;
+		buffer = new char[MAX_BUFFER_LEN];
 		Reset();
+	}
+
+	Buffer(unsigned int size) {
+		this->size = size;
+		if( size > 0 ) {
+			buffer = new char[this->size];
+		}
+		Reset();
+	}
+
+	~Buffer() {
+		if( buffer ) {
+			delete[] buffer;
+			buffer = NULL;
+		}
 	}
 
 	void Reset() {
 		len = 0;
-		memset(buffer, '\0', sizeof(buffer));
+		if( size > 0 && buffer ) {
+			memset(buffer, '\0', size);
+		}
 	}
 
-} Buffer;
+	int Size() {
+		return size;
+	}
+
+	int Freespace() {
+		return size - len;
+	}
+
+	void ReadZeroCopy(const void **data, int &size) {
+		*data = buffer;
+		size = len;
+	}
+
+	int Toss(int size) {
+		int parsedLen = len<size?len:size;
+		memcpy((void *)buffer, (const void *)(buffer + parsedLen), len - parsedLen);
+		len -= parsedLen;
+		return parsedLen;
+	}
+
+	bool Write(const char* data, int size) {
+		if( Freespace() > size ) {
+			memcpy((void *)(buffer + len), (const void *)data, size);
+			len += size;
+			return true;
+		}
+		return false;
+	}
+
+private:
+	int		len;
+	int 	size;
+	char	*buffer;
+};
 
 #endif /* BUFFER_H_ */

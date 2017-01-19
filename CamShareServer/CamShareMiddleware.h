@@ -9,15 +9,16 @@
 #ifndef CamShareMiddleware_H_
 #define CamShareMiddleware_H_
 
-#include "Session.h"
-#include "Client.h"
-#include "MessageList.h"
-#include "TcpServer.h"
 #include "FreeswitchClient.h"
+#include "Session.h"
 #include "SessionManager.h"
 #include "DBHandler.h"
-#include "LogManager.h"
 
+#include <parser/HttpParser.h>
+
+#include <server/AsyncIOServer.h>
+
+#include <common/LogManager.h>
 #include <common/ConfFile.hpp>
 #include <common/KSafeMap.h>
 #include <common/TimeProc.hpp>
@@ -33,7 +34,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.1.0"
+#define VERSION_STRING "1.1.2"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -72,27 +73,20 @@ class CheckConferenceRunnable;
 class UploadRecordsRunnable;
 class HttpClient;
 
-class CamShareMiddleware : public TcpServerObserver,
-								ClientCallback,
-								ILiveChatClientListener,
-								FreeswitchClientListener {
+class CamShareMiddleware :
+		public AsyncIOServerCallback,
+		HttpParserCallback,
+		ILiveChatClientListener,
+		FreeswitchClientListener {
+
 public:
 	CamShareMiddleware();
 	virtual ~CamShareMiddleware();
 
-	bool Run(const string& config);
-	bool Run();
-	bool IsRunning();
+	bool Start(const string& config);
+	bool Start();
 	bool Stop();
-
-	/***************************** TcpServer回调 **************************************/
-	bool OnAccept(TcpServer *ts, int fd, char* ip);
-	void OnRecvMessage(TcpServer *ts, Message *m);
-	void OnSendMessage(TcpServer *ts, Message *m);
-	void OnDisconnect(TcpServer *ts, int fd);
-	void OnClose(TcpServer *ts, int fd);
-	void OnTimeoutMessage(TcpServer *ts, Message *m);
-	/***************************** TcpServer回调 end **************************************/
+	bool IsRunning();
 
 	/***************************** 线程处理函数 **************************************/
 	/**
@@ -122,25 +116,19 @@ public:
 	/***************************** 线程处理函数 end **************************************/
 
 	/***************************** 内部服务(HTTP), 命令回调 **************************************/
-	void OnClientGetDialplan(
-			Client* client,
-			const string& caller,
-			const string& channelId,
-			const string& conference,
-			const string& serverId,
-			const string& siteId,
-			const string& source
-			);
-	void OnClientRecordFinish(
-			Client* client,
-			const string& conference,
-			const string& siteId,
-			const string& filePath,
-			const string& startTime,
-			const string& endTime
-			);
-	void OnClientReloadLogConfig(Client* client);
-	void OnClientUndefinedCommand(Client* client);
+	// AsyncIOServerCallback
+	bool OnAccept(Client *client);
+	void OnDisconnect(Client* client);
+
+	// HttpParserCallback
+	void OnHttpParserHeader(HttpParser* parser);
+	void OnHttpParserError(HttpParser* parser);
+
+	// HttpHandler
+	void OnRequestGetDialplan(HttpParser* parser);
+	void OnRequestRecordFinish(HttpParser* parser);
+	void OnRequestReloadLogConfig(HttpParser* parser);
+	void OnRequestUndefinedCommand(HttpParser* parser);
 	/***************************** 内部服务(HTTP), 命令回调 end **************************************/
 
 	/***************************** 内部服务(Freeswitch), 命令回调 **************************************/
@@ -176,12 +164,6 @@ private:
 	 * 重新读取日志等级
 	 */
 	bool ReloadLogConfig();
-
-	/**
-	 * HTTP server处理
-	 */
-	void TcpServerRecvMessageHandle(TcpServer *ts, Message *m);
-	void TcpServerTimeoutMessageHandle(TcpServer *ts, Message *m);
 
 	/**
 	 * Freeswitch事件处理
@@ -255,13 +237,18 @@ private:
 
 	/***************************** 内部服务接口 **************************************/
 	/**
+	 * 内部服务(HTTP), 解析请求
+	 */
+	bool HttpParseRequest(HttpParser* parser);
+
+	/**
 	 * 内部服务(HTTP), 发送请求响应
-	 * @param client		客户端
+	 * @param parser		请求
 	 * @param respond		响应实例
 	 * @return true:发送成功/false:发送失败
 	 */
-	bool SendRespond2Client(
-			Client* client,
+	bool HttpSendRespond(
+			HttpParser* parser,
 			IRespond* respond
 			);
 	/***************************** 内部服务接口 end **************************************/
@@ -449,10 +436,12 @@ private:
 	/***************************** 统计参数 end **************************************/
 
 	/***************************** 运行参数 **************************************/
+
+	KMutex mServerMutex;
 	/**
 	 * 是否运行
 	 */
-	bool mIsRunning;
+	bool mRunning;
 
 	/**
 	 * 配置文件锁
@@ -471,12 +460,7 @@ private:
 	/**
 	 * 内部服务(HTTP)
 	 */
-	TcpServer mClientTcpServer;
-
-	/*
-	 * 内部服务(HTTP), 在线客户端列表
-	 */
-	ClientMap mClientMap;
+	AsyncIOServer mAsyncIOServer;
 
 	/**
 	 * 外部服务(LiveChat), 实例列表
@@ -487,11 +471,6 @@ private:
 	 * 会话管理器
 	 */
 	SessionManager mSessionManager;
-
-	/**
-	 * 客户端缓存数据包buffer
-	 */
-	MessageList mIdleMessageList;
 
 	/**
 	 * Freeswitch实例

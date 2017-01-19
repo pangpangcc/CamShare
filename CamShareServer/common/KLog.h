@@ -12,7 +12,7 @@
 #include <string>
 using namespace std;
 
-#include "../LogManager.h"
+#include "LogManager.h"
 
 #define FileLog(fileNamePre, format, ...) LogManager::GetLogManager()->Log(LOG_STAT, format, ## __VA_ARGS__)
 

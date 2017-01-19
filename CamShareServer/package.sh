@@ -17,6 +17,11 @@ elif [ "$env" = "demo" ]; then
 elif [ "$env" = "operating" ]; then
   cp -rf camshare-middleware.config.operating ./package/CamShareServer/camshare-middleware.config
 fi
+
+# ---- copy camshare executor files
+cp -f ./CamShareServer/executor/camshare-executor ./package/CamShareServer/
+cp -f ./CamShareServer/executor/camshare-executor.config ./package/CamShareServer/
+
 cp -rf ./bin/* ./package/CamShareServer/
 
 # package file

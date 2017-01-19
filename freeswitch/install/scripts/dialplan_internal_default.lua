@@ -68,7 +68,7 @@ if( #tables >= 3 ) then
   
 --  解析返回
   if response ~= nil then
-    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回:\n" .. response);
+    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回:" .. url .. ", response:" .. response .. "\n");
     json = cjson.decode(response);
     body = json["body"];
     if body ~= nil then
@@ -87,26 +87,26 @@ if( #tables >= 3 ) then
 --          进入自己会议室
 --          table.insert(ACTIONS, {"set", "enable_file_write_buffering=false"})
 --          table.insert(ACTIONS, {"record_fsv", "$${base_dir}/recordings/" .. destination_number .. "-${strftime(%Y-%m-%d-%H-%M-%S)}.fsv"})
-            table.insert(ACTIONS, {"conference", conference .. "@default++flags{moderator}"})
-            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{moderator}\n");
+            table.insert(ACTIONS, {"conference", conference .. "@default++flags{moderator|mute|vmute|deaf}"})
+            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{moderator|mute|vmute|deaf}\n");
         else
 --          进入别人会议室
-            table.insert(ACTIONS, {"conference", conference .. "@default"})
-            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default\n");
+            table.insert(ACTIONS, {"conference", conference .. "@default++flags{mute|vmute|deaf}"})
+            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{mute|vmute|deaf}\n");
         end
       else
-          session:consoleLog("NOTICE", "# 内网拨号计划->caller解析失败\n");
+          session:consoleLog("NOTICE", "# 内网拨号计划->caller解析失败:" .. url .. "\n");
       end
 
     else
-      session:consoleLog("NOTICE", "# 内网拨号计划->json解析失败\n");
+      session:consoleLog("NOTICE", "# 内网拨号计划->json解析失败:" .. url .. "\n");
     end
     
   else
-    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回失败\n");
+    session:consoleLog("NOTICE", "# 内网拨号计划->获取http返回失败:" .. url .. "\n");
   end
 else
-    session:consoleLog("NOTICE", "# 内网拨号计划->解析[用户Id]/[Livechat服务器Id]/[站点Id]错误失败\n");
+    session:consoleLog("NOTICE", "# 内网拨号计划->解析[用户Id]/[Livechat服务器Id]/[站点Id]错误失败" .. url .. "\n");
 end
 
 session:consoleLog("NOTICE", "# 内网拨号计划->结束\n")

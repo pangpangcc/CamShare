@@ -74,7 +74,7 @@ if result == 0 then
     freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
     response = api:execute("curl", url);
     if response ~= nil then
-      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回:\n" .. response .. "\n");
+      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回:" .. response .. "\n");
       json = cjson.decode(response);
       body = json["body"];
       if body ~= nil then
@@ -84,13 +84,13 @@ if result == 0 then
         errno = json["errno"];
         errmsg = json["errmsg"];
       else
-        freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->http返回协议解析失败\n");
+        freeswitch.consoleLog("WARNING", "# 用户登陆脚本->http返回协议解析失败\n");
       end
     else
-      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回失败\n");
+      freeswitch.consoleLog("WARNING", "# 用户登陆脚本->获取http返回失败\n");
     end
   else
-    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->没有找到http URL\n");
+    freeswitch.consoleLog("WARNING", "# 用户登陆脚本->没有找到http URL\n");
   end
 end
 
@@ -115,6 +115,8 @@ if result == 1 then
       </domain>
     </section>
   </document>]]
+else
+  freeswitch.consoleLog("WARNING", "# 用户登陆脚本->账号:" .. req_user .. "登陆失败\n");
 end
 
 --freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->xml:\n" .. XML_STRING .. "\n")

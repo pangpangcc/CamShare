@@ -22,7 +22,11 @@ static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 
 #define HTTP_URL_MAX_PATH 2048
 #define HTTP_URL_FIRSTLINE_PARAM_COUNT 3
-#define HTTP_URL_PATH_PARAM_COUNT 5
+#define HTTP_URL_FIRSTLINE_PARAM_MAX_COUNT HTTP_URL_FIRSTLINE_PARAM_COUNT + 1
+// 暂时不做PHP验证
+//#define HTTP_URL_PATH_PARAM_COUNT 5
+#define HTTP_URL_PATH_PARAM_COUNT 3
+#define HTTP_URL_PATH_PARAM_MAX_COUNT HTTP_URL_PATH_PARAM_COUNT + 1
 
 #define HTTP_PARAM_SEP ":"
 #define HTTP_LINE_SEP "\r\n"
@@ -333,30 +337,30 @@ bool WSClientParser::GetPacket(WSPacket* packet, unsigned long long dataLen) {
 		packet->SetPlayloadLength(dataLen);
 		packet->SetMaskKey(NULL);
 
-		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->uuid),
-				SWITCH_LOG_DEBUG,
-				"WSClientParser::GetPacket( "
-				"this : %p, "
-				"dataLen : %lld, "
-				"packet->Fin : %s, "
-				"packet->RSV : %u, "
-				"packet->Opcode : %u, "
-				"packet->Mask : %s, "
-				"packet->Playload Length : %u, "
-				"packet->Extend Playload Length : %llu, "
-				"packet->Mask Key : %s "
-				") \n",
-				this,
-				dataLen,
-				packet->baseHeader.IsFin()?"true":"false",
-				packet->baseHeader.GetRSVType(),
-				packet->baseHeader.GetOpcode(),
-				packet->baseHeader.IsMask()?"true":"false",
-				packet->baseHeader.GetPlayloadLength(),
-				packet->GetPlayloadLength(),
-				packet->GetMaskKey()
-				);
+//		switch_log_printf(
+//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+//				SWITCH_LOG_DEBUG,
+//				"WSClientParser::GetPacket( "
+//				"this : %p, "
+//				"dataLen : %lld, "
+//				"packet->Fin : %s, "
+//				"packet->RSV : %u, "
+//				"packet->Opcode : %u, "
+//				"packet->Mask : %s, "
+//				"packet->Playload Length : %u, "
+//				"packet->Extend Playload Length : %llu, "
+//				"packet->Mask Key : %s "
+//				") \n",
+//				this,
+//				dataLen,
+//				packet->baseHeader.IsFin()?"true":"false",
+//				packet->baseHeader.GetRSVType(),
+//				packet->baseHeader.GetOpcode(),
+//				packet->baseHeader.IsMask()?"true":"false",
+//				packet->baseHeader.GetPlayloadLength(),
+//				packet->GetPlayloadLength(),
+//				packet->GetMaskKey()
+//				);
 
 		return true;
 	}
@@ -385,31 +389,32 @@ bool WSClientParser::Login() {
 			mpCustom
 			);
 
-	switch_event_t *locate_params;
-	switch_xml_t xml = NULL;
-
-	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
-	switch_assert(locate_params);
-	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
-	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
-	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
-
-	/* Locate user */
-	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
-		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->uuid),
-				SWITCH_LOG_ERROR,
-				"WSClientParser::Login( "
-				"[Fail], "
-				"this : %p, "
-				"user : '%s', "
-				"domain : '%s' ",
-				this,
-				mpUser,
-				mpDomain
-				);
-		return false;
-	}
+	// 暂时不做PHP验证
+//	switch_event_t *locate_params;
+//	switch_xml_t xml = NULL;
+//
+//	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
+//	switch_assert(locate_params);
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
+//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
+//
+//	/* Locate user */
+//	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
+//		switch_log_printf(
+//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+//				SWITCH_LOG_ERROR,
+//				"WSClientParser::Login( "
+//				"[Fail], "
+//				"this : %p, "
+//				"user : '%s', "
+//				"domain : '%s' ",
+//				this,
+//				mpUser,
+//				mpDomain
+//				);
+//		return false;
+//	}
 
 	// 发送登录成功事件
 	ws_login();
@@ -956,8 +961,8 @@ bool WSClientParser::ParseFirstLine(char* line) {
 	char* delim = " ";
 	char decodeUrl[HTTP_URL_MAX_PATH] = {0};
 
-	char *array[10];
-	if( switch_separate_string_string(p, delim, array, HTTP_URL_FIRSTLINE_PARAM_COUNT) == HTTP_URL_FIRSTLINE_PARAM_COUNT ) {
+	char *array[HTTP_URL_FIRSTLINE_PARAM_MAX_COUNT];
+	if( switch_separate_string_string(p, delim, array, HTTP_URL_FIRSTLINE_PARAM_MAX_COUNT) >= HTTP_URL_FIRSTLINE_PARAM_COUNT ) {
 		Arithmetic ac;
 		ac.decode_url(array[1], strlen(array[1]), decodeUrl);
 
@@ -978,12 +983,17 @@ bool WSClientParser::ParseFirstLine(char* line) {
 			if( *p == *delim ) {
 				p++;
 			}
-			if( switch_separate_string_string(p, delim, array, HTTP_URL_PATH_PARAM_COUNT) >= HTTP_URL_PATH_PARAM_COUNT ) {
-				mpUser = switch_core_strdup(mpPool, array[0]);
-				mpDomain = switch_core_strdup(mpPool, array[1]);
-				mpDestNumber = switch_core_strdup(mpPool, array[2]);
-				mpSite = switch_core_strdup(mpPool, array[3]);
-				mpCustom = switch_core_strdup(mpPool, array[4]);
+
+			char *array2[HTTP_URL_PATH_PARAM_MAX_COUNT];
+			if( switch_separate_string_string(p, delim, array2, HTTP_URL_PATH_PARAM_MAX_COUNT) >= HTTP_URL_PATH_PARAM_COUNT ) {
+				mpUser = switch_core_strdup(mpPool, array2[0]);
+				mpDomain = switch_core_strdup(mpPool, array2[1]);
+				mpDestNumber = switch_core_strdup(mpPool, array2[2]);
+				// 暂时不做PHP验证
+//				mpSite = switch_core_strdup(mpPool, array2[3]);
+//				mpCustom = switch_core_strdup(mpPool, array2[4]);
+				mpSite = switch_core_strdup(mpPool, "");
+				mpCustom = switch_core_strdup(mpPool, "");
 
 				switch_log_printf(
 						SWITCH_CHANNEL_UUID_LOG(this->uuid),

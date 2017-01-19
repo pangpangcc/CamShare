@@ -8,8 +8,7 @@
 #ifndef SQLITEMANAGER_H_
 #define SQLITEMANAGER_H_
 
-#include "LogManager.h"
-
+#include <common/LogManager.h>
 #include <common/TimeProc.hpp>
 #include <common/StringHandle.h>
 #include <common/KThread.h>

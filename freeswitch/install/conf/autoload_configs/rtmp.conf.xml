@@ -14,7 +14,7 @@
 			<!-- Numbers of handle thread -->
 			<param name="handle-thread" value="8"/>
 			<!-- Millisecond of connection timeout time without sending data -->
-			<param name="connection-timeout" value="10000"/>
+			<param name="active-timeout" value="60000"/>
 		</settings>
 	</profile>
   </profiles>

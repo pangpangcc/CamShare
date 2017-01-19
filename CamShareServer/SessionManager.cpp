@@ -7,6 +7,8 @@
 
 #include "SessionManager.h"
 
+#include <common/LogManager.h>
+
 #define SEQ_TYPE		"SEQ"
 #define CUSTOM_TYPE		"CUSTOM"
 

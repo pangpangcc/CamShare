@@ -8,6 +8,12 @@
 #include "TransportPacketHandler.h"
 #include "task/ITask.h"
 #include "zlib.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
 #include <common/KLog.h>
 
 // 使用 ntohl 需要include跨平台socket头文件

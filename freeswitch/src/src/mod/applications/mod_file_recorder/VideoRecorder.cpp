@@ -895,16 +895,16 @@ void VideoRecorder::RunCloseShell()
 //					, cmd);
 
 		// run shell
-		int result = system(cmd);
-//		bool bFlag = SendCommand(cmd);
+//		int code = system(cmd);
+		bool result = SendCommand(cmd);
 
 		// log
-		if (result >= 0) {
+		if (result) {
 //		if( bFlag ) {
 			// success
-//			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 success, result:%d, cmd:%s\n"
-//						, result, cmd);
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 success, cmd:%s\n"
+						, cmd);
 		}
 		else {
 			// error
@@ -1295,7 +1295,7 @@ bool VideoRecorder::RunPictureShell()
 	char cmd[MAX_PATH_LENGTH] = {0};
 //	snprintf(cmd, sizeof(cmd), "%s %s %s"
 //			, mcPicShell, mcPicH264Path, mcPicPath);
-	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -i %s -y -s 240x180 -vframes 1 %s > /dev/null 2>&1"
+	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -i %s -y -s 240x180 -vframes 1 %s"
 			, mcPicH264Path, mcPicPath);
 
 	// log
@@ -1304,33 +1304,34 @@ bool VideoRecorder::RunPictureShell()
 //				, cmd);
 
 	// run shell
-	int code = system(cmd);
-	result = (code >= 0);
+//	int code = system(cmd);
+//	result = (code >= 0);
+	result = SendCommand(cmd);
 
 	// log
 	if (result) {
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg success, code:%d, cmd:%s\n"
-//					, code, cmd);
+//					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg success, cmd:%s\n"
+//					, cmd);
 	}
 	else {
 		// error
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg fail! code:%d, cmd:%s\n"
-					, code, cmd);
+					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg fail!, cmd:%s\n"
+					, cmd);
 	}
 
 	return result;
 }
 
 bool VideoRecorder::SendCommand(const char* cmd) {
-	switch_log_printf(
-			SWITCH_CHANNEL_LOG,
-			SWITCH_LOG_INFO,
-			"mod_file_recorder: VideoRecorder::SendCommand() cmd : %s\n",
-			cmd
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_LOG,
+//			SWITCH_LOG_DEBUG,
+//			"mod_file_recorder: VideoRecorder::SendCommand() cmd : \"%s\"\n",
+//			cmd
+//			);
 	return file_record_send_command(cmd);
 }
 

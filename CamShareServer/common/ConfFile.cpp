@@ -61,7 +61,7 @@ bool ConfFile::LoadConfFile()
             }
             char* pData = new char[buf.st_size];
             char* pDataDes = new char[buf.st_size];
-            if (fread(pData, sizeof(char), buf.st_size, fdTmp) == buf.st_size) {
+            if (fread(pData, sizeof(char), buf.st_size, fdTmp) == (size_t)buf.st_size) {
                 int iRet = m_Arithmetic.HexToAscii(pData, buf.st_size, pDataDes);
                 if (iRet) {
                     m_Arithmetic.TeaDecode(pDataDes, iRet, (char*)m_strCipher.c_str(), pData);
@@ -256,7 +256,7 @@ bool ConfFile::UpdateConfFile()
                 if (fseek(fd, 0, SEEK_SET) == 0) { 
                     char* pData = new char[((isize + 7) * 2)];
                     char* pDataEns = new char[((isize + 7) * 2)];
-                    if (fread((char*)pData, sizeof(char), isize, fd) == isize) {
+                    if (fread((char*)pData, sizeof(char), isize, fd) == (size_t)isize) {
                         int iRet;
                         iRet = m_Arithmetic.TeaEncode((char*)pData, isize, (char*)m_strCipher.c_str(), (char*)pDataEns);
                         if (iRet) {

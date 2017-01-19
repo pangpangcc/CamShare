@@ -17,6 +17,14 @@ if [ -z "$PID" ];then
   exit
 fi
 
+APP="camshare-executor"
+PID=`ps -ef | grep ${APP} | grep -v grep | awk -F" " '{ print $2 }'`
+if [ -z "$PID" ];then
+  # 运行camshare-executor
+	`cd /usr/local/CamShareServer/ && nohup ./camshare-executor -f ./camshare-executor.config 2>&1>/dev/null &`
+  exit
+fi
+
 # Check freeswitch
 APP="freeswitch"
 PID=`ps -ef | grep ${APP} | grep -v grep | awk -F" " '{ print $2 }'`

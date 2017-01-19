@@ -13,6 +13,7 @@
 #include <curl/curl.h>
 
 #include <list>
+#include <string>
 using namespace std;
 
 class HttpClient {

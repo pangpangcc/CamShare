@@ -6,7 +6,8 @@
  */
 
 #include "Session.h"
-#include "LogManager.h"
+
+#include <common/LogManager.h>
 
 class CheckTimeoutRunnable : public KRunnable {
 public:

@@ -182,7 +182,7 @@ bool DBHandler::RemoveRecord(const Record& record) {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"DBHandler::RemoveRecord( "
-			"[删除录制完成记录]"
+			"[删除录制完成记录], "
 			"sql : %s "
 			")",
 			sql
@@ -192,7 +192,7 @@ bool DBHandler::RemoveRecord(const Record& record) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::RemoveRecord( "
-				"[删除录制完成记录, 失败]"
+				"[删除录制完成记录, 失败], "
 				"sql : %s "
 				")",
 				sql
@@ -214,14 +214,14 @@ bool DBHandler::RemoveRecords(Record* records, int size) {
 			bResult = mSqliteManager.ExecSQL(sql);
 		}
 
-		bResult = mSqliteManager.ExecSQL("COMMIT");
+		bResult = mSqliteManager.ExecSQL("COMMIT;");
 	}
 
 	if( !bResult ) {
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::RemoveRecords( "
-				"[删除录制完成记录(批量), 失败]"
+				"[删除录制完成记录(批量), 失败], "
 				"sql : %s "
 				")",
 				sql
@@ -289,7 +289,7 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::InsertErrorRecord( "
-				"[插入录制完成上传失败记录, 失败]"
+				"[插入录制完成上传失败记录, 失败], "
 				"sql : %s "
 				")",
 				sql

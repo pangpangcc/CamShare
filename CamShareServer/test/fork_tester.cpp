@@ -36,10 +36,10 @@ public:
 	}
 protected:
 	void onRun() {
-//		while( gStart ) {
-////			system("pwd");
-//			usleep(10 * 1000);
-//		}
+		while( gStart ) {
+			system("whoami 2>&1>/dev/NULL ");
+			usleep(10 * 1000);
+		}
 	}
 };
 
@@ -56,20 +56,24 @@ int main(int argc, char *argv[]) {
 	sigaction(SIGPIPE, &sa, 0);
 
 	gStart = true;
-//	for(int i = 0; i < 4; i++) {
+	for(int i = 0; i < 4; i++) {
+		TestRunnable* runnable = new TestRunnable();
+		testThreads[i] = new KThread();
+		testThreads[i]->start(runnable);
+
+		usleep(100 * 1000);
+	}
+
+//	while(gStart) {
 //		TestRunnable* runnable = new TestRunnable();
-//		testThreads[i] = new KThread();
-//		testThreads[i]->start(runnable);
-//
+//		KThread* thread = new KThread();
+//		thread->start(runnable);
 //		usleep(100 * 1000);
+////		usleep(500 * 1000);
 //	}
 
-	while(gStart) {
-		TestRunnable* runnable = new TestRunnable();
-		KThread* thread = new KThread();
-		thread->start(runnable);
-		usleep(100 * 1000);
-//		usleep(500 * 1000);
+	while( gStart ) {
+		sleep(1);
 	}
 
 	return EXIT_SUCCESS;

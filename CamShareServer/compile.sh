@@ -15,5 +15,15 @@ else
   chmod +x ./configure || exit 1
   ./configure || exit 1
 fi
-
 make || exit 1
+
+# compile
+cd executor
+if [ "$1" == "noclean" ]; then
+  echo "# build CamShareExecutor without clean"
+else
+  echo "# bulid CamShareExecutor with clean"
+  make clean
+fi
+make || exit 1
+cd ..

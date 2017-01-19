@@ -1,5 +1,5 @@
 #!/bin/sh
-rm /usr/local/CamShareServer/log -rf
+rm /usr/local/CamShareServer/log/* -rf
 rm /usr/local/freeswitch/log/* -rf
 
 rm /usr/local/CamShareServer/local*.db -rf

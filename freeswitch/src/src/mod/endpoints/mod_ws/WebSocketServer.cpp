@@ -391,22 +391,22 @@ void WebSocketServer::OnWSClientParserHandshake(WSClientParser* parser) {
 
 void WebSocketServer::OnWSClientParserData(WSClientParser* parser, const char* buffer, int len) {
 	Client* client = (Client *)parser->GetClient();
-	switch_log_printf(
-			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
-			SWITCH_LOG_INFO,
-			"WebSocketServer::OnWSClientParserData( "
-			"parser : %p, "
-			"len : %d, "
-			"user : '%s', "
-			"domain : '%s', "
-			"dest : '%s' "
-			") \n",
-			parser,
-			len,
-			parser->GetUser(),
-			parser->GetDomain(),
-			parser->GetDestNumber()
-			);
+//	switch_log_printf(
+//			SWITCH_CHANNEL_UUID_LOG(parser->GetUUID()),
+//			SWITCH_LOG_INFO,
+//			"WebSocketServer::OnWSClientParserData( "
+//			"parser : %p, "
+//			"len : %d, "
+//			"user : '%s', "
+//			"domain : '%s', "
+//			"dest : '%s' "
+//			") \n",
+//			parser,
+//			len,
+//			parser->GetUser(),
+//			parser->GetDomain(),
+//			parser->GetDestNumber()
+//			);
 }
 
 void WebSocketServer::OnWSClientDisconected(WSClientParser* parser) {

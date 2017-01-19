@@ -57,6 +57,7 @@ bool AsyncIOServer::Start(
 
 	mRunning = true;
 	mpPool = pool;
+	mThreadCount = iThreadCount;
 
 	// 创建处理队列
 	switch_queue_create(&mpHandleQueue, SWITCH_CORE_QUEUE_LEN, mpPool);
@@ -152,7 +153,7 @@ bool AsyncIOServer::Send(Client* client, const char* buffer, switch_size_t* len)
 void AsyncIOServer::Disconnect(Client* client) {
 	switch_log_printf(
 			SWITCH_CHANNEL_LOG,
-			SWITCH_LOG_DEBUG,
+			SWITCH_LOG_INFO,
 			"AsyncIOServer::Disconnect( "
 			"client : %p "
 			") \n",

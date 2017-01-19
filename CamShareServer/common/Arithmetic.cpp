@@ -410,7 +410,7 @@ string Arithmetic::AesEncrypt(string initKey, string src) {
 		int count = 0;
 
 		// 分块加密，先对整块加密
-		for(int j = 0; j < blockCount; j++)
+		for(unsigned int j = 0; j < blockCount; j++)
 		{
 			memcpy(in, src.c_str() + keyLen * j, keyLen);
 			aes_crypt_ecb(&aes_key, 1, in, out + keyLen * j);
@@ -449,7 +449,7 @@ string Arithmetic::AesDecrypt(string initKey, string src) {
 		const unsigned int dataLen = HexToAscii(src.c_str(), src.length(), dst);
 		const unsigned int blockCount = dataLen / keyLen;
 
-		int j=0;
+		unsigned int j=0;
 		int count=0;
 
 		// 加密密钥补位，防止内存读取内存错误
@@ -503,8 +503,8 @@ void Arithmetic::encipher(void* aData, const void* aKey)
 
     while (n-- > 0){
         sum += cnDelta;
-        y += (z << 4) + a ^ z + sum ^ (z >> 5) + b;
-        z += (y << 4) + c ^ y + sum ^ (y >> 5) + d;
+        y += ((z << 4) + a) ^ (z + sum) ^ ((z >> 5) + b);
+        z += ((y << 4) + c) ^ (y + sum) ^ ((y >> 5) + d);
     }
     ((long*)aData)[0] = y;
     ((long*)aData)[1] = z;
@@ -520,8 +520,8 @@ void Arithmetic::decipher(void* aData, const void* aKey)
     int n = 32;
 
     while (n-- > 0){
-        z -= (y << 4) + c ^ y + sum ^ (y >> 5) + d;
-        y -= (z << 4) + a ^ z + sum ^ (z >> 5) + b;
+        z -= ((y << 4) + c) ^ (y + sum) ^ ((y >> 5) + d);
+        y -= ((z << 4) + a) ^ (z + sum) ^ ((z >> 5) + b);
         sum -= cnDelta;
     }
     ((long*)aData)[0] = y;

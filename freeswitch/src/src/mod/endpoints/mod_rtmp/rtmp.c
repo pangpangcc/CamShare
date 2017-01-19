@@ -178,8 +178,9 @@ void rtmp_handle_invoke(rtmp_session_t *rsession, int amfnumber)
 
 	transaction_id = amf0_get_number(argv[i++]);
 
-	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "[amfnumber=%d] Got INVOKE for %s\n", amfnumber,
-		command);
+	// Modify by Max 2017-01-12
+//	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "[amfnumber=%d] Got INVOKE for %s\n", amfnumber,
+//		command);
 
 	if ((function = (rtmp_invoke_function_t)(intptr_t)switch_core_hash_find(rtmp_globals.invoke_hash, command))) {
 		function(rsession, state, amfnumber, transaction_id, argc - 2, argv + 2);

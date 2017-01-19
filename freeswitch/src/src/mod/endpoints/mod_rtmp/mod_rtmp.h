@@ -371,7 +371,7 @@ struct rtmp_profile {
 
 	// add by Samson 2016-05-24
 	int handle_thread;			/* < Numbers of handle thread */
-	int connection_timeout;		/* < Millisecond of connection timeout time without sending data */
+	int active_timeout;		/* < Millisecond of connection timeout time without sending data */
 	// ------------------------
 
 	switch_hash_t *reg_hash;	/* < Registration hashtable */
@@ -534,7 +534,8 @@ struct rtmp_session {
 
 	uint8_t tryread_times;
 
-	long long connect_time;
+	// Modify by Max 4 check active timeout 2017-01-12
+	long long active_time;
 	int8_t check_timeout;
 	// ------------------------
 };

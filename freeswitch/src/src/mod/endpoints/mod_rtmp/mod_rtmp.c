@@ -1647,7 +1647,7 @@ static switch_xml_config_item_t *get_instructions(rtmp_profile_t *profile) {
 		SWITCH_CONFIG_ITEM("buffer-len", SWITCH_CONFIG_INT, CONFIG_RELOADABLE, &profile->buffer_len, 500, &opt_bufferlen, "", "Length of the receiving buffer to be used by the flash clients, in miliseconds"),
 		// add by Samson 2016-05-24
 		SWITCH_CONFIG_ITEM("handle-thread", SWITCH_CONFIG_INT, CONFIG_RELOADABLE, &profile->handle_thread, 2, &opt_bufferlen, "", "Numbers of handle thread"),
-		SWITCH_CONFIG_ITEM("connection-timeout", SWITCH_CONFIG_INT, CONFIG_RELOADABLE, &profile->connection_timeout, 5000, &opt_bufferlen, "", "Millisecond of connection timeout time without sending data"),
+		SWITCH_CONFIG_ITEM("active-timeout", SWITCH_CONFIG_INT, CONFIG_RELOADABLE, &profile->active_timeout, 5000, &opt_bufferlen, "", "Millisecond of connection timeout time without sending data"),
 		// ------------------------
 		SWITCH_CONFIG_ITEM_END()
 	};
@@ -1666,6 +1666,7 @@ static switch_status_t config_profile(rtmp_profile_t *profile, switch_bool_t rel
 	int count;
 	const char *file = "rtmp.conf";
 
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "config_profile( profile : %s )\n", profile->name);
 	if (!(xml = switch_xml_open_cfg(file, &cfg, NULL))) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Could not open %s\n", file);
 		goto done;
