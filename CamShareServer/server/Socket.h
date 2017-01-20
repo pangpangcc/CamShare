@@ -12,20 +12,20 @@
 
 #include <sys/socket.h>
 
-#include <ev.h>
-
 #include <string>
 using namespace std;
 
 #include <common/LogManager.h>
-
-#define INVALID_SOCKET -1
 
 typedef enum SocketStatus {
 	SocketStatusSuccess,
 	SocketStatusFail,
 	SocketStatusTimeout
 }SocketStatus;
+
+typedef struct ev_io;
+
+#define INVALID_SOCKET -1
 
 class Socket {
 public:

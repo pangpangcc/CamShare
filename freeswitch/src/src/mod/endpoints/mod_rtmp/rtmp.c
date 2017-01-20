@@ -640,8 +640,9 @@ switch_status_t rtmp_send_message(rtmp_session_t *rsession, uint8_t amfnumber, u
 	}
 
 	if (type != RTMP_TYPE_AUDIO && type != RTMP_TYPE_VIDEO && type != RTMP_TYPE_ACK) {
-		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG,
-						  "[amfnumber=%d type=0x%x stream_id=0x%x] len=%"SWITCH_SIZE_T_FMT" \n", amfnumber, type, stream_id, len);
+		// Modify by Max 2017/01/20
+//		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG,
+//						  "[amfnumber=%d type=0x%x stream_id=0x%x] len=%"SWITCH_SIZE_T_FMT" \n", amfnumber, type, stream_id, len);
 	}
 
 #ifdef RTMP_DEBUG_IO
@@ -1046,7 +1047,8 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				if (state->remainlen == 0) {
 
 					if (state->type != RTMP_TYPE_AUDIO && state->type != RTMP_TYPE_VIDEO && state->type != RTMP_TYPE_ACK) {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "[chunk_stream=%d type=0x%x ts=%d stream_id=0x%x] len=%d\n", rsession->amfnumber, state->type, (int)state->ts, state->stream_id, state->origlen);
+						// Modify by Max 2017/01/20
+//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "[chunk_stream=%d type=0x%x ts=%d stream_id=0x%x] len=%d\n", rsession->amfnumber, state->type, (int)state->ts, state->stream_id, state->origlen);
 					}
 #ifdef RTMP_DEBUG_IO
 					fprintf(rsession->io_debug_in, "[chunk_stream=%d type=0x%x ts=%d stream_id=0x%x] len=%d\n", rsession->amfnumber, state->type, (int)state->ts, state->stream_id, state->origlen);

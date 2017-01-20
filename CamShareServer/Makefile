@@ -16,65 +16,40 @@ CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
-CXXFLAGS +=	-I. -Iinclude -Ilibev -Iesl/include -Isqlite -Icurl/include
+CXXFLAGS +=	-I. -Iinclude -Ithird_party -Ithird_party/esl/include
 
+# 注意连接依赖顺序问题, 被依赖的放后面
 LIBS =		-L. \
-			-Wl,-Bstatic -Llibev/.libs -lev \
-			-Wl,-Bstatic -Lesl/libs -lesl \
-			-Wl,-Bstatic -Lsqlite/.libs -lsqlite3 \
-			-Wl,-Bstatic -Lcurl/lib/.libs -lcurl \
+			-Wl,-Bstatic -Llivechat -llivechat \
+			-Wl,-Bstatic -Lparser -lparser \
+			-Wl,-Bstatic -Lrequest -lrequest \
+			-Wl,-Bstatic -Lrespond -lrespond \
+			-Wl,-Bstatic -Lhttpclient -lhttpclient \
+			-Wl,-Bstatic -Lsimulatorchecker -lsimulatorchecker \
+			-Wl,-Bstatic -Lserver -lserver \
+			-Wl,-Bstatic -Lcommon -lcommon \
+			-Wl,-Bstatic -Lthird_party/amf -lamf \
+			-Wl,-Bstatic -Lthird_party/json -ljson \
+			-Wl,-Bstatic -Lthird_party/xml -lxml \
+			-Wl,-Bstatic -Lthird_party/libev/.libs -lev \
+			-Wl,-Bstatic -Lthird_party/esl/libs -lesl \
+			-Wl,-Bstatic -Lthird_party/curl/lib/.libs -lcurl \
+			-Wl,-Bstatic -Lthird_party/sqlite/.libs -lsqlite3 \
 			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 
-COMMON  	=	common/LogFile.o common/md5.o common/KThread.o common/ConfFile.o common/Arithmetic.o common/aes.o\
-				common/IAutoLock.o common/CommonFunc.o common/LogManager.o
-				
-JSON    	=	json/json_reader.o json/json_value.o json/json_writer.o
-
-AMF	    	=	amf/AMF3.o amf/AmfParser.o
-
-XML			=   xml/tinystr.o xml/tinyxml.o xml/tinyxmlerror.o xml/tinyxmlparser.o
-
-CHECKER		=	simulatorchecker/SimulatorProtocolTool.o
-
-HTTPCLIENT	=	httpclient/HttpClient.o httpclient/HttpEntiy.o
-
-SERVER		= 	server/TcpServer.o server/AsyncIOServer.o
-
-PARSER		= 	parser/DataParser.o parser/HttpParser.o 
-
-REQUEST 	=	request/BaseRequest.o request/EnterConferenceRequest.o request/SendMsgExitConferenceRequest.o \
-				request/SendMsgEnterConferenceRequest.o
-
-RESPOND		=   respond/BaseRespond.o respond/DialplanRespond.o respond/RecordFinishRespond.o
-
-LIVECHAT	=	livechat/Counter.o livechat/ILiveChatClient.o livechat/ISocketHandler.o \
-				livechat/IThreadHandler.o livechat/ITransportDataHandler.o livechat/ITransportPacketHandler.o \
-				livechat/LiveChatClient.o livechat/TaskManager.o livechat/TaskMapManager.o \
-				livechat/TransportDataHandler.o livechat/TransportPacketHandler.o \
-				livechat/task/ITask.o livechat/task/BaseTask.o \
-				livechat/task/CheckVerTask.o livechat/task/RecvEnterConferenceTask.o \
-				livechat/task/RecvKickUserFromConferenceTask.o \
-				livechat/task/SendEnterConferenceTask.o livechat/task/SendMsgTask.o \
-				livechat/task/HearbeatTask.o
-				
 OBJS 		=	main.o CamShareMiddleware.o  \
 				Session.o FreeswitchClient.o SessionManager.o \
 				SqliteManager.o DBHandler.o
 		
-OBJS +=		$(COMMON)
-OBJS +=		$(JSON)
-OBJS +=		$(AMF)
-OBJS +=		$(XML)
-OBJS +=		$(CHECKER)
-OBJS +=		$(HTTPCLIENT)
-OBJS +=		$(SERVER)
-OBJS +=		$(PARSER)
-OBJS +=		$(REQUEST)
-OBJS +=     $(RESPOND)
-OBJS +=		$(LIVECHAT)
 TARGET =	camshare-middleware
 
-DEPDIRS	:= libev sqlite curl#rtmp
+DEPDIRS	:= third_party/libev third_party/sqlite third_party/curl \
+			third_party/amf third_party/json third_party/xml \
+			common httpclient simulatorchecker \
+			parser server \
+			request respond livechat \
+			executor
+			
 CLEAN_DEPS := $(addprefix _clean_, $(DEPDIRS))
 
 .PHONY: all deps test clean cleanall install $(DEPDIRS) $(TARGET)
@@ -96,7 +71,7 @@ $(CLEAN_DEPS):
 deps:	$(DEPDIRS)
 	@echo '################################################################'
 	@echo ''
-	@echo '# Bulid deps completed!'
+	@echo '# Bulid deps camshare-middleware completed!'
 	@echo ''
 	@echo '################################################################'
 	
@@ -105,12 +80,12 @@ all:	deps $(TARGET) $(LIVECHAT_TEST)
 test:	deps $(LIVECHAT_TEST) $(RTMP_TEST)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(TARGET) $(OBJS)
 	
 cleanall: clean	$(CLEAN_DEPS)
 	@echo '################################################################'
 	@echo ''
-	@echo '# Clean all finished!'
+	@echo '# Clean all camshare-middleware finished!'
 	@echo ''
 	@echo '################################################################'
 	

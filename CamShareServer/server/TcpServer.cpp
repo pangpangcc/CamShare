@@ -6,6 +6,9 @@
  */
 
 #include "TcpServer.h"
+#include "Socket.h"
+
+#include <ev.h>
 
 /***************************** libev回调函数 **************************************/
 void accept_handler(struct ev_loop *loop, ev_io *w, int revents);
@@ -49,6 +52,11 @@ TcpServer::TcpServer()
 	mpIORunnable = new IORunnable(this);
 
 	mLoop = NULL;
+
+	mpSocket = Socket::Create();
+	miMaxConnection = 1;
+
+	mpAcceptWatcher = (ev_io *)malloc(sizeof(ev_io));
 }
 
 TcpServer::~TcpServer() {
@@ -58,6 +66,16 @@ TcpServer::~TcpServer() {
 	if( mpIORunnable ) {
 		delete mpIORunnable;
 		mpIORunnable = NULL;
+	}
+
+	if( mpSocket ) {
+		Socket::Destroy(mpSocket);
+		mpSocket = NULL;
+	}
+
+	if( mpAcceptWatcher ) {
+		free(mpAcceptWatcher);
+		mpAcceptWatcher = NULL;
 	}
 }
 
@@ -117,15 +135,15 @@ bool TcpServer::Start(int port, int maxConnection, const char *ip) {
 	}
 
 	if( bFlag ) {
-		mSocket.SetAddress(fd, ip, port);
+		mpSocket->SetAddress(fd, ip, port);
 
 		// 设置快速重用
 		int iFlag = 1;
-		setsockopt(mSocket.fd, SOL_SOCKET, SO_REUSEADDR, &iFlag, sizeof(iFlag));
+		setsockopt(mpSocket->fd, SOL_SOCKET, SO_REUSEADDR, &iFlag, sizeof(iFlag));
 		// 设置非阻塞
-		int flags = fcntl(mSocket.fd, F_GETFL, 0);
+		int flags = fcntl(mpSocket->fd, F_GETFL, 0);
 		flags = flags | O_NONBLOCK;
-		fcntl(mSocket.fd, F_SETFL, flags);
+		fcntl(mpSocket->fd, F_SETFL, flags);
 	}
 
 	if( bFlag ) {
@@ -135,7 +153,7 @@ bool TcpServer::Start(int port, int maxConnection, const char *ip) {
 		ac_addr.sin_port = htons(port);
 		ac_addr.sin_addr.s_addr = INADDR_ANY;
 
-		if ( bind(mSocket.fd, (struct sockaddr *) &ac_addr, sizeof(struct sockaddr)) == -1 ) {
+		if ( bind(mpSocket->fd, (struct sockaddr *) &ac_addr, sizeof(struct sockaddr)) == -1 ) {
 			LogManager::GetLogManager()->Log(
 					LOG_ERR_SYS,
 					"TcpServer::Start( "
@@ -162,7 +180,7 @@ bool TcpServer::Start(int port, int maxConnection, const char *ip) {
 	}
 
 	if( bFlag ) {
-		if ( listen(mSocket.fd, 1024) == -1 ) {
+		if ( listen(mpSocket->fd, 1024) == -1 ) {
 			LogManager::GetLogManager()->Log(
 					LOG_ERR_SYS,
 					"TcpServer::Start( "
@@ -295,9 +313,9 @@ void TcpServer::Stop() {
 			"maxConnection : %d, "
 			"ip : %s "
 			")",
-			mSocket.port,
+			mpSocket->port,
 			miMaxConnection,
-			mSocket.ip.c_str()
+			mpSocket->ip.c_str()
 			);
 
 	mServerMutex.lock();
@@ -312,17 +330,17 @@ void TcpServer::Stop() {
 
 		// 停止监听socket事件
 		mWatcherMutex.lock();
-		ev_io_stop(mLoop, &mAcceptWatcher);
+		ev_io_stop(mLoop, mpAcceptWatcher);
 		mWatcherMutex.unlock();
 
 		// 关掉监听socket
-		mSocket.Disconnect();
+		mpSocket->Disconnect();
 
 		// 等待IO线程停止
 		mIOThread.stop();
 
 		// 关闭监听socket
-		mSocket.Close();
+		mpSocket->Close();
 
 		// 清除监听器队列
 		ev_io* w = NULL;
@@ -345,9 +363,9 @@ void TcpServer::Stop() {
 			"maxConnection : %d, "
 			"ip : %s "
 			")",
-			mSocket.port,
+			mpSocket->port,
 			miMaxConnection,
-			mSocket.ip.c_str()
+			mpSocket->ip.c_str()
 			);
 
 }
@@ -423,9 +441,9 @@ void TcpServer::IOHandleThread() {
 			);
 
 	// 把mServer放到事件监听队列
-	ev_io_init(&mAcceptWatcher, accept_handler, mSocket.fd, EV_READ);
-	mAcceptWatcher.data = &mSocket;
-	ev_io_start(mLoop, &mAcceptWatcher);
+	ev_io_init(mpAcceptWatcher, accept_handler, mpSocket->fd, EV_READ);
+	mpAcceptWatcher->data = mpSocket;
+	ev_io_start(mLoop, mpAcceptWatcher);
 
 	// 增加回调参数
 	ev_set_userdata(mLoop, this);
@@ -682,7 +700,7 @@ void TcpServer::StopEvIO(ev_io *w) {
 		ev_io_stop(mLoop, w);
 		mWatcherMutex.unlock();
 
-		if( mWatcherList.Size() <= miMaxConnection ) {
+		if( mWatcherList.Size() <= (size_t)miMaxConnection ) {
 			// 空闲的缓存小于设定值
 			LogManager::GetLogManager()->Log(
 					LOG_STAT,

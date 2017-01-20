@@ -65,7 +65,7 @@ if support_test == 1 then
     freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
   end
 end
-  
+
 -- 从接口验证用户
 if result == 0 then 
   local loginPath = getLoginPath(siteId);

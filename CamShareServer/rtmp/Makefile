@@ -16,22 +16,26 @@ CXXFLAGS = -O2 -g
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable -Wno-write-strings -Wno-narrowing -Wno-unused-variable
-CXXFLAGS +=	-I. -I../ -I../libev
+CXXFLAGS +=	-I. -I../
 
+# 注意连接依赖顺序问题, 被依赖的放后面
 LIBS =		-L. \
-			-Wl,-Bdynamic -ldl -lz -lpthread 
-
-COMMON  	=	../common/LogFile.o ../common/md5.o ../common/KThread.o ../common/ConfFile.o ../common/Arithmetic.o ../common/aes.o\
-				../common/IAutoLock.o ../common/CommonFunc.o
+			-Wl,-Bstatic -L../common -lcommon \
+			-Wl,-Bstatic -L../third_party/amf -lamf \
+			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 				
-OBJS	+= $(COMMON)		
-OBJS	+=	amf.o ISocketHandler.o IThreadHandler.o RtmpClient.o rtmp_client.o ../LogManager.o ../MessageList.o
+OBJS	+=	amf.o ISocketHandler.o IThreadHandler.o RtmpClient.o rtmp_client.o
 		
 TARGET =	rtmp-client
 
-.PHONY: clean $(TARGET)
+DEPDIRS	:= ../third_party/amf \
+			../common 
+			
+CLEAN_DEPS := $(addprefix _clean_, $(DEPDIRS))
 
-$(TARGET):	$(OBJS)
+.PHONY: deps clean $(TARGET)
+
+$(TARGET):	deps $(OBJS)
 	$(CXX) -o $(TARGET) $(OBJS) $(LIBS)
 	@echo '################################################################'
 	@echo ''
@@ -39,6 +43,13 @@ $(TARGET):	$(OBJS)
 	@echo ''
 	@echo '################################################################'
 
+deps:	$(DEPDIRS)
+	@echo '################################################################'
+	@echo ''
+	@echo '# Bulid deps rtmp-client completed!'
+	@echo ''
+	@echo '################################################################'
+	
 all:	$(TARGET)
 
 clean:

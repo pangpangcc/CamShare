@@ -8,11 +8,12 @@
 #ifndef SRC_MOD_ENDPOINTS_MOD_WS_ASYNCIOSERVER_H_
 #define SRC_MOD_ENDPOINTS_MOD_WS_ASYNCIOSERVER_H_
 
-#include "Client.h"
 #include "TcpServer.h"
+#include "Client.h"
 
 #include <common/KSafeList.h>
 
+class Client;
 class AsyncIOServerCallback {
 public:
 	virtual ~AsyncIOServerCallback(){};

@@ -19,7 +19,7 @@ using namespace std;
 
 #include "RtmpClient.h"
 #include <common/KThread.h>
-#include "../LogManager.h"
+#include <common/LogManager.h>
 
 #define VERSION_STRING "1.0.0"
 
@@ -413,7 +413,6 @@ protected:
 				")",
 				mContainer->GetIndex()
 				);
-		mContainer->Shutdown();
 	}
 private:
 	RtmpClient *mContainer;
@@ -452,7 +451,7 @@ protected:
 					);
 
 			if( mContainer->Connect(ip) ) {
-//				bool bHeartBeat = (mContainer->GetIndex() % 2 == 0);
+//				bool bHeartBeat = true;//(mContainer->GetIndex() % 2 == 0);
 //				if( bHeartBeat ) {
 //					// 开始心跳线程
 //					SendHeartBeatRunnable* pHeartBeatRunable = new SendHeartBeatRunnable(mContainer);

@@ -8,19 +8,19 @@
 # Email: Kingsleyyau@gmail.com
 #
 
-cd libev
+cd third_party/libev
 chmod +x configure &&
 ./configure &&
-cd ..
+cd -
 
-cd sqlite &&
+cd third_party/sqlite &&
 autoreconf -ivf &&
 chmod +x configure &&
 ./configure &&
-cd ..
+cd -
 
-cd curl &&
+cd third_party/curl &&
 autoreconf -ivf &&
 chmod +x configure &&
 ./configure --disable-shared --enable-static --without-ssl &&
-cd ..
+cd -

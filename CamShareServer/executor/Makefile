@@ -16,57 +16,53 @@ CXXFLAGS = -O2 -g
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
-CXXFLAGS +=	-I. -I../ -Iinclude \
-			-I../libev 
-			#-I../../deps/build/include
-
+CXXFLAGS +=	-I. -I../ -I../include -I../third_party 
 CXXFLAGS += -D__STDC_CONSTANT_MACROS
 
+# 注意连接依赖顺序问题, 被依赖的放后面
 LIBS =		-L. \
-			-Wl,-Bstatic -L../libev/.libs -lev \
-			-Wl,-Bdynamic -ldl -lz -lpthread
+			-Wl,-Bstatic -L../parser -lparser \
+			-Wl,-Bstatic -L../respond -lrespond \
+			-Wl,-Bstatic -L../server -lserver \
+			-Wl,-Bstatic -L../common -lcommon \
+			-Wl,-Bstatic -L../third_party/libev/.libs -lev \
+			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 
-COMMON  	=	../common/LogFile.o ../common/md5.o ../common/KThread.o ../common/ConfFile.o ../common/Arithmetic.o ../common/aes.o\
-				../common/IAutoLock.o ../common/CommonFunc.o ../common/LogManager.o
-				
-JSON    	=	../json/json_reader.o ../json/json_value.o ../json/json_writer.o
-
-SERVER		= 	../server/TcpServer.o ../server/AsyncIOServer.o
-
-PARSER		= 	../parser/DataParser.o ../parser/HttpParser.o 
-
-RESPOND		=   ../respond/BaseRespond.o respond/ExecCmdRespond.o
+RESPOND		=   respond/ExecCmdRespond.o
 
 OBJS 		=	main.o CamShareExecutor.o #Transcoder.o
 
-OBJS +=		$(COMMON)
-OBJS +=		$(JSON)
-OBJS +=		$(SERVER)
-OBJS +=		$(PARSER)
 OBJS +=		$(RESPOND)
 TARGET =	camshare-executor
 
-.PHONY: all clean cleanall install $(TARGET)
+DEPDIRS	:= ../third_party/libev \
+			../common \
+			../parser ../server \
+			../respond 
+			
+CLEAN_DEPS := $(addprefix _clean_, $(DEPDIRS))
 
-$(TARGET):	$(OBJS)
+.PHONY: all deps clean install $(DEPDIRS) $(TARGET)
+
+$(TARGET):	deps $(OBJS)
 	$(CXX) -o $(TARGET) $(OBJS) $(LIBS)
 	@echo '################################################################'
 	@echo ''
 	@echo '# Bulid camshare-executor completed!'
 	@echo ''
 	@echo '################################################################'
-	
+
+deps:	$(DEPDIRS)
+	@echo '################################################################'
+	@echo ''
+	@echo '# Bulid deps camshare-executor completed!'
+	@echo ''
+	@echo '################################################################'
+		
 all:	$(TARGET)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
-	
-cleanall: clean
-	@echo '################################################################'
-	@echo ''
-	@echo '# Clean all finished!'
-	@echo ''
-	@echo '################################################################'
+	rm -f $(TARGET) $(OBJS) 
 	
 install: 
 	copy camshare-executor.config /etc/ -rf

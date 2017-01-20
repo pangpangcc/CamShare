@@ -38,7 +38,12 @@ chmod +x $updatedir/update.sh
 # ---- copy freeswitch files
 # copy all ./lib & ./mod files
 mkdir -p $updatefiledir/lib
-cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
+#cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
+# copy common lib
+cp -f /usr/local/freeswitch/lib/libfreeswitch.a $updatefiledir/lib/
+cp -f /usr/local/freeswitch/lib/libfreeswitch.la $updatefiledir/lib/
+cp -f /usr/local/freeswitch/lib/libfreeswitch.so.1.0.0 $updatefiledir/lib/
+
 #mkdir -p $updatefiledir/mod
 #cp -f /usr/local/freeswitch/mod/* $updatefiledir/mod/
 
@@ -49,11 +54,6 @@ cp -f /usr/local/freeswitch/conf/autoload_configs/switch.conf.xml $updatefiledir
 
 # copy lua configs
 cp -f /usr/local/freeswitch/conf/autoload_configs/lua.conf.xml $updatefiledir/
-
-# copy common lib
-#cp -f /usr/local/freeswitch/lib/libfreeswitch.a $updatefiledir/
-#cp -f /usr/local/freeswitch/lib/libfreeswitch.la $updatefiledir/
-#cp -f /usr/local/freeswitch/lib/libfreeswitch.so.1.0.0 $updatefiledir/
 
 # copy shell
 #cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiledir/

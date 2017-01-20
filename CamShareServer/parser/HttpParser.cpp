@@ -61,7 +61,7 @@ int HttpParser::ParseData(char* buffer, int len) {
 			while( true ) {
 				if( (sep = strstr(header, HTTP_LINE_SEP)) && (sep != sepHeader) ) {
 					lineLen = sep - header;
-					if( lineLen < sizeof(line) - 1 ) {
+					if( lineLen < (int)(sizeof(line) - 1) ) {
 						memcpy(line, header, lineLen);
 						line[lineLen] = '\0';
 

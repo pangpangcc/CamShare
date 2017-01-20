@@ -8,6 +8,8 @@
 #ifndef TCPSERVER_H_
 #define TCPSERVER_H_
 
+#include "Socket.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,8 +27,6 @@
 #include <common/KThread.h>
 #include <common/KSafeList.h>
 #include <common/LogManager.h>
-
-#include "Socket.h"
 
 class TcpServerCallback {
 public:
@@ -68,13 +68,13 @@ private:
 	KMutex mServerMutex;
 	bool mRunning;
 
-	Socket mSocket;
+	Socket* mpSocket;
 	int miMaxConnection;
 
 	IORunnable* mpIORunnable;
 	KThread mIOThread;
 
-	ev_io mAcceptWatcher;
+	ev_io* mpAcceptWatcher;
 	struct ev_loop *mLoop;
 	KMutex mWatcherMutex;
 	WatcherList mWatcherList;

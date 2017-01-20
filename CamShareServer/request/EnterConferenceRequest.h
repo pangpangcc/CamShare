@@ -18,6 +18,7 @@ typedef enum EnterConferenceRequestCheckType {
 	Active,
 } EnterConferenceRequestCheckType;
 
+class FreeswitchClient;
 class EnterConferenceRequest : public BaseRequest {
 public:
 	EnterConferenceRequest();

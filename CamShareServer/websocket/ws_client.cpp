@@ -19,7 +19,7 @@ using namespace std;
 
 #include "WSClient.h"
 #include <common/KThread.h>
-#include "../LogManager.h"
+#include <common/LogManager.h>
 
 #define VERSION_STRING "1.0.0"
 
