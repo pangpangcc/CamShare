@@ -315,7 +315,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 
 		if (helper->last_seq && helper->last_seq + 1 != rtp_seq) {
 
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "possible video rtp packet loss? seq: %u - %u - 1 = %d ts: %u - %u = %d\n",
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "possible video rtp packet loss? seq: %u - %u - 1 = %d ts: %u - %u = %d\n",
 				ntohs(raw_rtp->seq), helper->last_seq, (int)(rtp_seq - helper->last_seq - 1),
 				ntohl(raw_rtp->ts), helper->last_recv_ts, (int)(rtp_ts - helper->last_recv_ts));
 

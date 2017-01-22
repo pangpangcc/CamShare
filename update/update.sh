@@ -11,7 +11,7 @@ sleep 5
 path=$(dirname $0)
 cd $path
 
-yum install libpng -y
+sudo yum install libpng -y
 
 # ---- freeswitch ----
 # freeswitch common config

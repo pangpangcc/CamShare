@@ -256,6 +256,7 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 				 * 2.RTMP连接心跳时间大于配置时间
 				 */
 				if( rsession ) {
+					switch_mutex_lock(rsession->handle_mutex);
 					user = NULL;
 					if( rsession->account ) {
 						user = rsession->account->user;
@@ -288,10 +289,8 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 							rsession->check_timeout = 0;
 							rtmp_session_shutdown(&rsession);
 						}
-	//					else {
-	//						break;
-	//					}
 					}
+					switch_mutex_unlock(rsession->handle_mutex);
 				}
 			}
 			else {
@@ -583,7 +582,8 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 		// ---------------------------
 	}
 
-	io->base.running = -1;
+//	// Modify by Max 2017/01/22 for crash when shutdown
+//	io->base.running = 0;
 	switch_socket_close(io->listen_socket);
 
 	return NULL;
@@ -778,6 +778,9 @@ switch_status_t rtmp_tcp_release(rtmp_profile_t *profile)
 	switch_list_node_t* node = NULL;
 
 	if (NULL != io_tcp) {
+		// Modify by Max 2017/01/22
+		io_tcp->base.running = 0;
+
 		// wait timeout thread exit
 		if (NULL != io_tcp->timeout_thread) {
 			switch_status_t st;
