@@ -79,8 +79,6 @@ private:
 	// yuv （uv是色度）中的长度，没有uv就是黑白了
 	int muv_length;
 
-	AVFrame *mFrameYUV;
-
 	Rtp2H264VideoTransfer mRtp2H264VideoTransfer;
 
 	string mFilePath;

@@ -14,6 +14,10 @@
 #include <string>
 using namespace std;
 
+typedef enum {
+	VIDEO_FORMATE_NV21 = 17
+}VIDEO_FORMATE_TYPE;
+
 typedef struct CaptureBuffer {
 	CaptureBuffer() {
 		data = NULL;
@@ -85,14 +89,16 @@ public:
 	CaptureBuffer* PopVideoData();
 	// 插入一个视频数据
 	bool PushVideoData(CaptureBuffer* item);
-	// 清空视频队列
-	void CleanDataList();
+	// 清空视频队列和设置插入标志
+	void CleanDataList(bool isStart);
 	// 根据帧率得到一帧时间
 	void SetCaptureFrameTime(int rate);
 	// 设置发送视频的宽高
 	void SetSendVideoSize(int width, int height);
 	// 清空视频队列
 	void CleanVideoDataList();
+	// 选择视频采集格式
+	int ChooseVideoFormate(int* videoFormate, int size, int deviceType);
 private:
 	// 整理队列符合采集数据
 	//void HandleAndSortVideoData(CaptureBuffer* item);
@@ -117,6 +123,13 @@ private:
 	int mWidth;
 	// 发送的视频高
 	int mHeight;
+	// 视频宽因数
+	int mWFactor;
+	// 视频高因数
+	int mHFactor;
+
+	// 开始插入数据标记
+	bool mIsPush;
 
 };
 

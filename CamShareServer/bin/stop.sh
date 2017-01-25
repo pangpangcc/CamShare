@@ -56,13 +56,13 @@ GetFreeswitchPID() {
 }
 
 KillFS() {
-  ShutdownFreeswitch
-#  GetFreeswitchPID
-#  if [ -n "$FS_PID" ];then
-#    KILL_CMD="kill $FS_PID"
-#    echo "kill freeswitch cmd:'$KILL_CMD'"
-#    eval $KILL_CMD
-#  fi
+#  ShutdownFreeswitch
+  GetFreeswitchPID
+  if [ -n "$FS_PID" ];then
+    KILL_CMD="kill $FS_PID"
+    echo "kill freeswitch cmd:'$KILL_CMD'"
+    eval $KILL_CMD
+  fi
 }
 
 Kill9FS() {
@@ -84,8 +84,9 @@ CheckAndWait() {
     #echo "CheckAndWait time : $i"
     
     wait=0
-    if [ "$fs_cmd_shutdown" == "+OK" ] && [ -n "$FS_PID" ]; then
-      # freeswitch命令成功, 服务未停止, 等待
+    #if [ "$fs_cmd_shutdown" == "+OK" ] && [ -n "$FS_PID" ]; then
+    if [ -n "$FS_PID" ]; then
+      # freeswitch服务未停止, 等待
       wait=1
     fi
     
@@ -96,6 +97,7 @@ CheckAndWait() {
     
     if [ "$wait" == 1 ]; then
       # 等待
+      echo "# waitting..."
       sleep 1
     else
       #echo "CheckAndWait break"
@@ -116,3 +118,4 @@ Kill9CS
 Kill9CSEXC
 Kill9FS
 sleep 1
+echo "# Stop all camshare service OK"

@@ -132,18 +132,22 @@ CaptureData::CaptureData() {
 	MaxListLen = 3;
 	mLastEncodeData = NULL;
 	// 默认一帧的时间
-	mCaptureFrameMS = 1000/8;
+	mCaptureFrameMS = 1000/6;
+//
+//	// 发送的视频宽
+//	mWidth = 176;
+//	// 发送的视频高
+//	mHeight = 144;
+//
+	SetSendVideoSize(176, 144);
 
-	// 发送的视频宽
-	mWidth = 176;
-	// 发送的视频高
-	mHeight = 144;
+	mIsPush = false;
 }
 
 CaptureData::~CaptureData() {
 	// TODO Auto-generated destructor stub
 
-	CleanDataList();
+	CleanDataList(false);
 	delete mLastEncodeData;
 	mLastEncodeData = NULL;
 	IAutoLock::ReleaseAutoLock(mCaptureDataLock);
@@ -200,45 +204,47 @@ CaptureBuffer* CaptureData::PopVideoData()
 		int newWidth = 0;
 		int newHeight = 0;
 		unsigned char* newData = NULL;
+		int factor = mWFactor > mHFactor ? mWFactor : mHFactor;
+
 		switch(item->direction)
 		{
 		case 0:
 		{
-			result = item->width / 22;
-			newWidth = 22 * result;
-			newHeight = 18 * result;
+			result = item->width / factor;
+			newWidth = mWFactor * result;
+			newHeight = mHFactor * result;
 			newData = detailPic0(item->data, item->width, item->heigth, newWidth, newHeight);
 		}
 		break;
 		case 90:
 		{
-			result = item->heigth / 22;
-			newWidth = 22 * result;
-			newHeight = 18 * result;
+			result = item->heigth / factor;
+			newWidth = mWFactor * result;
+			newHeight = mHFactor * result;
 			newData = detailPic90(item->data, item->width, item->heigth, newWidth, newHeight);
 		}
 		break;
 		case 180:
 		{
-			result = item->width / 22;
-			newWidth = 22 * result;
-			newHeight = 18 * result;
+			result = item->width / factor;
+			newWidth = mWFactor * result;
+			newHeight = mHFactor * result;
 			newData = detailPic180(item->data, item->width, item->heigth, newWidth, newHeight);
 		}
 		break;
 		case 270:
 		{
-			result = item->heigth / 22;
-			newWidth = 22 * result;
-			newHeight = 18 * result;
+			result = item->heigth / factor;
+			newWidth = mWFactor * result;
+			newHeight = mHFactor * result;
 			newData = detailPic270(item->data, item->width, item->heigth, newWidth, newHeight);
 		}
 		break;
 		default:
 		{
-			result = item->heigth / 22;
-			newWidth = 22 * result;
-			newHeight = 18 * result;
+			result = item->heigth / factor;
+			newWidth = mWFactor * result;
+			newHeight = mHFactor * result;
 			newData = detailPic270(item->data, item->width, item->heigth, newWidth, newHeight);
 		}
 		break;
@@ -248,16 +254,18 @@ CaptureBuffer* CaptureData::PopVideoData()
 			dataItem->timeInterval = dataItem->timeStamp - mLastEncodeData->timeStamp;
 			delete mLastEncodeData;
 			mLastEncodeData = NULL;
-			mLastEncodeData = new CaptureBuffer(dataItem);
-			delete dataItem;
-			dataItem = NULL;
 		}
 		else
 		{
 			dataItem->timeInterval = 0;
-			mLastEncodeData = new CaptureBuffer(dataItem);
-			delete dataItem;
-			dataItem = NULL;
+
+		}
+		mLastEncodeData = new CaptureBuffer(dataItem);
+		delete dataItem;
+		dataItem = NULL;
+		if (newData){
+			delete[] newData;
+			newData = NULL;
 		}
 	}
 
@@ -298,8 +306,15 @@ bool CaptureData::PushVideoData(CaptureBuffer* item)
 	{
 		CleanVideoDataList();
 	}
+	if (mIsPush){
+		CaptureDataList.push_back(item);
+		FileLog("CamshareClient",
+				"CaptureData::PushVideoData"
+				"succse"
+				")"
+				);
+	}
 
-	CaptureDataList.push_back(item);
 
 	if (NULL != mCaptureDataLock)
 	{
@@ -312,19 +327,36 @@ bool CaptureData::PushVideoData(CaptureBuffer* item)
 	return result;
 }
 
-// 清空视频队列
-void CaptureData::CleanDataList()
+// 清空视频队列和设置插入标志
+void CaptureData::CleanDataList(bool isStart)
 {
+	FileLog("CamshareClient",
+			"CaptureData::CleanDataList(start "
+			"isStart :%d"
+			")",
+			isStart
+			);
 	if (NULL != mCaptureDataLock)
 	{
 		mCaptureDataLock->Lock();
 	}
+		mIsPush = isStart;
+		if (mLastEncodeData){
+			delete mLastEncodeData;
+			mLastEncodeData = NULL;
+		}
+
 		CleanVideoDataList();
 
 	if (NULL != mCaptureDataLock)
 	{
 		mCaptureDataLock->Unlock();
 	}
+
+	FileLog("CamshareClient",
+			"CaptureData::CleanDataList(end "
+			")"
+			);
 }
 
 // 清空视频队列
@@ -349,11 +381,63 @@ void CaptureData::SetCaptureFrameTime(int rate)
 // 设置发送视频的宽高
 void CaptureData::SetSendVideoSize(int width, int height)
 {
+	FileLog("CamshareClient",
+			"CaptureData::SetSendVideoSize(start "
+			"width :%d,"
+			"height :%d"
+			")",
+			width,
+			height
+			);
 	// 发送的视频宽
 	 mWidth = width;
 	// 发送的视频高
 	 mHeight = height;
+
+	 int m = width;
+	 int n = height;
+	 //获取最大公因数, 最后m为最大公因数
+	 while(n!=0){
+		 int r = m%n;
+		 m = n;
+		 n = r;
+	 }
+
+	 int wM = mWidth/m;
+	 int hM = mHeight/m;
+
+	 if (wM %2 || hM%2){
+		 wM = wM * 2;
+		 hM = hM * 2;
+	 }
+	 mWFactor = wM;
+	 mHFactor = hM;
+
+		FileLog("CamshareClient",
+				"CaptureData::SetSendVideoSize(end "
+				"mWidth :%d,"
+				"mHeight :%d,"
+				"mWFactor :%d,"
+				"mHFactor :%d"
+				")",
+				mWidth,
+				mHeight,
+				mWFactor,
+				mHFactor
+				);
+
 }
 
 
-
+// 选择视频采集格式
+int CaptureData::ChooseVideoFormate(int* videoFormate, int size, int deviceType)
+{
+	int result = -1;
+	for (int i = 0; i < size; i++){
+		if (videoFormate[i] == VIDEO_FORMATE_NV21){
+			result = videoFormate[i];
+			break;
+		}
+	}
+	return result;
+}

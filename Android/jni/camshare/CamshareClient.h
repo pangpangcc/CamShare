@@ -42,9 +42,10 @@ public:
 };
 
 class ClientRunnable;
+class SendHeartBeatRunnable;
 class CamshareClient : public RtmpClientListener {
 	friend class ClientRunnable;
-
+	friend class SendHeartBeatRunnable;
 public:
 	CamshareClient();
 	virtual ~CamshareClient();
@@ -121,6 +122,17 @@ public:
 	void StartCapture();
 	// 停止采集
 	void StopCapture();
+	// 选择采集视频格式
+	/*
+	 *  videoFormate 采集的格式数组
+	 *  size         数组的多少
+	 *  device       设备类型：0：android；1：ios；2：其他
+	 */
+	int ChooseVideoFormate(int* videoFormate, int size, int deviceType);
+	// 开始心跳包
+	void StartHearBest();
+	// 停止心跳包
+	void StopHearBest();
 
 public:
 	void OnConnect(RtmpClient* client, const string& sessionId);
@@ -155,6 +167,9 @@ private:
 	RtmpClient mRtmpClient;
 	ClientRunnable* mpRunnable;
 	KThread mClientThread;
+	// 心跳线程
+	SendHeartBeatRunnable* mpSendHeartBeatRunnable;
+	KThread mheartBeatThread;
 	H264Decoder mH264Decoder;
 	// 编码器
 	H264Encoder mH264Encoder;

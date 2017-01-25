@@ -44,6 +44,7 @@ public:
 protected:
 	void onRun() {
 		if( mContainer->mRtmpClient.Connect(mContainer->hostName) ) {
+			mContainer->StartHearBest();
 			RtmpPacket recvPacket;
 			while( mContainer->mRtmpClient.RecvRtmpPacket(&recvPacket) ) {
 
@@ -57,6 +58,7 @@ protected:
 					"[Disconnect] "
 					")"
 					);
+			mContainer->StopHearBest();
 
 		} else {
 			// 连接失败
@@ -66,6 +68,33 @@ protected:
 		}
 	}
 
+private:
+	CamshareClient *mContainer;
+};
+
+class SendHeartBeatRunnable : public KRunnable {
+public:
+	SendHeartBeatRunnable(CamshareClient *container) {
+		mContainer = container;
+	}
+	virtual ~SendHeartBeatRunnable() {
+		mContainer = NULL;
+	}
+protected:
+	void onRun() {
+		unsigned int timeSleep = 0;
+		unsigned int start = 0, end = 0;
+
+		while( mContainer->IsRunning() ) {
+			if(timeSleep >= 100){
+				mContainer->mRtmpClient.SendHeartBeat();
+				timeSleep = 0;
+			}
+
+			Sleep(100);
+			timeSleep ++;
+		}
+	}
 private:
 	CamshareClient *mContainer;
 };
@@ -86,7 +115,6 @@ CamshareClient::CamshareClient() {
 
 	mFrameWidth = 0;
 	mFrameHeight = 0;
-
 	mFilePath = "";
 
 	mpRunnable = new ClientRunnable(this);
@@ -155,7 +183,7 @@ bool CamshareClient::Start(
 	// Create encoder
 	bFlag = mH264Encoder.Create();
 
-	bFlag = StartVideoDataThread();
+
 
 	this->hostName = hostName;
 	this->user = user;
@@ -218,7 +246,7 @@ void CamshareClient::Stop(bool bWait) {
 		mH264Decoder.Destroy();
 
 		StopCapture();
-		StopVideoDataThread();
+
 		mH264Encoder.Destroy();
 
 		// 关闭socket
@@ -246,6 +274,12 @@ void CamshareClient::Stop(bool bWait) {
 	}
 
 	mClientMutex.unlock();
+
+	FileLog("CamshareClient",
+			"CamshareClient::Stop( end "
+
+			")"
+			);
 }
 
 bool CamshareClient::MakeCall(const string& dest, const string serverId) {
@@ -310,7 +344,6 @@ void CamshareClient::SetRecordFilePath(const string& filePath) {
 //	mRtmpClient.SetRecordFile(Path);
 }
 
-
 // 编码和发送视频数据
 bool CamshareClient::InsertVideoData(unsigned char* data, unsigned int len,  unsigned long timesp, int width, int heigh, int direction){
 
@@ -336,14 +369,13 @@ bool CamshareClient::InsertVideoData(unsigned char* data, unsigned int len,  uns
 			")"
 			);
 	return result;
-
 }
 
 bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 {
 	bool result = false;
 	// 编码后的数据
-	unsigned char* videoDate = new unsigned char[512 * 1024];
+	unsigned char* videoDate = new unsigned char[80 * 1024];
 	// 编码后的数据的长度
 	int dateLen   = 0;
 	// 编码后是否是关键帧
@@ -354,18 +386,6 @@ bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 
 	if (result)
 	{
-
-//		FileLog("CamshareClient",
-//				"Jni::CamshareClient1"
-//				"desData[4]:%x,"
-//				//"isKey_frame:%d,"
-//				"dateLen:%d"
-//				")",
-//				//pictType,
-//				//isKey_frame,
-//				videoDate[4],
-//				dateLen
-//				);
 		if (isKeyFrame){
 
 			// 关键帧
@@ -379,7 +399,7 @@ bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 			// 组包
 			result = mRtmpClient.RtmpToPacketH264(sps, position->pspLen, item->timeInterval);
 
-			//pps
+			// pps
 			unsigned char* pps = new unsigned char[position->ppsLen];
 			memcpy(pps, videoDate + position->ppsStartPosition, position->ppsLen);
 
@@ -402,11 +422,11 @@ bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 			// I帧
 			memcpy(iFrame, videoDate + position->iFrameStartPosition, position->iFrameLen);
 			result = mRtmpClient.RtmpToPacketH264(iFrame, position->iFrameLen, item->timeInterval);
-			delete sps;
+			delete[] sps;
 			sps = NULL;
-			delete pps;
+			delete[] pps;
 			pps = NULL;
-			delete iFrame;
+			delete[] iFrame;
 			iFrame = NULL;
 			delete position;
 		}
@@ -415,7 +435,7 @@ bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 					"Jni::CamshareClient1"
 					")"
 					);
-			// 非I帧（这里是p帧，以后可能要）
+			// 非I帧（这里是p帧）
 			int startPosition = 0;
 			if(videoDate[2] == 0x01 && (videoDate[3] &0x1f == 1)){
 				startPosition = 3;
@@ -433,12 +453,12 @@ bool CamshareClient::EncodeVideoData(CaptureBuffer* item)
 
 		}
 
-		//mRtmpClient.HandleSendH264();
+		// mRtmpClient.HandleSendH264();
 
 	}
 
 
-	delete(videoDate);
+	delete[] videoDate;
 	return result;
 }
 
@@ -476,18 +496,33 @@ bool CamshareClient::setVideRate(int rate)
 // 开始采集
 void CamshareClient::StartCapture()
 {
+
+	StartVideoDataThread();
 	if(mVideoData){
 		mCaptureVideoStart = true;
+		mVideoData->CleanDataList(mCaptureVideoStart);
+
 	}
 }
 
 // 停止采集
 void CamshareClient::StopCapture()
 {
+	StopVideoDataThread();
 	if(mVideoData){
 		mCaptureVideoStart = false;
-		mVideoData->CleanVideoDataList();
+		mVideoData->CleanDataList(mCaptureVideoStart);
 	}
+}
+
+// 选择采集视频格式
+int CamshareClient::ChooseVideoFormate(int* videoFormate, int size, int deviceType)
+{
+	int result = -1;
+	if (mVideoData){
+		result = mVideoData->ChooseVideoFormate(videoFormate, size, deviceType);
+	}
+	return result;
 }
 
 void CamshareClient::OnConnect(RtmpClient* client, const string& sessionId) {
@@ -652,6 +687,11 @@ void CamshareClient::OnRecvVideo(RtmpClient* client, const char* data, unsigned 
 
 	delete[] frame;
 
+	FileLog("CamshareClient",
+			"CamshareClient::OnRecvVideo( end"
+			")"
+			);
+
 }
 
 // 分离关键帧（psp，pps和I帧）
@@ -791,9 +831,9 @@ TH_RETURN_PARAM CamshareClient::VideoDataThread(void* obj){
 // 视频数据线程处理函数
 void CamshareClient::VideoDataThreadProc()
 {
+	mEncodeTimeStamp = GetCurrentTime();
 	while (mVideoDataThreadStart)
 	{
-
 		bool bFlag = false;
 		if (mCaptureVideoStart && !mVideoData->IsVideoDataEmpty())
 		{
@@ -828,16 +868,25 @@ void CamshareClient::VideoDataThreadProc()
 				if(NULL != item){
 					bFlag = true;
 
-					unsigned char* frame = new unsigned char[512 * 1024];
-					//int frameLen = 0, width = 0, height = 0;
-					mpCamshareClientListener->OnCallVideo(this, item->data, item->width, item->heigth, timeInterval);
+					//unsigned char* frame = new unsigned char[5120 * 1024];
+
+					if (timeInterval >= 20000){
+						timeInterval = 0;
+					}
+					int frameLen = 0, width = 0, height = 0;
+					if (mpCamshareClientListener != NULL)
+					{
+						mpCamshareClientListener->OnCallVideo(this, item->data, item->width, item->heigth, timeInterval);
+					}
 					item->timeInterval = timeInterval;
 					EncodeVideoData(item);
-					delete frame;
-					frame = NULL;
+					//delete[] frame;
+					//frame = NULL;
 					FileLog("CamshareClient",
 								"CamshareClient::VideoDataThreadProc(end"
-								")"
+								"timeInterval :%d"
+								")",
+								item->timeInterval
 								);
 				}
 				Sleep(5);
@@ -866,5 +915,23 @@ uint64_t CamshareClient::GetCurrentTime()
 	struct timeval tv;
 	gettimeofday(&tv, 0);
 	return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+}
+
+// 开始心跳包
+void CamshareClient::StartHearBest(){
+	// 开始心跳线程
+	mpSendHeartBeatRunnable = new SendHeartBeatRunnable(this);
+	mheartBeatThread.start(mpSendHeartBeatRunnable);
+}
+
+// 停止心跳包
+void CamshareClient::StopHearBest(){
+
+	mheartBeatThread.stop();
+	if (mpSendHeartBeatRunnable){
+		delete mpSendHeartBeatRunnable;
+		mpSendHeartBeatRunnable = NULL;
+	}
+
 }
 

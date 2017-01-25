@@ -122,7 +122,7 @@ static void decodeYUV420SP(unsigned char* rgb, const unsigned char* yuv420sp, in
 		int uvp = frameSize + (j >> 1) * width/2, u = 0, v = 0;
 		int vup = frameSize + frameSize/4 + (j >> 1) * width/2;
 		for (int i = 0; i < width; i++, yp++) {
-			int y = (0xff & ((int) yuv420sp[yp])) - 16;
+			int y = (0xff & ((int) yuv420sp[yp]));
 			if (y < 0) y = 0;
 			if ((i & 1) == 0) {
 
@@ -141,10 +141,11 @@ static void decodeYUV420SP(unsigned char* rgb, const unsigned char* yuv420sp, in
 //			if (b < 0) b = 0; else if (b > 262143) b = 262143;
 //			//rgb[yp] = 0xff000000 | ((r << 6) & 0xff0000) | ((g >> 2) & 0xff00) | ((b >> 10) & 0xff);
 
+			// 这是rgb的方法
 //			int r = y + 1.4075*v;
 //			int g = y - 0.3455*u - 0.7169*v;
 //			int b = y + 1.779*u;
-
+            // 这是rgb优化的方法
 			int r = y + v + (v*103>>8);
 			int g = y - (u*88>>8) - (v*183>>8);
 			int b = y + u + (u*198>>8);
@@ -153,9 +154,6 @@ static void decodeYUV420SP(unsigned char* rgb, const unsigned char* yuv420sp, in
 			g = g>255?255:(g<0?0:g);
 			b = b>255?255:(b<0?0:b);
 
-
-			//rgb[yp*2] = ((((r >> 3) <<11) | ((g >> 2) << 5) | ((b >> 3) << 0)) & 0xff00) << 8;
-			//rgb[yp*2 + 1] = ((((r >> 3) <<11) | ((g >> 2) << 5) | ((b >> 3) << 0)) & 0x00ff);
 
 			rgb[yp*2] = (((g & 0x1C) << 3) | (b >> 3));
 			rgb[yp*2 + 1] = ((r & 0xF8) | (g>>5));
@@ -378,6 +376,15 @@ class CamshareClientListenerImp : public CamshareClientListener {
 		if( iRet == JNI_OK ) {
 			gJavaVM->DetachCurrentThread();
 		}
+
+		FileLog("CamshareClient",
+				"Jni::OnRecvVideo(end "
+				"client : %p, "
+				"this : %p "
+				")",
+				client,
+				this
+				);
 	}
 
 	void OnRecvVideoSizeChange(CamshareClient* client, unsigned int width, unsigned int height) {
@@ -459,17 +466,27 @@ class CamshareClientListenerImp : public CamshareClientListener {
 							signure.c_str());
 
 					if( jMethodID ) {
+						FileLog("CamshareClient",
+								"Jni::OnCallVideo("
+								"start CallVoidMethod"
+								")"
+								);
 						jbyteArray jData = env->NewByteArray(newsize);
 						env->SetByteArrayRegion(jData, 0, newsize, (jbyte*)rgb);
 						env->CallVoidMethod(jCallback, jMethodID, jData, width, height, newsize, time);
 						env->DeleteLocalRef(jData);
+						FileLog("CamshareClient",
+								"Jni::OnCallVideo("
+								"end CallVoidMethod"
+								")"
+								);
 					}
 				}
 			}
 		}
 
 		gCallbackMap.Unlock();
-		delete rgb;
+		delete[] rgb;
 		rgb = NULL;
 		if( iRet == JNI_OK ) {
 			gJavaVM->DetachCurrentThread();
@@ -594,49 +611,11 @@ JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_Stop
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	SendVideoData
- * Signature:	(J[BIIII)Z
- */
-JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SendVideoData(JNIEnv *env, jobject thiz, jlong client, jbyteArray data, jint size, jlong timesp, jint width, jint heigh, jint direction){
-	FileLog("CamshareClient",
-			"Jni::SendVideoData(start "
-			"size:%d,"
-			"timesp:%d,"
-			"width:%d,"
-			"heigh:%d,"
-			"direction:%d"
-			")",
-			size,
-			timesp,
-			width,
-			heigh,
-			direction
-			);
-	bool bFlag = false;
-	CamshareClient* pclient = (CamshareClient *)client;
-	int len = env->GetArrayLength(data);
-	unsigned char* pData = new unsigned char[len];
-	env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(pData));
-	bFlag = pclient->InsertVideoData(pData, size, timesp, width, heigh, direction);
-	delete(pData);
-	pData = NULL;
-
-	FileLog("CamshareClient",
-			"Jni::SendVideoData(end "
-			"bFlag:%d,"
-			")",
-			bFlag
-			);
-	return bFlag;
-}
-
-/*
- * Class:		com_qpidnetwork_camshare_CamshareClient
  * Method:  	SetVideoSize
  * Signature:	(JII)Z
  */
-JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetVideoSize
-  (JNIEnv *env, jobject thiz, jlong client, jint width, jint heigh)
+JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetSendVideoSize
+  (JNIEnv *env, jobject thiz, jlong client, jint width, jint height)
 {
 	FileLog("CamshareClient",
 			"Jni::SetVideoSize(start "
@@ -644,12 +623,12 @@ JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetVideo
 			"heigh:%d"
 			")",
 			width,
-			heigh
+			height
 			);
 	bool bFlag = false;
 	CamshareClient* pclient = (CamshareClient *)client;
 
-	bFlag = pclient->SetVideoSize(width, heigh);
+	bFlag = pclient->SetVideoSize(width, height);
 
 
 	FileLog("CamshareClient",
@@ -688,45 +667,83 @@ JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetVideo
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	StartCapture
- * Signature:	(J)Z
+ * Method:  	ChooseVideoFormate
+ * Signature:	(J)[I
  */
-JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_StartCapture
-  (JNIEnv *env, jobject thiz, jlong client)
+JNIEXPORT jint JNICALL Java_com_qpidnetwork_camshare_CamshareClient_ChooseVideoFormate
+  (JNIEnv *env, jobject thiz, jlong client, jintArray formates)
 {
 	FileLog("CamshareClient",
-			"Jni::StartCapture( "
+			"Jni::ChooseVideoFormate begin("
 			")"
 			);
+	int result = -1;
 	CamshareClient* pclient = (CamshareClient *)client;
+	jsize len = env->GetArrayLength(formates);
+	if (len <= 0){
+		FileLog("CamshareClient",
+				"Jni::ChooseVideoFormate"
+				"Not video Formate"
+				")"
+				);
+		return result;
+	}
+	// 获取java传递下来数组的长度
+	jint* array = env->GetIntArrayElements(formates, 0);
+	if (array == NULL){
+		FileLog("CamshareClient",
+				"Jni::ChooseVideoFormate"
+				"fail not Formate"
+				")"
+				);
+		return result;
+	}
 
-	pclient->StartCapture();
+	result = pclient->ChooseVideoFormate(array, len, 0);
 
 	FileLog("CamshareClient",
-			"Jni::StartCapture(end "
-			")"
+			"Jni::ChooseVideoFormate end("
+			"videoFormate:%d"
+			")",
+			result
 			);
+	return result;
 }
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	StopCapture
- * Signature:	(J)Z
+ * Method:  	SendVideoData
+ * Signature:	(J[BIIII)Z
  */
-JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_StopCapture
-  (JNIEnv *env, jobject thiz, jlong client)
-{
+JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SendVideoData(JNIEnv *env, jobject thiz, jlong client, jbyteArray data, jint size, jlong timesp, jint width, jint heigh, jint direction){
 	FileLog("CamshareClient",
-			"Jni::StopCapture( "
-			")"
+			"Jni::SendVideoData(start "
+			"size:%d,"
+			"timesp:%lld,"
+			"width:%d,"
+			"heigh:%d,"
+			"direction:%d"
+			")",
+			size,
+			timesp,
+			width,
+			heigh,
+			direction
 			);
+	bool bFlag = false;
 	CamshareClient* pclient = (CamshareClient *)client;
-
-	pclient->StopCapture();
+	int len = env->GetArrayLength(data);
+	unsigned char* pData = new unsigned char[len];
+	env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(pData));
+	bFlag = pclient->InsertVideoData(pData, size, timesp, width, heigh, direction);
+	delete[] pData;
+	pData = NULL;
 
 	FileLog("CamshareClient",
-			"Jni::StopCapture(end "
-			")"
+			"Jni::SendVideoData(end "
+			"bFlag:%d,"
+			")",
+			bFlag
 			);
+	return bFlag;
 }
-

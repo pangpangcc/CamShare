@@ -3,9 +3,10 @@ package com.qpidnetwork.camshare;
 import android.util.Log;
 
 public class CamshareClient implements CamshareClientJniCallback {
+	private static final String TAG = CamshareClient.class.getName();
 	static {
 		System.loadLibrary("camshareclient");
-		Log.i("CamshareClient", "CamshareClient Load Library");
+		Log.i(TAG, "CamshareClient Load Library");
 		GobalInit();
 	}
 	
@@ -35,18 +36,28 @@ public class CamshareClient implements CamshareClientJniCallback {
 	 */
 	static public native void SetLogDirPath(String filePath);
 	
+	private boolean isInited = false;
+	
 	/**
 	 * 初始化实例
 	 * @param renderer	渲染器, 用于画图
 	 * @param callback	回调处理
 	 * @return 成功失败
 	 */
-	public boolean Create(VideoRendererInterface renderer, CamshareClientCallback callback) {
+	public boolean Create(VideoRendererInterface renderer) {
 		this.renderer = renderer;
-		this.callback = callback;
 		client = Create(this);
 		return client != -1;
 	}
+	
+	/**
+	 * 设置状态监听器
+	 * @param callback
+	 */
+	public void setCamShareClientListener(CamshareClientCallback callback){
+		this.callback = callback;
+	}
+	
 	/**
 	 * 创建实例
 	 * @param callback	回调处理
@@ -82,7 +93,7 @@ public class CamshareClient implements CamshareClientJniCallback {
      */
     public enum UserType {
     	Lady,
-    	Man,
+    	Man
     };
     
     /**
@@ -94,9 +105,13 @@ public class CamshareClient implements CamshareClientJniCallback {
      * @param userType
      * @return
      */
-	public boolean Login(String user, String domain, String siteId, String sid, UserType userType) {
-		Log.i("CamshareClientJava", String.format("Login( user : %s, domain : %s, siteId : %s, sid : %s, userType : %d )", user, domain, siteId, sid, userType.ordinal()));
-		return Login(client, user, domain, siteId, sid, userType.ordinal());
+	public boolean Login(String userId, String domain, String siteId, String sid, UserType userType) {
+		if(!Login(client, userId, domain, siteId, sid, userType.ordinal())){
+			if(callback != null){
+				callback.onLogin(this, false);
+			}
+		}
+		return true;
 	}
 	private native boolean Login(long client, String user, String domain, String siteId, String sid, int userType);
 
@@ -106,9 +121,13 @@ public class CamshareClient implements CamshareClientJniCallback {
 	 * @param serverId
 	 * @return 成功/失败
 	 */
-	public boolean MakeCall(String dest, String serverId) {
-		Log.i("CamshareClientJava", String.format("MakeCall( dest : %s, serverId : %s )", dest, serverId));
-		return MakeCall(client, dest, serverId);
+	public boolean MakeCall(String targetId, String targetServerId) {
+		if(!MakeCall(client, targetId, targetServerId)){
+			if(callback != null){
+				callback.onMakeCall(this, false);
+			}
+		}
+		return true;
 	}
 	private native boolean MakeCall(long client, String dest, String serverId);
 	
@@ -117,8 +136,12 @@ public class CamshareClient implements CamshareClientJniCallback {
 	 * @return 成功/失败
 	 */
 	public boolean Hangup() {
-		Log.i("CamshareClientJava", String.format("Hangup()"));
-		return Hangup(client);
+		if(!Hangup(client)){
+			if(callback != null){
+				this.callback.onHangup(this, "");
+			}
+		}
+		return true;
 	}
 	private native boolean Hangup(long client);
 	
@@ -126,7 +149,6 @@ public class CamshareClient implements CamshareClientJniCallback {
 	 * 断开连接
 	 */
 	public void Stop() {
-		Log.i("CamshareClientJava", String.format("Stop()"));
 		Stop(client);
 	}
 	private native void Stop(long client);
@@ -139,50 +161,56 @@ public class CamshareClient implements CamshareClientJniCallback {
 	 * width      采集视频的宽
 	 * heigh      采集视频的高
 	 * direction  采集视频的方向（90,180,270,0  也与摄像头前后有关）
-	 * return      成功失败
 	 */
 	public boolean SendVideoData(byte[] data, int size, long timesp, int width, int heigh, int direction){
-		Log.i("CamshareClientJava", String.format("SendVideoData()"));
+		Log.i(TAG, String.format("SendVideoData()"));
 		return SendVideoData(client, data, size, timesp, width, heigh, direction);
 	}
 	private native boolean SendVideoData(long client, byte[] data, int size, long timesp, int width, int heigh, int direction);
 	
 	/**
+	 * 选择采集视频格式
+	 * formates     采集视频格式数组
+	 * return    成功：返回 格式  失败：-1
+	 */
+	public int ChooseVideoFormate(int[] formates){
+		Log.i(TAG, String.format("ChooseVideoFormate()"));
+		return ChooseVideoFormate(client, formates);
+	}
+	private native int ChooseVideoFormate(long client, int[] formates);
+
+	/**
 	 * 设置发送视频数据的大小
 	 */
-	public boolean SetVideoSize(int width, int heigh){
-		Log.i("CamshareClientJava", String.format("SetVideoSize()"));
-		return SetVideoSize(client, width, heigh);
+	public boolean SetSendVideoSize(int width, int heigh){
+		Log.i(TAG, String.format("SetSendVideoSize()"));
+		return SetSendVideoSize(client, width, heigh);
 	}
-	private native boolean SetVideoSize(long client, int width, int heigh);
+	private native boolean SetSendVideoSize(long client, int width, int heigh);
 	
 	/**
-	 * 设置视频采集帧率（现在基本是编码，采集前进行设置，默认是8帧。以后可以考虑作为SendVideoData每帧的参数）
-	 * rate     采集视频帧率
-	 * return    成功，失败
+	 * 设置视频采集帧率
 	 */
 	public boolean SetVideoRate(int rate){
-		Log.i("CamshareClientJava", String.format("SetVideoRate()"));
+		Log.i(TAG, String.format("SetVideoRate()"));
 		return SetVideoRate(client, rate);
 	}
 	private native boolean SetVideoRate(long client, int rate);
 	
 	/**
-	 * 开始采集  （开启采集）
-	 * return   成功，失败
+	 * 开始采集
 	 */
 	public void StartCapture(){
-		Log.i("CamshareClientJava", String.format("StartCapture()"));
+		Log.i(TAG, String.format("StartCapture()"));
 		StartCapture(client);
 	}
 	private native void StartCapture(long client);
 	
 	/**
-	 * 停止采集 （停止和清除视频队列和编码）
-	 * return   成功，失败
+	 * 停止采集
 	 */
 	public void StopCapture(){
-		Log.i("CamshareClientJava", String.format("StopCapture()"));
+		Log.i(TAG, String.format("StopCapture()"));
 		StopCapture(client);
 	}
 	private native void StopCapture(long client);
@@ -191,52 +219,73 @@ public class CamshareClient implements CamshareClientJniCallback {
 	@Override
 	public void onLogin(boolean success) {
 		// TODO Auto-generated method stub
-		Log.i("CamshareClientJava", String.format("onLogin( success : %s )", success?"true":"false"));
-		this.callback.onLogin(this, success);
+		Log.i(TAG, String.format("onLogin( success : %s )", success?"true":"false"));
+		if(callback != null){
+			this.callback.onLogin(this, success);
+		}
 	}
 
 	@Override
 	public void onMakeCall(boolean success) {
 		// TODO Auto-generated method stub
-		Log.i("CamshareClientJava", String.format("onMakeCall( success : %s )", success?"true":"false"));
-		this.callback.onMakeCall(this, success);
+		Log.i(TAG, String.format("onMakeCall( success : %s )", success?"true":"false"));
+		if(callback != null){
+			this.callback.onMakeCall(this, success);
+		}
 	}
 	
 	@Override
 	public void onHangup(String cause) {
 		// TODO Auto-generated method stub
-		Log.i("CamshareClientJava", String.format("onHangup( cause : %s )", cause));
-		this.callback.onHangup(this, cause);
+		Log.i(TAG, String.format("onHangup( cause : %s )", cause));
+		if(callback != null){
+			this.callback.onHangup(this, cause);
+		}
 	}
 	
 	@Override
 	public void onRecvVideo(byte[] data, int size, int timestamp) {
 		// TODO Auto-generated method stub
-		renderer.DrawFrame(data, size, timestamp);
+		Log.i(TAG, "onRecvVideo size: " + size + " ~~~timestamp：" + timestamp);
+		if(renderer != null){
+			Log.i(TAG, "onRecvVideo renderer not null");
+			renderer.DrawFrame(data, size, timestamp);
+		}
+		if(callback != null){
+			if(size > 0){
+				this.callback.onRecvVideo();
+			}
+		}
 	}
 	
 	@Override
 	public void onRecvVideoSizeChange(int width, int height) {
-		Log.i("CamshareClientJava", String.format("onRecvVideoSizeChange( width : %d, height : %d )", width, height));
-		renderer.ChangeRendererSize(width, height);
-		this.callback.onRecvVideoSizeChange(width, height);
+		Log.i(TAG, String.format("onRecvVideoSizeChange( width : %d, height : %d )", width, height));
+		if(renderer != null){
+			renderer.onRecvVideoSizeChange(width, height);
+		}
 	}
-
+	
 	@Override
 	public void onDisconnect() {
 		// TODO Auto-generated method stub
-		Log.i("CamshareClientJava", String.format("onDisconnect()"));
-		this.callback.onDisconnect();
+		Log.i(TAG, String.format("onDisconnect()"));
+		if(callback != null){
+			this.callback.onDisconnect();
+		}
 	}
 	
-	// 采集视频的回调，编码前返回java层显示视频
+	// 采集视频的回调
 	@Override
-	public void onCallVideo(byte[] data, int width, int height, int size, int timestamp) {
+	public void onCallVideo(byte[] data, int width, int height, int size, int timestamp){
 		// TODO Auto-generated method stub
-		Log.i("CamshareClientJava", String.format("onCallVideo()"));
+		Log.i(TAG, String.format("onCallVideo()"));
 		//renderer.DrawFrame2(data, width, height);
-		renderer.ChangeRendererSize(width, height);
+		renderer.onRecvVideoSizeChange(width, height);
 		renderer.DrawFrame(data, size, timestamp);
+		if(callback != null){
+			this.callback.onRecvVideo();
+		}
 	}
-	
+
 }

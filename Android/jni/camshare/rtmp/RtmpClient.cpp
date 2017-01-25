@@ -302,11 +302,13 @@ void RtmpClient::Shutdown() {
 			"RtmpClient::Shutdown( "
 			"port : %u, "
 			"user : '%s', "
-			"dest : '%s' "
+			"dest : '%s' ,"
+			"this:%p"
 			")",
 			port,
 			mUser.c_str(),
-			mDest.c_str()
+			mDest.c_str(),
+			this
 			);
 
 	mClientMutex.lock();
@@ -329,11 +331,13 @@ void RtmpClient::Close() {
 			"RtmpClient::Close( "
 			"port : %u, "
 			"user : '%s', "
-			"dest : '%s' "
+			"dest : '%s', "
+			"this:%p"
 			")",
 			port,
 			mUser.c_str(),
-			mDest.c_str()
+			mDest.c_str(),
+			this
 			);
 
 	mClientMutex.lock();
@@ -378,12 +382,14 @@ bool RtmpClient::Login(const string& user, const string& password, const string&
 			"user : '%s', "
 			"password : %s, "
 			"site : %s, "
-			"custom : %s "
+			"custom : %s ,"
+			"this"
 			")",
 			user.c_str(),
 			password.c_str(),
 			site.c_str(),
-			custom.c_str()
+			custom.c_str(),
+			this
 			);
 	bool bFlag = false;
 
@@ -400,9 +406,11 @@ bool RtmpClient::Login(const string& user, const string& password, const string&
 		FileLog("RtmpClient",
 				"RtmpClient::Login( "
 				"[Success], "
-				"user : '%s' "
+				"user : '%s', "
+				"this:%p"
 				")",
-				user.c_str()
+				user.c_str(),
+				this
 				);
 		mUser = user;
 
@@ -410,9 +418,11 @@ bool RtmpClient::Login(const string& user, const string& password, const string&
 		FileLog("RtmpClient",
 				"RtmpClient::Login( "
 				"[Fail], "
-				"user : '%s' "
+				"user : '%s', "
+				"this:%p"
 				")",
-				user.c_str()
+				user.c_str(),
+				this
 				);
 	}
 
@@ -595,6 +605,13 @@ bool RtmpClient::SendVideoData(const char* data, unsigned int len, unsigned int 
 
 	packet.body = (char *)data;
 
+	FileLog("RtmpClient",
+			"Jni::RtmpClient::SendVideoData( "
+			"timestamp = %d "
+			")",
+			timestamp
+			);
+
 	packet.messageHeader.SetTimestamp(timestamp);
 	packet.messageHeader.SetBodySize(len);
 	packet.messageHeader.SetType(RTMP_HEADER_MESSAGE_TYPE_VIDEO);
@@ -633,21 +650,27 @@ bool RtmpClient::SendHeartBeat() {
 
 	FileLog("RtmpClient",
 			"RtmpClient::SendHeartBeat("
-			")"
+			"this:%p"
+			")",
+			this
 			);
 
 	bFlag = SendActivePacket();
 	if( bFlag ) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendHeartBeat( "
+				"this:%p"
 				"[Success] "
-				")"
+				")",
+				this
 				);
 	} else {
 		FileLog("RtmpClient",
 				"RtmpClient::SendHeartBeat( "
 				"[Fail] "
-				")"
+				"this:%p"
+				")",
+				this
 				);
 	}
 	return bFlag;
@@ -791,15 +814,15 @@ bool RtmpClient::HandShake() {
 	}
 
 	if( bFlag ) {
-//		bMatch = (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
-//		if (!bMatch) {
-//			FileLog("RtmpClient",
-//					"RtmpClient::HandShake( "
-//					"[Handshake check fail] "
-//					")"
-//					);
-//			bFlag = false;
-//		}
+		bMatch = (memcmp(serversig, clientsig, RTMP_SIG_SIZE) == 0);
+		if (!bMatch) {
+			FileLog("RtmpClient",
+					"RtmpClient::HandShake( "
+					"[Handshake check fail] "
+					")"
+					);
+			bFlag = false;
+		}
 	}
 	mSendMutex.unlock();
 
@@ -1227,8 +1250,10 @@ bool RtmpClient::SendActivePacket() {
 	if( !SendRtmpPacket(&packet) ) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendActivePacket( "
+				"this:%p"
 				"[Fail] "
-				")"
+				")",
+				this
 				);
 		return false;
 	}
@@ -1282,7 +1307,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 	FileLog("RtmpClient",
 			"RtmpClient::SendRtmpPacket( "
 			"####################### Send ####################### "
-			")"
+			"this:%p"
+			")",
+			this
 			);
 	// Dump Raw Packet
 	DumpRtmpPacket(packet);
@@ -1294,7 +1321,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 		FileLog("RtmpClient",
 				"RtmpClient::SendRtmpPacket( "
 				"[Not connected] "
-				")"
+				"this:%p"
+				")",
+				this
 				);
 		bFlag = false;
 	}
@@ -1339,8 +1368,10 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 				FileLog("RtmpClient",
 						"RtmpClient::SendRtmpPacket( "
 						"timestamp ：%d"
+						"this:%p"
 						")",
-						timestamp
+						timestamp,
+						this
 						);
 			// Modify to delta Timestamp
 			packet->messageHeader.SetTimestamp(timestamp);
@@ -1356,7 +1387,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 			FileLog("RtmpClient",
 					"RtmpClient::SendRtmpPacket( "
 					"[Send Header Fail] "
-					")"
+					"this:%p"
+					")",
+					this
 					);
 			Shutdown();
 			bFlag = false;
@@ -1376,7 +1409,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 						FileLog("RtmpClient",
 								"RtmpClient::SendRtmpPacket( "
 								"[Send Body Fail] "
-								")"
+								"this:%p"
+								")",
+								this
 								);
 						Shutdown();
 						bFlag = false;
@@ -1396,7 +1431,9 @@ bool RtmpClient::SendRtmpPacket(RtmpPacket* packet) {
 						FileLog("RtmpClient",
 								"RtmpClient::SendRtmpPacket( "
 								"[Send Chunk Separate Fail] "
-								")"
+								"this:%p"
+								")",
+								this
 								);
 						Shutdown();
 						bFlag = false;
@@ -1553,7 +1590,7 @@ bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet, bool & errorPacket, boo
 			}
 			// 重新赋值
 			*pLastRecvPacket = *packet;
-
+			packet->nBytesRead = 0;
 			// 清空旧数据
 			pLastRecvPacket ->FreeBody();
 			// 申请空间
@@ -1573,7 +1610,7 @@ bool RtmpClient::RecvRtmpChunkPacket(RtmpPacket* packet, bool & errorPacket, boo
 				unsigned int delta = packet->messageHeader.GetTimestamp();
 				unsigned int timestamp = delta + pLastRecvPacket->messageHeader.GetTimestamp();
 				packet->messageHeader.SetTimestamp(timestamp);
-
+				packet->nBytesRead = 0;
 				// 赋值bodysize
 				pLastRecvPacket->messageHeader.SetBodySize(packet->messageHeader.GetBodySize());
 
@@ -2144,12 +2181,26 @@ bool RtmpClient::Rtmp2H264(unsigned char* data, unsigned int len) {
 		}
 	} else if ((data[0] == 0x17 || data[0] == 0x27) && data[1] == 1) {
 		if (mReadVideoHelper->sps && mReadVideoHelper->pps) {
+
+
+			FileLog("RtmpClient",
+					"RtmpClient::Rtmp2H264("
+					"mReadVideoHelper->sps"
+					")"
+					);
 			unsigned char * pdata = data + 5;
 			unsigned int pdata_len = len - 5;
 			unsigned int lenSize = mReadVideoHelper->lenSize;
 			unsigned char *nal_buf = NULL;
 			unsigned int nal_len = 0;
 
+			FileLog("RtmpClient",
+					"RtmpClient::Rtmp2H264("
+					"mReadVideoHelper->sps"
+					"lenSize: %d"
+					")",
+					lenSize
+					);
 			while (pdata_len > 0) {
 				unsigned int nalSize = 0;
 				switch (lenSize) {
@@ -2174,13 +2225,21 @@ bool RtmpClient::Rtmp2H264(unsigned char* data, unsigned int len) {
 							);
 					return false;
 				}
-
+				FileLog("RtmpClient",
+						"RtmpClient::Rtmp2H264( "
+						"nalSize :%d,"
+						"pdata_len: %d"
+						")",
+						nalSize,
+						pdata_len
+						);
 				nal_buf = pdata + lenSize;
 				nal_len = nalSize;
 
 				//next nal
 				pdata = pdata + lenSize + nalSize;
 				pdata_len -= (lenSize + nalSize);
+
 			}
 
 			if ((nal_len > 0 && nal_len < len) && nal_buf != NULL) {
@@ -2245,6 +2304,10 @@ bool RtmpClient::Rtmp2H264(unsigned char* data, unsigned int len) {
 				);
 	}
 
+	FileLog("RtmpClient",
+			"RtmpClient::Rtmp2H264( end"
+			")"
+			);
 	return bFlag;
 }
 
@@ -2253,7 +2316,9 @@ bool RtmpClient::RtmpToPacketH264(unsigned char* data, unsigned int len, unsigne
 {
 	FileLog("RtmpClient",
 			"RtmpClient::RtmpToPacketH264(start"
-			" )"
+			"timesp :%d"
+			" )",
+			timesp
 			);
 	bool result = true;
 	// 数据
@@ -2656,9 +2721,11 @@ wait_sps:
 
 	FileLog("RtmpClient",
 			"RtmpClient::RtmpClient(end"
-			"nalType:%d"
+			"nalType:%d,"
+			"timestamp:%d,"
 			" )",
-			nalType
+			nalType,
+			mPacketVideoHelper->timestamp
 			);
 	return result;
 }
@@ -2729,6 +2796,10 @@ void RtmpClient::HandleSendH264()
 					")"
 					);
 			goto skip;
+		}
+
+		if (mPacketVideoHelper->timestamp >= 0xffffff){
+			mPacketVideoHelper->timestamp = 0;
 		}
 
 		if (((uint8_t *)rtmp_data)[0] == 0x17 && mPacketVideoHelper->send_avc) {

@@ -13,6 +13,7 @@ import android.hardware.Camera.PreviewCallback;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceHolder.Callback;
@@ -28,8 +29,6 @@ import com.qpidnetwork.camshare.CaptureCapabilityAndroid;
 import com.qpidnetwork.camshare.R;
 import com.qpidnetwork.camshare.VideoRenderer;
 import com.qpidnetwork.tool.CrashHandlerJni;
-
-
 
 
 public class MainActivity extends Activity implements CamshareClientCallback, PreviewCallback, Callback {
@@ -49,6 +48,10 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
     private int mCamIdx = -1;
     
     private long timesp = 0;
+    
+    private Handler handler = null;
+    private Runnable runnable = null;
+    private boolean  isStop = false;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -71,20 +74,49 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 		CamshareClient.SetLogDirPath(filePath + "/camshare/log");
 		
         surfaceView = (SurfaceView) this.findViewById(R.id.surfaceView); 
-        videoRenderer = new VideoRenderer(surfaceView);
+       // surfaceView = (SurfaceView) this.findViewById(R.id.surfaceViewSend); 
+        videoRenderer = new VideoRenderer();
+        videoRenderer.bindView(surfaceView, 220, 180);
         //videoRenderer = new VideoRenderer(null);
         camshareClient = new CamshareClient();
-        camshareClient.Create(videoRenderer, this);
+        camshareClient.Create(videoRenderer);
+        camshareClient.setCamShareClientListener(this);
         camshareClient.SetRecordFilePath(filePath + "/camshare/record");
        
         mCamIdx = FindFrontCamera();
 
         videosendView = (SurfaceView) this.findViewById(R.id.surfaceViewSend);
+        //videosendView = (SurfaceView) this.findViewById(R.id.surfaceView);
         localPreview = videosendView.getHolder();
         localPreview.addCallback(this);
         localPreview.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
        // mCamera = Camera.open();
         // 採集數據的格式
+        
+        
+        // test
+        handler = new Handler();
+        runnable = new Runnable(){
+        	@Override
+        	public void run(){
+        		if (!isStop){
+        			
+        			//camshareClient.Login("MM211", "172.25.10.31", "1", "SESSION123456", UserType.Man);
+    				camshareClient.Login("WW1", "52.196.96.7", "1", "SESSION123456", UserType.Man);
+    				StartCapture(320,240,6);
+        			isStop = true;
+        			handler.postDelayed(this,7000);
+        		}
+        		else
+        		{
+        			StopCapture();
+        			isStop = false;
+        			handler.postDelayed(this,2000);
+        			camshareClient.Stop();
+        		}
+        	}
+        };
+        
         
         Button loginButton = (Button)this.findViewById(R.id.button1);
         loginButton.setOnClickListener(new OnClickListener() {
@@ -103,11 +135,12 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 			@Override
 			public void onClick(View v) {
 				// TODO Auto-generated method stub
-				camshareClient.MakeCall("WW1", "PC0");
-//				camshareClient.Login("WW1", "52.196.96.7", "1", "SESSION123456", UserType.Man);
-//				StartCapture(320,240,10);
+				//camshareClient.MakeCall("WW1", "PC0");
+				//camshareClient.Login("WW1", "52.196.96.7", "1", "SESSION123456", UserType.Man);
+				//StartCapture(320,240,6);
 //				camshareClient.Login("WW1", "192.168.88.152", "1", "SESSION123456", UserType.Man);
 				//camshareClient.StartCapture();
+				handler.postDelayed(runnable,2000);
 			}
 		});
         
@@ -119,6 +152,8 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 				camshareClient.Hangup();
 //				StopCapture();
 				//camshareClient.StopCapture();
+				
+				handler.removeCallbacks(runnable);
 			}
 		});
         
@@ -156,12 +191,6 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
 	}
 
 	@Override
-	public void onRecvVideoSizeChange(int width, int height) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
 	public void onDisconnect() {
 		// TODO Auto-generated method stub
 		
@@ -196,11 +225,20 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
       //parameters.setPictureSize(currentCapability.width,
        //      currentCapability.height);
       
+      List<Integer> formats = parameters.getSupportedPreviewFormats();
+      int[] array = new int[formats.size()];
+      for(int i = 0; i< array.length; i++){
+    	  array[i] = formats.get(i);
+      }
+      int formate = camshareClient.ChooseVideoFormate(array);
+      
       List<Size> supportedPreviewSizes = parameters.getSupportedPreviewSizes();
       Size size = getBestSupportedSize(supportedPreviewSizes, width, height);
       if (size.width < width || size.height < height){
     	  return -1;
       }
+      
+
       
       CaptureCapabilityAndroid currentCapability =
       new CaptureCapabilityAndroid();
@@ -215,7 +253,8 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
       parameters.setPreviewSize(currentCapability.width,
               currentCapability.height);
       // 设置采集的格式
-      parameters.setPreviewFormat(PIXEL_FORMAT);
+     // parameters.setPreviewFormat(PIXEL_FORMAT);
+      parameters.setPreviewFormat(formate);
       // 设置采集的帧率 
       parameters.setPreviewFrameRate(currentCapability.maxFPS);
       // parameters.set("rotation", "180");
@@ -227,10 +266,11 @@ public class MainActivity extends Activity implements CamshareClientCallback, Pr
       } catch (RuntimeException e) {
          // Log.e(TAG, "setParameters failed", e);
           return -1;
-      } catch (IOException e) {
+      } 
+      catch (IOException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
-	}
+      }
 
       // 设置一帧的大小，和存储个数。
       int bufSize = width * height * pixelFormat.bitsPerPixel / 8;
@@ -269,12 +309,12 @@ public void surfaceCreated(SurfaceHolder holder) {
 	// TODO Auto-generated method stub
 	//mCamera = Camera.open();
     if (mCamera != null) {
-    	try {
-			mCamera.setPreviewDisplay(localPreview);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//    	try {
+////			mCamera.setPreviewDisplay(localPreview);
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
     }
 }
 
@@ -365,6 +405,12 @@ private Size getBestSupportedSize(List<Size> sizes, int width, int height){
 		}
 	}
 	return bestSize;
+}
+
+@Override
+public void onRecvVideo() {
+	// TODO Auto-generated method stub
+	
 }
 
 }

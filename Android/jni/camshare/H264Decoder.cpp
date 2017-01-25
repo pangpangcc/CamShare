@@ -85,12 +85,24 @@ bool H264Decoder::Create() {
 }
 
 void H264Decoder::Destroy() {
+	FileLog("CamshareClient",
+			"H264Decoder::Destroy(start "
+			"this : %p, "
+			")",
+			this
+			);
 	if( mContext ) {
 		avcodec_close(mContext);
 		mContext = NULL;
 	}
 
 	mCodec = NULL;
+	FileLog("CamshareClient",
+			"H264Decoder::Destroy(end "
+			"this : %p, "
+			")",
+			this
+			);
 }
 
 bool H264Decoder::DecodeFrame(
@@ -209,6 +221,13 @@ bool H264Decoder::DecodeFrame(
 	    mRtp2H264VideoTransfer.DestroyVideoBuffer();
 	}
 
+	FileLog("CamshareClient",
+			"H264Decoder::DecodeFrame( end"
+			"this : %p, "
+			"######################## Frame ########################"
+			")",
+			this
+			);
 	return bFlag;
 }
 

@@ -86,6 +86,12 @@ function print_netstat_rtmp_log()
   print_log "rtmp count : $rtmp_count"
 }
 
+function print_netstat_websocket_log()
+{
+  ws_count=`netstat -atnl | grep 8080 | grep -v 0.0.0.0 | wc -l`
+  print_log "websocket count : $ws_count"
+}
+
 # all process monitor
 function print_all_process_log()
 {
@@ -102,6 +108,7 @@ function main()
     print_separator
     print_memory_log
     print_netstat_rtmp_log
+    print_netstat_websocket_log
     print_fs_conference_log
     print_debug_separator
     print_all_process_log

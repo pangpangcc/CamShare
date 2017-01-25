@@ -44,7 +44,7 @@ H264Encoder::H264Encoder() {
 	// 采集裁剪后U或V的大小
 	muv_length = mCaptureWidth * mCaptureHeight/4;
     // 采集频率
-	mFramerate = 8;
+	mFramerate = 6;
 }
 
 H264Encoder::~H264Encoder() {
@@ -91,10 +91,18 @@ bool H264Encoder::Create() {
 	}
 
 	mContext->codec_type = AVMEDIA_TYPE_VIDEO;
-	mContext->bit_rate = 100000;
-	mContext->rc_max_rate = 120000;
+	mContext->bit_rate = 64000;
+	mContext->rc_max_rate = 64000;
+	mContext->rc_min_rate = 64000;
 	mContext->width    = mEncodeWidth;
 	mContext->height   = mEncodeHeight;
+
+	 mContext->bit_rate_tolerance = 64000;
+	 mContext->rc_buffer_size = 64000;
+	 mContext->rc_initial_buffer_occupancy = mContext->rc_buffer_size*3/4;
+	 mContext->rc_buffer_aggressivity = (float)1.0;
+	 mContext->rc_initial_cplx = (float)0.5;
+
 	mContext->time_base.num = 1;
 	mContext->time_base.den = mFramerate;
 	mContext->gop_size      = mFramerate;
@@ -104,7 +112,7 @@ bool H264Encoder::Create() {
 	mContext->keyint_min    = mFramerate;
 	//mContext->qmin = 10;
 	//mContext->qmax = 51;
-	mContext->level = 30;
+	mContext->level = 21;
 	//mContext->refs = 4;
 
 
@@ -143,20 +151,27 @@ bool H264Encoder::Create() {
 }
 
 void H264Encoder::Destroy() {
+	FileLog("CamshareClient",
+			"H264Encoder::Destroy(start"
+			"this:%p"
+			")",
+			this
+			);
+
 	if( mContext ) {
 		avcodec_close(mContext);
 		av_free(mContext);
 		mContext = NULL;
 	}
 
-	//av_freep(&mFrameYUV->data[0]);
-	//av_frame_free(&mFrameYUV);
-	if (mFrameYUV)
-	{
-		av_free(mFrameYUV);
-		mFrameYUV = NULL;
-	}
 	mCodec = NULL;
+	FileLog("CamshareClient",
+			"H264Encoder::Destroy(end"
+			"this:%p"
+			")",
+			this
+			);
+
 }
 
 bool H264Encoder::EncodeFrame(
@@ -171,8 +186,19 @@ bool H264Encoder::EncodeFrame(
 
 	FileLog("CamshareClient",
 			"H264Encoder::EncodeFrame(start"
-			")"
-
+			"width:%d,"
+			"height:%d,"
+			"mCaptureWidth:%d,"
+			"mCaptureHeight:%d,"
+			"mContext->width:%d,"
+			"mContext->height:%d"
+			")",
+			width,
+			height,
+			mCaptureWidth,
+			mCaptureHeight,
+			mContext->width,
+			mContext->height
 			);
 
 	if(width <= 0 || height <= 0)
@@ -181,18 +207,47 @@ bool H264Encoder::EncodeFrame(
 	}
 	if(width != mCaptureWidth || height != mCaptureHeight)
 	{
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame("
+				"mCaptureWidth or mCaptureHeight set"
+				"width:%d,"
+				"height:%d,"
+				"mCaptureWidth:%d,"
+				"mCaptureHeight:%d,"
+				"mContext->width:%d,"
+				"mContext->height:%d"
+				")",
+				width,
+				height,
+				mCaptureWidth,
+				mCaptureHeight,
+				mContext->width,
+				mContext->height
+				);
 		SetCaptureVideoSize(width, height);
 	}
 
+	FileLog("CamshareClient",
+			"H264Encoder::EncodeFrame(1"
+			")"
+			);
 	bool bFlag = false;
 	int ret;
 	int enc_got_frame = 0;
 	// new一个采集一帧视频的容器
-	mFrameYUV = av_frame_alloc();
+	AVFrame * mFrameYUV = av_frame_alloc();
 	// new一个一帧视频的大小
 	uint8_t *out_buffer = (uint8_t *)av_malloc(avpicture_get_size(PIX_FMT_YUV420P, mCaptureWidth, mCaptureHeight));
+	FileLog("CamshareClient",
+			"H264Encoder::EncodeFrame(2"
+			")"
+			);
 	// 将out_buffer放进pFrameYUV里面
 	avpicture_fill((AVPicture *)mFrameYUV, out_buffer, PIX_FMT_YUV420P, mCaptureWidth, mCaptureHeight);
+	FileLog("CamshareClient",
+			"H264Encoder::EncodeFrame(3"
+			")"
+			);
 
 	 // 安卓摄像头数据为NV21格式，此处将其转换为YUV420P格式
 	 //jbyte* in = (jbyte*)(*env)->GetByteArrayElements(env, yuv, 0);
@@ -224,16 +279,31 @@ bool H264Encoder::EncodeFrame(
 //		avpicture_fill((AVPicture *)rgbFrame, (uint8_t *)buffer, AV_PIX_FMT_YUV420P,
 //				mContext->width, mContext->height);
 //
-
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(4"
+				")"
+				);
 		uint8_t *buffer = (uint8_t *)av_malloc(avpicture_get_size(PIX_FMT_YUV420P, mContext->width, mContext->height));
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(5"
+				")"
+				);
 		// 将out_buffer放进pFrameYUV里面
 		avpicture_fill((AVPicture *)rgbFrame, buffer, PIX_FMT_YUV420P, mContext->width, mContext->height);
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(6"
+				")"
+				);
 
 		struct SwsContext *img_convert_ctx = sws_getContext(mCaptureWidth, mCaptureHeight, AV_PIX_FMT_YUV420P,
 				mContext->width, mContext->height, AV_PIX_FMT_YUV420P, SWS_POINT, NULL, NULL, NULL);
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(7"
+				")"
+				);
 
 		if (img_convert_ctx == NULL){
-			FileLog("CamshareClientError",
+			FileLog("CamshareClient",
 					"H264Encoder::EncodeFrame(sws_scale"
 					"img_convert_ctx is NULL"
 					")"
@@ -241,11 +311,23 @@ bool H264Encoder::EncodeFrame(
 					);
 			return false;
 		}
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(8"
+				")"
+				);
 		sws_scale(img_convert_ctx,
 				mFrameYUV->data,
 				mFrameYUV->linesize, 0, mCaptureHeight, rgbFrame->data,
 				rgbFrame->linesize);
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(9"
+				")"
+				);
 		sws_freeContext(img_convert_ctx);
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(10"
+				")"
+				);
 		img_convert_ctx = NULL;
 
 
@@ -254,7 +336,15 @@ bool H264Encoder::EncodeFrame(
 	 mEnc_pkt.data = NULL;
 	 mEnc_pkt.size = 0;
 	 av_init_packet(&mEnc_pkt);
+		FileLog("CamshareClient",
+				"H264Encoder::EncodeFrame(11"
+				")"
+				);
 	ret = avcodec_encode_video2(mContext, &mEnc_pkt, rgbFrame, &enc_got_frame);
+	FileLog("CamshareClient",
+			"H264Encoder::EncodeFrame(12"
+			")"
+			);
 	 if (enc_got_frame == 1){
 
 //		 // 帧的类型
@@ -273,6 +363,7 @@ bool H264Encoder::EncodeFrame(
 
 			FileLog("CamshareClient",
 					"Jni::EncodeFrame"
+					"mEnc_pkt.size:%d,"
 					"mEnc_pkt[0]:%x,"
 					"mEnc_pkt[1]:%x,"
 					"mEnc_pkt[2]:%x,"
@@ -282,6 +373,7 @@ bool H264Encoder::EncodeFrame(
 					"pictType:%d,"
 					"framepictType:%d"
 					")",
+					mEnc_pkt.size,
 					mEnc_pkt.data[0],
 					mEnc_pkt.data[1],
 					mEnc_pkt.data[2],
@@ -305,7 +397,15 @@ bool H264Encoder::EncodeFrame(
 			 isKeyFrame = false;
 		 }
 
+			FileLog("CamshareClient",
+					"H264Encoder::EncodeFrame(13"
+					")"
+					);
 		 memcpy(desData + datalen, mEnc_pkt.data, mEnc_pkt.size);
+			FileLog("CamshareClient",
+					"H264Encoder::EncodeFrame(14"
+					")"
+					);
 		 desDataLen = mEnc_pkt.size + datalen;
 
 //			// 录制文件
@@ -332,14 +432,15 @@ bool H264Encoder::EncodeFrame(
 	 }
 
 	FileLog("CamshareClient",
-			"H264Encoder::EncodeFrame(start"
+			"H264Encoder::EncodeFrame(end"
 			")"
 			);
-	 av_freep(&mFrameYUV->data[0]);
-	 av_frame_free(&mFrameYUV);
-	 av_freep(&rgbFrame->data[0]);
-	 av_frame_free(&rgbFrame);
-
+	av_free(mFrameYUV);
+	 av_free(out_buffer);
+	 mFrameYUV = NULL;
+	 av_free(rgbFrame);
+	 av_free(buffer);
+	 rgbFrame = NULL;
 	return bFlag;
 }
 

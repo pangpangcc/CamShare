@@ -81,19 +81,21 @@ JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_Stop
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	SendVideoData
- * Signature:	(J[BIJIII)Z
+ * Method:  	ChooseVideoFormate
+ * Signature:	(J)Z[I
  */
-JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SendVideoData
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jlong, jint, jint, jint);
+JNIEXPORT jint JNICALL Java_com_qpidnetwork_camshare_CamshareClient_ChooseVideoFormate
+  (JNIEnv *, jobject, jlong, jintArray);
+
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	SetVideoSize
+ * Method:  	SetSendVideoSize
  * Signature:	(JII)Z
  */
-JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetVideoSize
-  (JNIEnv *, jobject, jlong, jint, jint);
+JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetSendVideoSize
+(JNIEnv *, jobject , jlong , jint, jint);
+
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
@@ -105,19 +107,13 @@ JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SetVideo
 
 /*
  * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	StartCapture
- * Signature:	(J)Z
+ * Method:  	SendVideoData
+ * Signature:	(J[BIJIII)Z
  */
-JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_StartCapture
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jboolean JNICALL Java_com_qpidnetwork_camshare_CamshareClient_SendVideoData
+  (JNIEnv *, jobject, jlong, jbyteArray, jint, jlong, jint, jint, jint);
 
-/*
- * Class:		com_qpidnetwork_camshare_CamshareClient
- * Method:  	StopCapture
- * Signature:	(J)Z
- */
-JNIEXPORT void JNICALL Java_com_qpidnetwork_camshare_CamshareClient_StopCapture
-  (JNIEnv *, jobject, jlong);
+
 
 #ifdef __cplusplus
 }

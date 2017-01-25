@@ -28,3 +28,5 @@ cd /usr/local/freeswitch/bin && ./freeswitch -nc
 echo "camshare-middlewarecd pid : `ps -ef | grep camshare-middleware | grep -v "grep" | awk -F" " '{ print $2 }'`"
 echo "camshare-executor pid : `ps -ef | grep camshare-executor | grep -v "grep" | awk -F" " '{ print $2 }'`"
 echo "freeswitch pid : `ps -ef | grep "freeswitch -nc" | grep -v "grep" | awk -F" " '{ print $2 }'`"
+
+echo "# Run all camshare service OK"
