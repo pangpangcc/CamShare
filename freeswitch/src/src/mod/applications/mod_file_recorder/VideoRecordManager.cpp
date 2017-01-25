@@ -290,6 +290,8 @@ bool VideoRecordManager::StartRecord(switch_file_handle_t *handle, const char *p
 		VideoRecorder* recorder = GetVideoRecorder();
 		if (NULL != recorder)
 		{
+			recorder->SetCallback(this);
+
 			// 启动录制视频
 			result = recorder->StartRecord(handle, path
 						, m_videoMp4Dir, m_videoCloseShell
@@ -426,29 +428,37 @@ void VideoRecordManager::RecordVideoFrame2FileProc()
 //								, recorder, recorder->IsRecord());
 
 				if (recorder->IsRecord()) {
-					// 若没有处理，则sleep
-					if (!procResult) {
-						switch_sleep(50 * 1000);
-					}
+					// Modify by Max 2017/01/24
+					// 放回处理队列之前需要释放CPU给其他录制线程处理, 否则会吃光CPU)
+//					// 若没有处理，则sleep
+//					if (!procResult) {
+//						switch_sleep(50 * 1000);
+//					}
+					switch_sleep(50 * 1000);
 
 					switch_queue_push(m_queueVideo, (void*)recorder);
 				}
 				else {
 					// 已经停止录制，设置不再处理
 					recorder->SetVideoHandling(false);
-
+					recorder->Stop();
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() CanReset, recorder:%p, result:%d\n"
 //									, recorder, recorder->CanReset());
 
-					if (recorder->CanReset()) {
-						// 可以重置，插入回收队列
-						switch_queue_push(m_queueToRecycle, (void*)recorder);
-					}
-					else {
-						// 未可重置，插入当前队列
-						switch_queue_push(m_queueVideo, (void*)recorder);
-					}
+//					if (recorder->CanReset()) {
+//						// 可以重置，插入回收队列
+//						switch_queue_push(m_queueToRecycle, (void*)recorder);
+//					}
+//					else {
+//						// Modify by Max 2017/01/24
+//						// 放回处理队列之前需要释放CPU给截图线程处理(当停止录制会标记为处理完成), 否则会吃光CPU
+//						switch_sleep(50 * 1000);
+//
+//						// 未可重置，插入当前队列
+//						switch_queue_push(m_queueVideo, (void*)recorder);
+//					}
+
 				}
 			}
 			else {
@@ -511,6 +521,7 @@ void VideoRecordManager::RecordPicture2FileProc()
 				}
 				else {
 					recorder->SetPicHandling(false);
+					recorder->Stop();
 				}
 			}
 			else {
@@ -644,27 +655,35 @@ VideoRecorder* VideoRecordManager::GetVideoRecorder()
 		recorder = new VideoRecorder;
 		m_videoRecorderCount++;
 
-//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecordManager::GetVideoRecorder() new VideoRecorder, count:%d, recorder:%p\n"
-//						, m_videoRecorderCount, recorder);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+						, "mod_file_recorder: VideoRecordManager::GetVideoRecorder() new VideoRecorder, count:%d, recorder:%p\n"
+						, m_videoRecorderCount, recorder);
 	}
-//	else {
-//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecordManager::GetVideoRecorder() success, recorder:%p\n"
-//						, recorder);
-//	}
+	else {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+						, "mod_file_recorder: VideoRecordManager::GetVideoRecorder() success, recorder:%p\n"
+						, recorder);
+	}
 	return recorder;
 }
 
 // 回收VideoRecorder
 void VideoRecordManager::RecycleVideoRecorder(VideoRecorder* recorder)
 {
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() recycle VideoRecorder, recorder:%p\n"
-//					, recorder);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+					, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() recycle VideoRecorder, recorder:%p\n"
+					, recorder);
 
 	if (NULL != recorder) {
 		switch_queue_trypush(m_queueFree, (void*)recorder);
 	}
 }
 
+void VideoRecordManager::OnStop(VideoRecorder* recorder) {
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "VideoRecordManager::OnStop() recorder:%p\n"
+//					, recorder
+//					);
+	// 可以重置，插入回收队列
+	switch_queue_push(m_queueToRecycle, (void*)recorder);
+}

@@ -26,8 +26,8 @@ if fun == "conference_member_add" then
   -- 关别人听
 --  api:execute("conference", conference_name .. " vmute " .. member_id);
   -- 关自己看
---  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " clear");
---  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " sendvideo");
+  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " clear");
+  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " sendvideo");
 --  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " nospeak");
 --  api:execute("conference", conference_name .. " relate " .. member_id .. " " .. member_id .. " nohear");
   -- 关自己听
@@ -36,7 +36,7 @@ if fun == "conference_member_add" then
   -- 根据用户类型设置权限
   if member_type == "moderator" then
     freeswitch.consoleLog("NOTICE", "# 会议事件监听脚本->事件:增加主持人[member_id:" .. member_id .. "]到会议室[" .. conference_name .. "]\n");   
---    api:execute("conference", conference_name .. " vid-floor " .. member_id .. " force");
+    api:execute("conference", conference_name .. " vid-floor " .. member_id .. " force");
 --    api:execute("uuid_setvar", channel_id .. " enable_file_write_buffering false");
 --    api:execute("conference", conference_name .. " record /usr/local/freeswitch/recordings/video_h264/" .. conference_name .. os.date("_%Y%m%d%H%M%S", os.time()) .. ".h264");
   else

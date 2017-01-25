@@ -100,6 +100,13 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 //							, mpMemoryPool);
 		}
 
+		// 创建状态锁
+		if( success ) {
+			success = (SWITCH_STATUS_SUCCESS
+							== switch_mutex_init(&mpMutex, SWITCH_MUTEX_NESTED, mpMemoryPool));
+		}
+
+
 		// 记录句柄
 		if (success) {
 			mpHandle = handle;
@@ -274,10 +281,21 @@ void VideoRecorder::StopRecord()
 }
 
 // 判断是否可Reset
-bool VideoRecorder::CanReset()
+bool VideoRecorder::Stop()
 {
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+					, "VideoRecorder::Stop() recorder:%p\n"
+					, this
+					);
 	bool result = false;
+	switch_mutex_lock(mpMutex);
 	result = !mIsVideoHandling && !mIsPicHandling;
+	switch_mutex_unlock(mpMutex);
+	if( result ) {
+		if( mpCallback ) {
+			mpCallback->OnStop(this);
+		}
+	}
 	return result;
 }
 
@@ -351,9 +369,14 @@ void VideoRecorder::Reset()
 //			, mpHandle);
 
 	// 重置参数
+	switch_mutex_lock(mpMutex);
 	ResetParam();
+	switch_mutex_unlock(mpMutex);
 }
 
+void VideoRecorder::SetCallback(VideoRecorderCallback* callback) {
+	mpCallback = callback;
+}
 
 // 录制视频frame
 bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
@@ -605,13 +628,17 @@ void VideoRecorder::PutVideoBuffer2FileProc()
 // 设置视频是否正在处理
 void VideoRecorder::SetVideoHandling(bool isHandling)
 {
+	switch_mutex_lock(mpMutex);
 	mIsVideoHandling = isHandling;
+	switch_mutex_unlock(mpMutex);
 }
 
 // 设置监控截图是否正在处理
 void VideoRecorder::SetPicHandling(bool isHandling)
 {
+	switch_mutex_lock(mpMutex);
 	mIsPicHandling = isHandling;
+	switch_mutex_unlock(mpMutex);
 }
 
 // 监制截图线程处理
@@ -1306,6 +1333,7 @@ bool VideoRecorder::RunPictureShell()
 	// run shell
 //	int code = system(cmd);
 //	result = (code >= 0);
+//	result = true;
 	result = SendCommand(cmd);
 
 	// log
@@ -1332,7 +1360,7 @@ bool VideoRecorder::SendCommand(const char* cmd) {
 //			"mod_file_recorder: VideoRecorder::SendCommand() cmd : \"%s\"\n",
 //			cmd
 //			);
-	return file_record_send_command(cmd);
+	return file_record_send_command_lua(cmd);
 }
 
 bool VideoRecorder::file_record_send_command(const char* cmd) {
@@ -1347,7 +1375,7 @@ bool VideoRecorder::file_record_send_command(const char* cmd) {
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_ERROR,
-				"mod_file_recorder: VideoRecorder::file_record_send_command( "
+				"VideoRecorder::file_record_send_command( "
 				"[Send event Fail], "
 				"this : %p, "
 				"cmd : '%s' "
@@ -1358,6 +1386,73 @@ bool VideoRecorder::file_record_send_command(const char* cmd) {
 	}
 
 	return status == SWITCH_STATUS_SUCCESS;
+}
+
+bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
+	bool bFlag = true;
+
+	char result[SWITCH_CMD_CHUNK_LEN];
+	switch_stream_handle_t stream = { 0 };
+//	SWITCH_STANDARD_STREAM(stream);
+
+	memset(&stream, 0, sizeof(stream));
+	stream.data = result;
+	memset(stream.data, 0, SWITCH_CMD_CHUNK_LEN);
+	stream.end = stream.data;
+	stream.data_size = SWITCH_CMD_CHUNK_LEN;
+	stream.write_function = switch_console_stream_write;
+	stream.raw_write_function = switch_console_stream_raw_write;
+	stream.alloc_len = SWITCH_CMD_CHUNK_LEN;
+	stream.alloc_chunk = SWITCH_CMD_CHUNK_LEN;
+
+	char path[2048] = {0};
+	char url[2048] = {0};
+	if( switch_url_encode(cmd, url, sizeof(url)) ) {
+		snprintf(path, sizeof(path) - 1, "event_file_recorder.lua %s", url);
+	}
+
+//	switch_log_printf(
+//			SWITCH_CHANNEL_LOG,
+//			SWITCH_LOG_INFO,
+//			"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+//			"[LUA call], "
+//			"this : %p, "
+//			"path : %s "
+//			") \n",
+//			this,
+//			path
+//			);
+
+	if( strlen(path) > 0 && switch_api_execute("lua", path, NULL, &stream) == SWITCH_STATUS_SUCCESS ) {
+		bFlag = true;
+//		switch_log_printf(
+//				SWITCH_CHANNEL_LOG,
+//				SWITCH_LOG_INFO,
+//				"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+//				"[LUA call OK], "
+//				"this : %p, "
+//				"stream.data : '%s' "
+//				") \n",
+//				this,
+//				stream.data
+//				);
+	} else {
+		switch_log_printf(
+				SWITCH_CHANNEL_LOG,
+				SWITCH_LOG_ERROR,
+				"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+				"[LUA call Fail], "
+				"this : %p, "
+				"stream.data : '%s' "
+				") \n",
+				this,
+				stream.data
+				);
+	}
+
+//	switch_safe_free(stream.data);
+
+	return bFlag;
 }
 
 // 获取空闲buffer

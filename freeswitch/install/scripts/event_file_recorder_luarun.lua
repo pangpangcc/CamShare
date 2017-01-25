@@ -20,7 +20,6 @@ fun = event:getHeader("Event-Calling-Function");
 --freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->事件:[" .. fun .. "]\n");
 --freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->event:\n" .. event:serialize("json") .. "\n");
   
----- 处理会议增加成员
 if fun == "file_record_send_command" then
   cmd = event:getHeader("cmd");
   --  发起http请求, 通知执行命令
@@ -36,8 +35,7 @@ if fun == "file_record_send_command" then
   else
     freeswitch:consoleLog("WARNING", "# 录制模块事件监听脚本(luarun)->获取http返回失败:" .. url .."\n");
   end
-  
-end -- 处理会议增加成员完成
+end
 
 --freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->结束\n");
 end

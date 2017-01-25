@@ -16,7 +16,7 @@
     
     <!-- video record over handle(video transcode) thread -->
     <!-- 录制结束处理线程数(转码) -->        
-    <param name="video-close-thread" value="2"/>
+    <param name="video-close-thread" value="8"/>
     
     <!-- ===== cut picture setting ===== -->
     <!-- picture source directory -->
@@ -33,11 +33,11 @@
     
     <!-- cut picture interval(millisecond) -->
     <!-- 生成i帧jpeg文件的时间间隔(毫秒) -->
-    <param name="pic-interval" value="5000"/>
+    <param name="pic-interval" value="2000"/>
     
     <!-- picture handle thread -->
     <!-- 生成监控图处理线程数 -->
-    <param name="pic-thread" value="1"/>
+    <param name="pic-thread" value="8"/>
     
   </settings>
 </configuration>

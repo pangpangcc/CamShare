@@ -30,7 +30,7 @@
     -->
     <!--<param name="startup-script" value="event_listener.lua"/>-->
     <!--<param name="startup-script" value="startup_script_2.lua"/>-->
-    <param name="startup-script" value="event_file_recorder_luarun.lua"/>
+    <!--<param name="startup-script" value="event_file_recorder_luarun.lua"/>-->
     
     <!--<hook event="CUSTOM" subclass="conference::maintenance" script="catch-event.lua"/>-->
     <hook event="CUSTOM" subclass="conference::maintenance" script="event_conference.lua"/>

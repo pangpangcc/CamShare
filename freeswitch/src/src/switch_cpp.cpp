@@ -41,24 +41,36 @@ static void event_handler(switch_event_t *event)
 {
 	EventConsumer *E = (EventConsumer *) event->bind_user_data;
 	switch_event_t *dup;
+	// Modify by Max 2017/01/19
+	char* json = NULL;
 	
 	switch_event_dup(&dup, event);
 
 	if (switch_queue_trypush(E->events, dup) != SWITCH_STATUS_SUCCESS) {
 		// Modify by Max 2017/01/19
+//		switch_event_serialize_json(event, &json);
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Cannot queue any more events.....\n");
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Cannot queue any more events....., "
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "event_handler(), Cannot queue any more events....., "
 				"size : %d, "
 				"event_id : %d, "
-				"subclass_name : %s, "
-				"body : %s"
+				"subclass_name : %s "
+//				"json : %s"
 				"\n",
 				switch_queue_size(E->events),
 				event->event_id,
-				event->subclass_name,
-				event->body
+				event->subclass_name
+//				json
 				);
 		switch_event_destroy(&dup);
+//		switch_safe_free(json);
+	} else {
+//		// Modify by Max 2017/01/19
+//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+//				"event_handler(), "
+//				"size : %d "
+//				"\n",
+//				switch_queue_size(E->events)
+//				);
 	}
 
 }

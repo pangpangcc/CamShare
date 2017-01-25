@@ -15,6 +15,13 @@
 
 #define MAX_PATH_LENGTH	512
 
+class VideoRecorder;
+class VideoRecorderCallback {
+public:
+	virtual ~VideoRecorderCallback() {};
+	virtual void OnStop(VideoRecorder* recorder) = 0;
+};
+
 class VideoRecorder
 {
 public:
@@ -39,10 +46,13 @@ public:
 	// 录制视频frame
 	bool RecordVideoFrame(switch_frame_t *frame);
 
-	// 判断是否可Reset
-	bool CanReset();
+	// 判断处理状态并停止
+	bool Stop();
 	// 重置(包括重置参数及执行close_shell)
 	void Reset();
+
+	// 设置回调
+	void SetCallback(VideoRecorderCallback* callback);
 
 // 外部线程调用函数
 public:
@@ -112,6 +122,7 @@ private:
 	// 发送命令事件
 	bool SendCommand(const char* cmd);
 	bool file_record_send_command(const char* cmd);
+	bool file_record_send_command_lua(const char* cmd);
 
 private:
 	char mcH264Path[2048];
@@ -149,6 +160,10 @@ private:
 	long long			mlPicBuildTime;		// 生成图片时间
 	uint8_t* 			mpPicDataBuffer;	// 监控图片h264数据缓存
 	uint32_t			miPicDataBufferSize;	// 监控图片h264数据缓存size
+
+	// 处理回调
+	VideoRecorderCallback* mpCallback;
+	switch_mutex_t*		mpMutex;		// 状态锁
 };
 
 #endif /* SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDER_H_ */

@@ -14,7 +14,7 @@
 
 using namespace std;
 
-class VideoRecordManager
+class VideoRecordManager : public VideoRecorderCallback
 {
 public:
 	VideoRecordManager();
@@ -33,6 +33,8 @@ public:
 	void StopRecord(switch_file_handle_t *handle);
 	// 录制视频frame
 	bool RecordVideoFrame(switch_file_handle_t *handle, switch_frame_t *frame);
+
+	void OnStop(VideoRecorder* recorder);
 
 // VideoRecorder回收线程函数
 private:
