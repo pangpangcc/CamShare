@@ -348,6 +348,7 @@ void VideoRecorder::Reset()
 	if (NULL != mpMemoryPool)
 	{
 		switch_core_destroy_memory_pool(&mpMemoryPool);
+		mpMemoryPool = NULL;
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
