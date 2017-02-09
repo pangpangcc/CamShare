@@ -1924,6 +1924,7 @@ bool CamShareMiddleware::SendRecordFinish(
 	errorRecord = false;
 	errorCode = "";
 
+	long httpCode = 0;
 	const char* respond = NULL;
 	int respondSize = 0;
 	HttpEntiy httpEntiy;
@@ -1980,6 +1981,7 @@ bool CamShareMiddleware::SendRecordFinish(
 
 	if( !errorRecord && client->Request(url.c_str(), &httpEntiy) ) {
 		// 解析返回
+		httpCode = client->GetRespondCode();
 		client->GetBody(&respond, respondSize);
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
@@ -1992,6 +1994,7 @@ bool CamShareMiddleware::SendRecordFinish(
 				"filePath : '%s', "
 				"startTime : '%s', "
 				"endTime : '%s', "
+				"httpCode : %ld, "
 				"respondSize : '%d', "
 				"respond : '%s' "
 				")",
@@ -2002,35 +2005,47 @@ bool CamShareMiddleware::SendRecordFinish(
 				record.filePath.c_str(),
 				record.startTime.c_str(),
 				record.endTime.c_str(),
+				httpCode,
 				respondSize,
 				respond
 				);
-		if( respondSize > 0 ) {
-			// 发送成功
-			Json::Value root;
-			Json::Reader reader;
-			if( reader.parse(respond, root, false) ) {
-				// 解析协议成功, 标记为发送成功
-				bFlag = true;
+		if( httpCode == 200 ) {
+			if( respondSize > 0 ) {
+				// 发送成功
+				Json::Value root;
+				Json::Reader reader;
+				if( reader.parse(respond, root, false) ) {
+					// 解析协议成功, 标记为发送成功
+					bFlag = true;
 
-				if( root["result"].isInt() ) {
-					int result = root["result"].asInt();
-					switch(result) {
-					case 0:{
-						// 上传失败
-						if( root["errno"].isString() ) {
-							// 解析错误码
-							errorCode = root["errno"].asString();
+					if( root["result"].isInt() ) {
+						int result = root["result"].asInt();
+						switch(result) {
+						case 0:{
+							// 上传失败
+							if( root["errno"].isString() ) {
+								// 解析错误码
+								errorCode = root["errno"].asString();
+							}
+						}break;
+						case 1:{
+							// 上传成功
+							success = true;
+
+						}break;
 						}
-					}break;
-					case 1:{
-						// 上传成功
-						success = true;
-
-					}break;
 					}
+				} else {
+					// 标记为错误记录, 手工处理
+					errorRecord = true;
 				}
+			} else {
+				// 标记为错误记录, 手工处理
+				errorRecord = true;
 			}
+
+		} else {
+			// 不是200 OK记录继续发送
 		}
 	}
 

@@ -16,30 +16,16 @@ CXXFLAGS = -O2 -g
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wunused-variable -Wno-write-strings -Wno-narrowing -Wno-unused-variable
-CXXFLAGS +=	-I. -I../ \
-			-I../libev \
-			-I../../deps/build/include
+CXXFLAGS +=	-I. -I../ -I../include -I../third_party -I../third_party/libev
 
 CXXFLAGS += -D__STDC_CONSTANT_MACROS
 
+# 注意连接依赖顺序问题, 被依赖的放后面
 LIBS =		-L. \
-			-Wl,-Bstatic -L../libev/.libs -lev \
-			-Wl,-Bstatic -L../../deps/build/lib/ \
-			-lavcodec \
-			-lavutil \
-			-lswscale \
-			-lavdevice \
-			-lavfilter \
-			-lavformat \
-			-lpostproc \
-			-lswresample \
-			-lx264 \
-			-Wl,-Bdynamic -ldl -lz -lpthread 
-
-COMMON  	=	../common/LogFile.o ../common/md5.o ../common/KThread.o ../common/ConfFile.o ../common/Arithmetic.o ../common/aes.o\
-				../common/IAutoLock.o ../common/CommonFunc.o
+			-Wl,-Bstatic -L../common -lcommon \
+			-Wl,-Bstatic -L../third_party/libev/.libs -lev \
+			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
 				
-OBJS	+= $(COMMON)		
 OBJS	+=	http_client.o HttpServerTest.o		
 TARGET =	http-client
 
@@ -48,7 +34,7 @@ FORK_OBJS += fork_tester.o
 FORK_TEST =	fork-tester
 
 TRANSCODER_OBJS += $(COMMON)
-TRANSCODER_OBJS += transcoder_tester.o ../executor/Transcoder.o
+TRANSCODER_OBJS += transcoder_tester.o
 TRANSCODER_TEST =	transcoder-tester
 
 .PHONY: clean $(TARGET) $(FORK_TEST) $(TRANSCODER_TEST)

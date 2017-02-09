@@ -5,7 +5,7 @@ PORT=9200
 # 最大连接数
 MAXCLIENT=2000
 # 处理线程数目, 一般为cpu内核数目
-MAXHANDLETHREAD=4
+MAXHANDLETHREAD=8
 # 单核每秒处理请求数目
 MAXQUERYPERCOPY=0
 # 单个HTTP请求超时时间(秒), 0为不超时

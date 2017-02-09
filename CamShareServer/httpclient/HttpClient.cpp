@@ -44,6 +44,7 @@ HttpClient::HttpClient() {
 
 	mbStop = false;
 
+	mHttpCode = 0;
 	mContentType = "";
 	mContentLength = -1;
 
@@ -82,6 +83,7 @@ bool HttpClient::Request(const string& url, const HttpEntiy* entiy) {
 	mUrl = url;
 	mbStop = false;
 
+	mHttpCode = 0;
 	mContentType = "";
 	mContentLength = -1;
 
@@ -209,6 +211,9 @@ bool HttpClient::Request(const string& url, const HttpEntiy* entiy) {
 	curl_easy_getinfo(mpCURL, CURLINFO_TOTAL_TIME, &totalTime);
 	FileLog("httpclient", "HttpClient::Request( totalTime : %f second )", totalTime);
 
+	curl_easy_getinfo(mpCURL, CURLINFO_RESPONSE_CODE, &mHttpCode);
+	FileLog("httpclient", "HttpClient::Request( mHttpCode : %ld )", mHttpCode);
+
 	if( mpCURL != NULL ) {
 		curl_easy_cleanup(mpCURL);
 		mpCURL = NULL;
@@ -228,6 +233,10 @@ bool HttpClient::Request(const string& url, const HttpEntiy* entiy) {
 	FileLog("httpclient", "HttpClient::Request( bFlag : %s , res : %d )", bFlag?"true":"false", res);
 
 	return bFlag;
+}
+
+long HttpClient::GetRespondCode() {
+	return mHttpCode;
 }
 
 string HttpClient::GetContentType() const

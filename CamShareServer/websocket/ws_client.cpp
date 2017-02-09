@@ -26,13 +26,13 @@ using namespace std;
 //char ip[128] = {"172.16.172.129"};
 char ip[128] = {"192.168.88.152"};
 int iTotal = 1;
-int iReconnect = 10;
+int iReconnect = 120;
 bool bPlay = false;
 bool bNoVideo = false;
 
 bool Parse(int argc, char *argv[]);
 
-#define MAX_CLIENT 200
+#define MAX_CLIENT 1000
 bool testReconnect = true;
 #define RECONN_MAX_TIME_S (10*1000*1000)
 #define RECONN_CHECK_INTERVAL (100*1000)
@@ -79,7 +79,7 @@ protected:
 
 			char user[1024];
 			char dest[1024];
-			sprintf(user, "MM%d", mContainer->GetIndex());
+			sprintf(user, "MM%d", mContainer->GetIndex() + 300);
 			sprintf(dest, "WW%d|||PC0|||1", mContainer->GetIndex());
 
 			if( mContainer->Connect(ip, user, dest) ) {
@@ -263,6 +263,7 @@ bool Parse(int argc, char *argv[]) {
 		value = argv[i+1];
 
 		if( key.compare("-h") == 0 ) {
+			memset(ip, 0, sizeof(ip));
 			memcpy(ip, value.c_str(), value.length());
 		} else if( key.compare("-n") == 0 ) {
 			iTotal = atoi(value.c_str());

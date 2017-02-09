@@ -71,10 +71,10 @@ if result == 0 then
   local loginPath = getLoginPath(siteId);
   if( loginPath ~= nil ) then
     local url = loginPath .. "&userId=" .. req_user .. " json connect-timeout 10 timeout 30 post " .. custom;
-    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
+--    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->发起http请求 " .. url .. "\n");
     response = api:execute("curl", url);
     if response ~= nil then
-      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回:" .. response .. "\n");
+      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->获取http返回:" .. url .. ", response:" .. response .. "\n");
       json = cjson.decode(response);
       body = json["body"];
       if body ~= nil then
@@ -84,13 +84,13 @@ if result == 0 then
         errno = json["errno"];
         errmsg = json["errmsg"];
       else
-        freeswitch.consoleLog("WARNING", "# 用户登陆脚本->http返回协议解析失败\n");
+        freeswitch.consoleLog("WARNING", "# 用户登陆脚本->http返回协议解析失败:" .. url .. "\n");
       end
     else
-      freeswitch.consoleLog("WARNING", "# 用户登陆脚本->获取http返回失败\n");
+      freeswitch.consoleLog("WARNING", "# 用户登陆脚本->获取http返回失败:" .. url .. "\n");
     end
   else
-    freeswitch.consoleLog("WARNING", "# 用户登陆脚本->没有找到http URL\n");
+    freeswitch.consoleLog("WARNING", "# 用户登陆脚本->没有找到http URL, siteId:" .. siteId .. ", req_user:" .. req_user .. "\n");
   end
 end
 

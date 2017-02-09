@@ -39,6 +39,10 @@
     <!-- 生成监控图处理线程数 -->
     <param name="pic-thread" value="8"/>
     
+    <!-- picture handle thread -->
+    <!-- 录制最大缓存数量，0为不设限制 -->
+    <param name="video-recorder-count-max" value="200"/>
+    
   </settings>
 </configuration>
 

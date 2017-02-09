@@ -87,7 +87,6 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
 cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
 cp -f ./freeswitch/install/scripts/event_file_recorder.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/event_file_recorder_luarun.lua $updatefiledir/
 cp -f ./freeswitch/install/scripts/event_conference.lua $updatefiledir/
 
 # remove freeswitch scripts config

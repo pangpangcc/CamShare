@@ -36,6 +36,10 @@ public:
 	bool Request(const string& url, const HttpEntiy* entiy);
 
 	/**
+	 * 获取返回值
+	 */
+	long GetRespondCode();
+	/**
 	 * 获取返回头类型
 	 */
 	string GetContentType() const;
@@ -89,6 +93,7 @@ private:
 	string mUrl;
 	string mContentType;
 	double mContentLength;
+	long mHttpCode;
 
 	// stop manually
 	bool mbStop;

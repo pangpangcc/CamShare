@@ -63,7 +63,7 @@ if( #tables >= 3 ) then
                       "&siteId=" .. siteId .. 
                       "&source=" .. source .. 
                       " json connect-timeout 5 timeout 10 get";
-  freeswitch.consoleLog("NOTICE", "# 内网拨号计划->发起http请求 " .. url .. "\n");
+--  freeswitch.consoleLog("NOTICE", "# 内网拨号计划->发起http请求 " .. url .. "\n");
   response = api:execute("curl", url);
   
 --  解析返回

@@ -52,7 +52,7 @@ private:
 
 	string mLogDir;
 
-	KMutex mKFileCtrlMutex;
+	KMutex mMutex;
 	CFileCtrl *mpFileCtrl;
 	LOG_LEVEL mLogLevel;
 

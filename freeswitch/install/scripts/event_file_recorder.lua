@@ -10,7 +10,7 @@ api = freeswitch.API();
 --freeswitch.consoleLog("NOTICE", "# 录制模块事件监听脚本->开始");
 
 local_domain_name = freeswitch.getGlobalVariable("domain_name")
-freeswitch.consoleLog("local_domain_name", local_domain_name)
+--freeswitch.consoleLog("local_domain_name", local_domain_name)
 
 cmd = argv[1];
 --  发起http请求, 通知执行命令

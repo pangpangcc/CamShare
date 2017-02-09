@@ -19,8 +19,8 @@ elif [ "$env" = "operating" ]; then
 fi
 
 # ---- copy camshare executor files
-cp -f ./CamShareServer/executor/camshare-executor ./package/CamShareServer/
-cp -f ./CamShareServer/executor/camshare-executor.config ./package/CamShareServer/
+cp -rf executor/camshare-executor ./package/CamShareServer/
+cp -rf executor/camshare-executor.config ./package/CamShareServer/
 
 cp -rf ./bin/* ./package/CamShareServer/
 

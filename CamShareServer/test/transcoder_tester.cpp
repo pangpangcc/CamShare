@@ -14,12 +14,12 @@
 #include <string>
 using namespace std;
 
-#include <executor/Transcoder.h>
+//#include <executor/Transcoder.h>
 
 int main(int argc, char *argv[]) {
 	printf("############## transcoder tester ############## \n");
 	srand(time(0));
 
-	Transcoder tester;
-	tester.TranscodeH2642JPEG("C348348.h264", "C348348.jpg");
+//	Transcoder tester;
+//	tester.TranscodeH2642JPEG("C348348.h264", "C348348.jpg");
 }

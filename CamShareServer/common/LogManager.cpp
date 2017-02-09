@@ -73,9 +73,12 @@ LogManager::~LogManager() {
 }
 
 bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
+	bool bFlag = false;
 	if( !mIsRunning ) {
 		return false;
 	}
+
+	mMutex.lock();
 
 	bool bNeedLog = false;
 	if( mDebugMode ) {
@@ -113,10 +116,12 @@ bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
         	mpFileCtrlDebug->LogMsg(logBuffer, (int)strlen(logBuffer), bitBuffer);
         }
 
-        return true;
+        bFlag = true;
     }
 
-	return true;
+    mMutex.unlock();
+
+	return bFlag;
 }
 
 bool LogManager::Start(LOG_LEVEL nLevel, const string& dir) {

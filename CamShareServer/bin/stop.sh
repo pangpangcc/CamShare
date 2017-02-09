@@ -9,7 +9,7 @@ KillCS() {
   GetCamSharePID
   if [ -n "$CS_PID" ]; then
     KILL_CMD="kill $CS_PID"
-    echo "kill camshare-middleware cmd:'$KILL_CMD'"
+    echo "# kill camshare-middleware cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -18,7 +18,7 @@ Kill9CS() {
   GetCamSharePID
   if [ -n "$CS_PID" ];then
     KILL_CMD="kill -9 $CS_PID"
-    echo "kill -9 camshare-middleware cmd:'$KILL_CMD'"
+    echo "# kill -9 camshare-middleware cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -31,7 +31,7 @@ KillCSEXC() {
   GetCamShareExecutorPID
   if [ -n "$CS_PID" ];then
     KILL_CMD="kill $CSEXC_PID"
-    echo "kill camshare-executor cmd:'$KILL_CMD'"
+    echo "# kill camshare-executor cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -40,7 +40,7 @@ Kill9CSEXC() {
   GetCamShareExecutorPID
   if [ -n "$CSEXC_PID" ];then
     KILL_CMD="kill -9 $CSEXC_PID"
-    echo "kill -9 camshare-executor cmd:'$KILL_CMD'"
+    echo "# kill -9 camshare-executor cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -48,7 +48,7 @@ Kill9CSEXC() {
 # -- Freeswitch Function
 ShutdownFreeswitch() {
   fs_cmd_shutdown=`/usr/local/freeswitch/bin/fs_cli -t 20 -T 20 -x "shutdown"`
-  echo "fs_cmd_shutdown : $fs_cmd_shutdown"
+  echo "# fs_cmd_shutdown : $fs_cmd_shutdown"
 }
 
 GetFreeswitchPID() {
@@ -60,7 +60,7 @@ KillFS() {
   GetFreeswitchPID
   if [ -n "$FS_PID" ];then
     KILL_CMD="kill $FS_PID"
-    echo "kill freeswitch cmd:'$KILL_CMD'"
+    echo "# kill freeswitch cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -69,7 +69,7 @@ Kill9FS() {
   GetFreeswitchPID
   if [ -n "$FS_PID" ];then
     KILL_CMD="kill -9 $FS_PID"
-    echo "kill -9 freeswitch cmd:'$KILL_CMD'"
+    echo "# kill -9 freeswitch cmd:'$KILL_CMD'"
     eval $KILL_CMD
   fi
 }
@@ -81,7 +81,7 @@ CheckAndWait() {
     GetCamSharePID
     GetFreeswitchPID
     GetCamShareExecutorPID
-    #echo "CheckAndWait time : $i"
+    #echo "# CheckAndWait time : $i"
     
     wait=0
     #if [ "$fs_cmd_shutdown" == "+OK" ] && [ -n "$FS_PID" ]; then
@@ -100,7 +100,7 @@ CheckAndWait() {
       echo "# waitting..."
       sleep 1
     else
-      #echo "CheckAndWait break"
+      #echo "# CheckAndWait break"
       sleep 1
       break
     fi

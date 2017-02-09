@@ -47,7 +47,18 @@ int main(int argc, char *argv[]) {
 	printf("############## fork_test ############## \n");
 	printf("# Version : %s \n", VERSION_STRING);
 	printf("# Build date : %s %s \n", __DATE__, __TIME__ );
-	srand(time(0));
+//	srand(time(0));
+
+	char temp[1204];
+	memcpy(temp, '\0', 0);
+	char* c = "1";
+	printf("# c : %p", c);
+
+	if( 1 ) {
+		char* c = "2";
+		printf("# c : %p", c);
+	}
+	printf("# c : %p", c);
 
 	/* Ignore SIGPIPE */
 	struct sigaction sa;
@@ -55,14 +66,14 @@ int main(int argc, char *argv[]) {
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
 
-	gStart = true;
-	for(int i = 0; i < 4; i++) {
-		TestRunnable* runnable = new TestRunnable();
-		testThreads[i] = new KThread();
-		testThreads[i]->start(runnable);
-
-		usleep(100 * 1000);
-	}
+//	gStart = true;
+//	for(int i = 0; i < 4; i++) {
+//		TestRunnable* runnable = new TestRunnable();
+//		testThreads[i] = new KThread();
+//		testThreads[i]->start(runnable);
+//
+//		usleep(100 * 1000);
+//	}
 
 //	while(gStart) {
 //		TestRunnable* runnable = new TestRunnable();
