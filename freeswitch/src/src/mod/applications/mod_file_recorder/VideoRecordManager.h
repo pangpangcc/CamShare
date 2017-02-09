@@ -26,7 +26,7 @@ public:
 	bool Init(switch_memory_pool_t* pool);
 	// 初始化配置
 	bool InitConfigure(const char* videoMp4Dir, const char* videoCloseShell, int videoThreadCount, int videoCloseThreadCount
-			, const char* picH264Dir, const char* picDir, const char* picShell, int picInterval, int picThreadCount);
+			, const char* picH264Dir, const char* picDir, const char* picShell, int picInterval, int picThreadCount, int videoRecorderCountMax);
 	// 开始录制
 	bool StartRecord(switch_file_handle_t *handle, const char *path);
 	// 停止录制
@@ -99,7 +99,10 @@ private:
 	switch_thread_t** m_recycleThread;		// VideoRecorder回收线程池
 	switch_queue_t* m_queueToRecycle;		// VideoRecorder待回收队列
 	bool m_isStartRecycle;					// 是否已启动VideoRecorder回收线程
+
+	switch_mutex_t*		mpVideoRecorderCountMutex;		// VideoRecorder数量锁
 	uint32_t m_videoRecorderCount;			// 已创建的VideoRecorder数量
+	int m_videoRecorderCountMax;		// 最大的缓存VideoRecorder数量
 
 	// 视频处理
 	switch_thread_t** m_videoThread;		// 视频处理线程池

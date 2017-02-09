@@ -650,9 +650,13 @@ switch_status_t conference_member_del_relationship(conference_member_t *member, 
 			}
 
 			if ((rel->flags & RFLAG_CAN_SEND_VIDEO)) {
-				conference_utils_member_clear_flag(member, MFLAG_RECEIVING_VIDEO);
+				// Modify by Max 2017/02/06
+//				conference_utils_member_clear_flag(member, MFLAG_RECEIVING_VIDEO);
+				conference_utils_member_clear_flag_locked(member, MFLAG_RECEIVING_VIDEO);
 				if ((omember = conference_member_get(member->conference, rel->id))) {
-					conference_utils_member_clear_flag(omember, MFLAG_RECEIVING_VIDEO);
+					// Modify by Max 2017/02/06
+//					conference_utils_member_clear_flag(omember, MFLAG_RECEIVING_VIDEO);
+					conference_utils_member_clear_flag_locked(omember, MFLAG_RECEIVING_VIDEO);
 					switch_thread_rwlock_unlock(omember->rwlock);
 				}
 			}
@@ -861,7 +865,9 @@ switch_status_t conference_member_add(conference_obj_t *conference, conference_m
 		}
 
 		if (conference->min && conference->count >= conference->min) {
-			conference_utils_set_flag(conference, CFLAG_ENFORCE_MIN);
+			// Modify by Max 2017/02/04
+//			conference_utils_set_flag(conference, CFLAG_ENFORCE_MIN);
+			conference_utils_set_flag_locked(conference, CFLAG_ENFORCE_MIN);
 		}
 
 		if (!switch_channel_test_app_flag_key("conference_silent", channel, CONF_SILENT_REQ) &&
@@ -888,7 +894,9 @@ switch_status_t conference_member_add(conference_obj_t *conference, conference_m
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,	"%s position data set\n", switch_channel_get_name(channel));
 					}
 
-					conference_utils_member_set_flag(member, MFLAG_POSITIONAL);
+					// Modify by Max 2017/02/06
+//					conference_utils_member_set_flag(member, MFLAG_POSITIONAL);
+					conference_utils_member_set_flag_locked(member, MFLAG_POSITIONAL);
 					member->al = conference_al_create(member->pool);
 				}
 			} else {
@@ -993,7 +1001,9 @@ switch_status_t conference_member_add(conference_obj_t *conference, conference_m
 
 	if (conference_utils_member_test_flag(member, MFLAG_JOIN_VID_FLOOR)) {
 		conference_video_set_floor_holder(conference, member, SWITCH_TRUE);
-		conference_utils_set_flag(member->conference, CFLAG_VID_FLOOR_LOCK);
+		// Modify by Max 2017/02/04
+//		conference_utils_set_flag(member->conference, CFLAG_VID_FLOOR_LOCK);
+		conference_utils_set_flag_locked(member->conference, CFLAG_VID_FLOOR_LOCK);
 
 		if (test_eflag(conference, EFLAG_FLOOR_CHANGE)) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference %s OK video floor %d %s\n",
@@ -1039,7 +1049,9 @@ void conference_member_set_floor_holder(conference_obj_t *conference, conference
 		old_member->floor_packets = 0;
 	}
 
-	conference_utils_set_flag(conference, CFLAG_FLOOR_CHANGE);
+	// Modify by Max 2017/02/04
+//	conference_utils_set_flag(conference, CFLAG_FLOOR_CHANGE);
+	conference_utils_set_flag_locked(conference, CFLAG_FLOOR_CHANGE);
 	switch_mutex_unlock(conference->mutex);
 
 	if (test_eflag(conference, EFLAG_FLOOR_CHANGE)) {
@@ -1120,7 +1132,9 @@ switch_status_t conference_member_del(conference_obj_t *conference, conference_m
 	switch_mutex_lock(member->audio_in_mutex);
 	switch_mutex_lock(member->audio_out_mutex);
 	lock_member(member);
-	conference_utils_member_clear_flag(member, MFLAG_INTREE);
+	// Modify by Max 2017/02/06
+//	conference_utils_member_clear_flag(member, MFLAG_INTREE);
+	conference_utils_member_clear_flag_locked(member, MFLAG_INTREE);
 
 	if (member->rec) {
 		conference->recording_members--;
@@ -1199,7 +1213,9 @@ switch_status_t conference_member_del(conference_obj_t *conference, conference_m
 
 		if ((conference->min && conference_utils_test_flag(conference, CFLAG_ENFORCE_MIN) && (conference->count + conference->count_ghosts) < conference->min)
 			|| (conference_utils_test_flag(conference, CFLAG_DYNAMIC) && (conference->count + conference->count_ghosts == 0))) {
-			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+//			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+			// Modify by Max 2017/02/04
+			conference_utils_set_flag_locked(conference, CFLAG_DESTRUCT);
 		} else {
 			if (!switch_true(switch_channel_get_variable(channel, "conference_permanent_wait_mod_moh")) && conference_utils_test_flag(conference, CFLAG_WAIT_MOD)) {
 				/* Stop MOH if any */

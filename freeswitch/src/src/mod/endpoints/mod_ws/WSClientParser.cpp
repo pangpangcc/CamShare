@@ -24,8 +24,8 @@ static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 #define HTTP_URL_FIRSTLINE_PARAM_COUNT 3
 #define HTTP_URL_FIRSTLINE_PARAM_MAX_COUNT HTTP_URL_FIRSTLINE_PARAM_COUNT + 1
 // 暂时不做PHP验证
-//#define HTTP_URL_PATH_PARAM_COUNT 5
-#define HTTP_URL_PATH_PARAM_COUNT 3
+#define HTTP_URL_PATH_PARAM_COUNT 5
+//#define HTTP_URL_PATH_PARAM_COUNT 3
 #define HTTP_URL_PATH_PARAM_MAX_COUNT HTTP_URL_PATH_PARAM_COUNT + 1
 
 #define HTTP_PARAM_SEP ":"
@@ -201,7 +201,6 @@ int WSClientParser::ParseData(char* buffer, int len) {
 				}
 			}
 		}
-		Unlock();
 
 		if( mState == WSClientState_Handshake ) {
 			if( mpCallback ) {
@@ -261,11 +260,10 @@ int WSClientParser::ParseData(char* buffer, int len) {
 //				packet->GetMaskKey()
 //				);
 
-		Unlock();
-
 		const char* data = (const char*)packet->GetData();//buffer;//packet->GetData();
 		int playloadLength = packet->GetPlayloadLength();//len;//packet->GetPlayloadLength();
 		ret = packet->GetHeaderLength() + playloadLength;
+
 		if( mpCallback) {
 			mpCallback->OnWSClientParserData(this, data, playloadLength);
 		}
@@ -273,13 +271,13 @@ int WSClientParser::ParseData(char* buffer, int len) {
 	}break;
 	case WSClientState_Disconnected:{
 		ret = len;
-		Unlock();
 	}break;
 	default:{
-		Unlock();
 		break;
 	}
 	}
+
+	Unlock();
 
 	return ret;
 }
@@ -389,37 +387,41 @@ bool WSClientParser::Login() {
 			mpCustom
 			);
 
+	bool bFlag = true;
+
 	// 暂时不做PHP验证
-//	switch_event_t *locate_params;
-//	switch_xml_t xml = NULL;
-//
-//	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
-//	switch_assert(locate_params);
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
-//	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
-//
-//	/* Locate user */
-//	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
-//		switch_log_printf(
-//				SWITCH_CHANNEL_UUID_LOG(this->uuid),
-//				SWITCH_LOG_ERROR,
-//				"WSClientParser::Login( "
-//				"[Fail], "
-//				"this : %p, "
-//				"user : '%s', "
-//				"domain : '%s' ",
-//				this,
-//				mpUser,
-//				mpDomain
-//				);
-//		return false;
-//	}
+	switch_event_t *locate_params;
+	switch_xml_t xml = NULL;
+
+	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
+	switch_assert(locate_params);
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_ws");
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
+
+	/* Locate user */
+	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
+		switch_log_printf(
+				SWITCH_CHANNEL_UUID_LOG(this->uuid),
+				SWITCH_LOG_ERROR,
+				"WSClientParser::Login( "
+				"[Fail], "
+				"this : %p, "
+				"user : '%s', "
+				"domain : '%s' ",
+				this,
+				mpUser,
+				mpDomain
+				);
+		bFlag = false;
+	}
+
+	switch_event_destroy(&locate_params);
 
 	// 发送登录成功事件
 	ws_login();
 
-	return true;
+	return bFlag;
 }
 
 WSChannel* WSClientParser::CreateCall(
@@ -978,7 +980,8 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				);
 
 		if( strlen(decodeUrl) > 0 ) {
-			p = decodeUrl;
+//			p = decodeUrl;
+			p = switch_core_strdup(mpPool, decodeUrl);
 			delim = "/";
 			if( *p == *delim ) {
 				p++;
@@ -990,10 +993,10 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				mpDomain = switch_core_strdup(mpPool, array2[1]);
 				mpDestNumber = switch_core_strdup(mpPool, array2[2]);
 				// 暂时不做PHP验证
-//				mpSite = switch_core_strdup(mpPool, array2[3]);
-//				mpCustom = switch_core_strdup(mpPool, array2[4]);
-				mpSite = switch_core_strdup(mpPool, "");
-				mpCustom = switch_core_strdup(mpPool, "");
+				mpSite = switch_core_strdup(mpPool, array2[3]);
+				mpCustom = switch_core_strdup(mpPool, array2[4]);
+//				mpSite = switch_core_strdup(mpPool, "");
+//				mpCustom = switch_core_strdup(mpPool, "");
 
 				switch_log_printf(
 						SWITCH_CHANNEL_UUID_LOG(this->uuid),
@@ -1026,10 +1029,10 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				"WSClientParser::ParseFirstLine( "
 				"[Fail], "
 				"this : %p, "
-				"decodeUrl : %s "
+				"decodeUrl : '%s' "
 				") \n",
 				this,
-				line
+				decodeUrl
 				);
 	}
 

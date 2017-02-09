@@ -280,25 +280,6 @@ void VideoRecorder::StopRecord()
 //	switch_mutex_unlock(mpVideoMutex);
 }
 
-// 判断是否可Reset
-bool VideoRecorder::Stop()
-{
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-					, "VideoRecorder::Stop() recorder:%p\n"
-					, this
-					);
-	bool result = false;
-	switch_mutex_lock(mpMutex);
-	result = !mIsVideoHandling && !mIsPicHandling;
-	switch_mutex_unlock(mpMutex);
-	if( result ) {
-		if( mpCallback ) {
-			mpCallback->OnStop(this);
-		}
-	}
-	return result;
-}
-
 // 重置(包括重置参数及执行close_shell)
 void VideoRecorder::Reset()
 {
@@ -630,7 +611,13 @@ void VideoRecorder::PutVideoBuffer2FileProc()
 void VideoRecorder::SetVideoHandling(bool isHandling)
 {
 	switch_mutex_lock(mpMutex);
-	mIsVideoHandling = isHandling;
+	if( mIsVideoHandling != isHandling ) {
+		mIsVideoHandling = isHandling;
+	}
+	bool result = !mIsVideoHandling && !mIsPicHandling;
+	if( result && mpCallback ) {
+		mpCallback->OnStop(this);
+	}
 	switch_mutex_unlock(mpMutex);
 }
 
@@ -638,7 +625,13 @@ void VideoRecorder::SetVideoHandling(bool isHandling)
 void VideoRecorder::SetPicHandling(bool isHandling)
 {
 	switch_mutex_lock(mpMutex);
-	mIsPicHandling = isHandling;
+	if( mIsPicHandling != isHandling ) {
+		mIsPicHandling = isHandling;
+	}
+	bool result = !mIsVideoHandling && !mIsPicHandling;
+	if( result && mpCallback ) {
+		mpCallback->OnStop(this);
+	}
 	switch_mutex_unlock(mpMutex);
 }
 

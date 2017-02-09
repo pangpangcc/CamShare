@@ -127,6 +127,7 @@ bool LoadConfig()
 	char picShell[MAX_PATH_LENGTH] = {0};
 	int picInterval = 0;
 	int picThreadCount = 0;
+	int videoRecorderCountMax = 0;
 
 	const char *cf = "file_recorder.conf";
 	switch_xml_t cfg, xml, settings, param;
@@ -168,6 +169,8 @@ bool LoadConfig()
 				}
 				else if (strcmp(var, "pic-thread") == 0) {
 					picThreadCount = atoi(val);
+				} else if (strcmp(var, "video-recorder-count-max") == 0) {
+					videoRecorderCountMax = atoi(val);
 				}
 			}
 		}
@@ -175,7 +178,7 @@ bool LoadConfig()
 	}
 
 	result = g_videoRecordMgr.InitConfigure(mp4Dir, closeShell, videoThreadCount, videoCloseThreadCount
-				, picH264Dir, picDir, picShell, picInterval, picThreadCount);
+				, picH264Dir, picDir, picShell, picInterval, picThreadCount, videoRecorderCountMax);
 
 	if (!result) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR

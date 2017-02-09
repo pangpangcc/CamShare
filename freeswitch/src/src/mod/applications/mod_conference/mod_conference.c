@@ -240,7 +240,9 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 
 		/* Sync the conference to a single timing source */
 		if (switch_core_timer_next(&timer) != SWITCH_STATUS_SUCCESS) {
-			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+			// Modify by Max 2017/02/04
+//			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+			conference_utils_set_flag_locked(conference, CFLAG_DESTRUCT);
 			break;
 		}
 
@@ -270,10 +272,14 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 					imember->video_media_flow = video_media_flow;
 
 					if (imember->video_media_flow == SWITCH_MEDIA_FLOW_SENDONLY) {
-						conference_utils_member_clear_flag(imember, MFLAG_CAN_BE_SEEN);
+						// Modify by Max 2017/02/06
+//						conference_utils_member_clear_flag(imember, MFLAG_CAN_BE_SEEN);
+						conference_utils_member_clear_flag_locked(imember, MFLAG_CAN_BE_SEEN);
 						conference_video_find_floor(imember, SWITCH_FALSE);
 					} else {
-						conference_utils_member_set_flag(imember, MFLAG_CAN_BE_SEEN);
+						// Modify by Max 2017/02/06
+//						conference_utils_member_set_flag(imember, MFLAG_CAN_BE_SEEN);
+						conference_utils_member_set_flag_locked(imember, MFLAG_CAN_BE_SEEN);
 						conference_video_find_floor(imember, SWITCH_TRUE);
 						switch_core_session_request_video_refresh(imember->session);
 					}
@@ -332,7 +338,9 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 			}
 			if (is_talking == 0) {
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "Conference has been idle for over %d seconds, terminating\n", conference->terminate_on_silence);
-				conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+				// Modify by Max 2017/02/04
+//				conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+				conference_utils_set_flag_locked(conference, CFLAG_DESTRUCT);
 			}
 		}
 
@@ -649,8 +657,11 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 			switch_epoch_time_now(NULL) - conference->endconference_time > conference->endconference_grace_time) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Conference %s: endconf grace time exceeded (%u)\n",
 							  conference->name, conference->endconference_grace_time);
-			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
-			conference_utils_set_flag(conference, CFLAG_ENDCONF_FORCED);
+			// Modify by Max 2017/02/04
+//			conference_utils_set_flag(conference, CFLAG_DESTRUCT);
+			conference_utils_set_flag_locked(conference, CFLAG_DESTRUCT);
+//			conference_utils_set_flag(conference, CFLAG_ENDCONF_FORCED);
+			conference_utils_set_flag_locked(conference, CFLAG_ENDCONF_FORCED);
 		}
 
 		switch_mutex_unlock(conference->mutex);
@@ -2084,8 +2095,12 @@ SWITCH_STANDARD_APP(conference_function)
 	} else {
 		/* if we're not using "bridge:" set the conference answered flag */
 		/* and this isn't an outbound channel, answer the call */
-		if (switch_channel_direction(channel) == SWITCH_CALL_DIRECTION_INBOUND)
-			conference_utils_set_flag(conference, CFLAG_ANSWERED);
+		if (switch_channel_direction(channel) == SWITCH_CALL_DIRECTION_INBOUND) {
+			// Modify by Max 2017/02/04
+//			conference_utils_set_flag(conference, CFLAG_ANSWERED);
+			conference_utils_set_flag_locked(conference, CFLAG_ANSWERED);
+		}
+
 	}
 
 	member.session = session;
@@ -3126,6 +3141,7 @@ conference_obj_t *conference_new(char *name, conference_xml_cfg_t cfg, switch_co
 	switch_mutex_init(&conference->canvas_mutex, SWITCH_MUTEX_NESTED, conference->pool);
 
 	switch_mutex_lock(conference_globals.hash_mutex);
+	// Modify by Max 2017/02/04
 	conference_utils_set_flag(conference, CFLAG_INHASH);
 	switch_core_hash_insert(conference_globals.conference_hash, conference->name, conference);
 	switch_mutex_unlock(conference_globals.hash_mutex);

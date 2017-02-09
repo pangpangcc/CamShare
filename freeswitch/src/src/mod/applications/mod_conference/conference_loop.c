@@ -915,7 +915,9 @@ void *SWITCH_THREAD_FUNC conference_loop_input(switch_thread_t *thread, void *ob
 						if (conference_utils_member_test_flag(member, MFLAG_MUTE_DETECT) && !conference_utils_member_test_flag(member, MFLAG_CAN_SPEAK)) {
 
 							if (!zstr(member->conference->mute_detect_sound)) {
-								conference_utils_member_set_flag(member, MFLAG_INDICATE_MUTE_DETECT);
+								// Modify by Max 2017/02/06
+//								conference_utils_member_set_flag(member, MFLAG_INDICATE_MUTE_DETECT);
+								conference_utils_member_set_flag_locked(member, MFLAG_INDICATE_MUTE_DETECT);
 							}
 
 							if (test_eflag(member->conference, EFLAG_MUTE_DETECT) &&
@@ -1131,7 +1133,9 @@ void conference_loop_output(conference_member_t *member)
 
 		switch_channel_set_private(channel, "_conference_autocall_list_", NULL);
 
-		conference_utils_set_flag(member->conference, CFLAG_OUTCALL);
+		// Modify by Max 2017/02/04
+//		conference_utils_set_flag(member->conference, CFLAG_OUTCALL);
+		conference_utils_set_flag_locked(member->conference, CFLAG_OUTCALL);
 
 		if (toval) {
 			to = atoi(toval);
@@ -1250,7 +1254,9 @@ void conference_loop_output(conference_member_t *member)
 			if (switch_channel_test_flag(channel, CF_ANSWERED) && !conference_utils_test_flag(member->conference, CFLAG_ANSWERED)) {
 				switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(member->session), SWITCH_LOG_DEBUG,
 								  "Outbound conference channel answered, setting CFLAG_ANSWERED\n");
-				conference_utils_set_flag(member->conference, CFLAG_ANSWERED);
+				// Modify by Max 2017/02/04
+//				conference_utils_set_flag(member->conference, CFLAG_ANSWERED);
+				conference_utils_set_flag_locked(member->conference, CFLAG_ANSWERED);
 			}
 		} else {
 			if (conference_utils_test_flag(member->conference, CFLAG_ANSWERED) && !switch_channel_test_flag(channel, CF_ANSWERED)) {
@@ -1336,7 +1342,9 @@ void conference_loop_output(conference_member_t *member)
 				switch_snprintf(msg, sizeof(msg), "Muted");
 				conference_member_say(member, msg, 0);
 			}
-			conference_utils_member_clear_flag(member, MFLAG_INDICATE_MUTE);
+			// Modify by Max 2017/02/06
+//			conference_utils_member_clear_flag(member, MFLAG_INDICATE_MUTE);
+			conference_utils_member_clear_flag_locked(member, MFLAG_INDICATE_MUTE);
 		}
 
 		if (conference_utils_member_test_flag(member, MFLAG_INDICATE_MUTE_DETECT)) {
@@ -1348,7 +1356,9 @@ void conference_loop_output(conference_member_t *member)
 				switch_snprintf(msg, sizeof(msg), "Currently Muted");
 				conference_member_say(member, msg, 0);
 			}
-			conference_utils_member_clear_flag(member, MFLAG_INDICATE_MUTE_DETECT);
+			// Modify by Max 2017/02/06
+//			conference_utils_member_clear_flag(member, MFLAG_INDICATE_MUTE_DETECT);
+			conference_utils_member_clear_flag_locked(member, MFLAG_INDICATE_MUTE_DETECT);
 		}
 
 		if (conference_utils_member_test_flag(member, MFLAG_INDICATE_UNMUTE)) {
@@ -1360,7 +1370,9 @@ void conference_loop_output(conference_member_t *member)
 				switch_snprintf(msg, sizeof(msg), "Un-Muted");
 				conference_member_say(member, msg, 0);
 			}
-			conference_utils_member_clear_flag(member, MFLAG_INDICATE_UNMUTE);
+			// Modify by Max 2017/02/06
+//			conference_utils_member_clear_flag(member, MFLAG_INDICATE_UNMUTE);
+			conference_utils_member_clear_flag_locked(member, MFLAG_INDICATE_UNMUTE);
 		}
 
 		if (switch_core_session_private_event_count(member->session)) {

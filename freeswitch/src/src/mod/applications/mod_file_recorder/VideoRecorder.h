@@ -46,8 +46,6 @@ public:
 	// 录制视频frame
 	bool RecordVideoFrame(switch_frame_t *frame);
 
-	// 判断处理状态并停止
-	bool Stop();
 	// 重置(包括重置参数及执行close_shell)
 	void Reset();
 
