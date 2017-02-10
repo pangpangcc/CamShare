@@ -906,7 +906,7 @@ void VideoRecorder::RunCloseShell()
 		// build shell处理文件
 		// shell h264Path mp4Path jpgPath userId siteId startTime
 		char cmd[MAX_PATH_LENGTH] = {0};
-		snprintf(cmd, sizeof(cmd), "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s'"
+		snprintf(cmd, sizeof(cmd), "%s \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\""
 				, mcCloseShell, mcH264Path, mp4Path, mcPicPath, mcPicH264Path
 				, userId, siteId, startStandardTime);
 
