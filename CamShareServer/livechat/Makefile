@@ -26,10 +26,14 @@ OBJS 		=	Counter.o ILiveChatClient.o ISocketHandler.o \
 				LiveChatClient.o TaskManager.o TaskMapManager.o \
 				TransportDataHandler.o TransportPacketHandler.o \
 				task/ITask.o task/BaseTask.o \
-				task/CheckVerTask.o task/RecvEnterConferenceTask.o \
+				task/HearbeatTask.o task/CheckVerTask.o \
+				task/RecvEnterConferenceTask.o \
 				task/RecvKickUserFromConferenceTask.o \
-				task/SendEnterConferenceTask.o task/SendMsgTask.o \
-				task/HearbeatTask.o
+				task/RecvGetOnlineListTask.o \
+				task/SendEnterConferenceTask.o \
+				task/SendMsgTask.o \
+				task/SendOnlineListTask.o \
+				task/SendOnlineStatusTask.o 
 		
 TARGET =	liblivechat.a
 

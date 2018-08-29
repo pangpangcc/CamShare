@@ -60,28 +60,28 @@ p.decode(<binary>);
       this._config.contextOptions.preserveDrawingBuffer = true;
     };
     
-    var webgl = "auto";
+    var webgl = false;
     if (this._config.webgl === true){
       webgl = true;
     }else if (this._config.webgl === false){
       webgl = false;
-    };
-    
-    if (webgl == "auto"){
-      webgl = true;
+    }
+    else {
       try{
-        if (!window.WebGLRenderingContext) {
-          // the browser doesn't even know what WebGL is
-          webgl = false;
-        } else {
+        if (window.WebGLRenderingContext) {
           var canvas = document.createElement('canvas');
-          var ctx = canvas.getContext("webgl");
-          if (!ctx) {
-            // browser supports WebGL but initialization failed.
-            webgl = false;
-          };
+          var supports = 'probablySupportsContext' in canvas ? 'probablySupportsContext' :  'supportsContext';
+          if (supports in canvas) {
+            var ctx = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (ctx && ctx instanceof WebGLRenderingContext) {
+              // browser supports WebGL and initialization success.
+              webgl = true;
+              //alert("webgl success");
+            };
+          }
         };
       }catch(e){
+      	//alert("webgl catch!");
         webgl = false;
       };
     };

@@ -42,8 +42,6 @@ bool SendMsgTask::GetSendData(void* data, unsigned int dataSize, unsigned int& d
 
 	// 填入buffer
 	if (json.length() < dataSize) {
-		// 打log
-		FileLog("LiveChatClient", "SendMsgTask::GetSendData() len:%d, json:%s", json.length(), json.c_str());
 		if( json.length() > 0 ) {
 			memcpy(data, json.c_str(), json.length());
 		}
@@ -53,7 +51,7 @@ bool SendMsgTask::GetSendData(void* data, unsigned int dataSize, unsigned int& d
 	}
 
 	// 打log
-	FileLog("LiveChatClient", "SendMsgTask::GetSendData() result:%d, json:%s", result, json.c_str());
+	FileLog("LiveChatClient", "SendMsgTask::GetSendData() cmd:%d. result:%d, len:%d, json:%s", GetCmdCode(), result, json.length(), json.c_str());
 
 	return result;
 }

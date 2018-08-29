@@ -339,7 +339,11 @@ RTMP_INVOKE_FUNCTION(rtmp_i_makeCall)
 			amf0_str(switch_str_nil(new_pvt->auth)),
 			NULL);
 
+		// Modify by Max 2017/02/27
+		switch_thread_rwlock_wrlock(rsession->rwlock);
 		rtmp_attach_private(rsession, switch_core_session_get_private(newsession));
+		switch_thread_rwlock_unlock(rsession->rwlock);
+//		rtmp_attach_private(rsession, switch_core_session_get_private(newsession));
 	}
 
 	return SWITCH_STATUS_SUCCESS;
@@ -431,7 +435,7 @@ RTMP_INVOKE_FUNCTION(rtmp_i_login)
 	}
 
 	if (rtmp_check_auth(rsession, user, domain, auth, site, custom) == SWITCH_STATUS_SUCCESS) {
-		rtmp_session_login(rsession, user, domain);
+		rtmp_session_login(rsession, user, domain, site);
 	} else {
 		rtmp_send_invoke_free(rsession, 3, 0, 0,
 			amf0_str("onLogin"),
@@ -513,7 +517,11 @@ RTMP_INVOKE_FUNCTION(rtmp_i_answer)
 		rtmp_private_t *new_tech_pvt = rtmp_locate_private(rsession, uuid);
 		if (new_tech_pvt) {
 			switch_channel_mark_answered(switch_core_session_get_channel(new_tech_pvt->session));
+			// Modify by Max 2017/02/27
+			switch_thread_rwlock_wrlock(rsession->rwlock);
 			rtmp_attach_private(rsession, new_tech_pvt);
+			switch_thread_rwlock_unlock(rsession->rwlock);
+//			rtmp_attach_private(rsession, new_tech_pvt);
 		}
 		return SWITCH_STATUS_FALSE;
 	}
@@ -525,7 +533,11 @@ RTMP_INVOKE_FUNCTION(rtmp_i_answer)
 	/* No UUID specified but we're attached to a channel, mark it as answered */
 	channel = switch_core_session_get_channel(rsession->tech_pvt->session);
 	switch_channel_mark_answered(channel);
+	// Modify by Max 2017/02/27
+	switch_thread_rwlock_wrlock(rsession->rwlock);
 	rtmp_attach_private(rsession, rsession->tech_pvt);
+	switch_thread_rwlock_unlock(rsession->rwlock);
+//	rtmp_attach_private(rsession, rsession->tech_pvt);
 
 	return SWITCH_STATUS_SUCCESS;
 }
@@ -539,7 +551,11 @@ RTMP_INVOKE_FUNCTION(rtmp_i_attach)
 		tech_pvt = rtmp_locate_private(rsession, uuid);
 	}
 	/* Will detach if an empty (or invalid) uuid is received */
+	// Modify by Max 2017/02/27
+	switch_thread_rwlock_wrlock(rsession->rwlock);
 	rtmp_attach_private(rsession, tech_pvt);
+	switch_thread_rwlock_unlock(rsession->rwlock);
+//	rtmp_attach_private(rsession, tech_pvt);
 
 	return SWITCH_STATUS_SUCCESS;
 }

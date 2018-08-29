@@ -26,6 +26,7 @@ public:
 	// 服务器主动请求
 	virtual void OnRecvEnterConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg) = 0;
 	virtual void OnRecvKickUserFromConference(ILiveChatClient* client, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg) = 0;
+	virtual void OnRecvGetOnlineList(ILiveChatClient* client, int seq, LCC_ERR_TYPE err, const string& errmsg) = 0;
 };
 
 // LiveChat客户端接口类
@@ -56,6 +57,10 @@ public:
 	virtual bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key) = 0;
 	// 发送消息到客户端
 	virtual bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg) = 0;
+	// 发送用户在线状态改变
+	virtual bool SendOnlineStatus(int seq, const string& userId, bool login) = 0;
+	// 发送用户在线列表
+	virtual bool SendOnlineList(int seq, const list<string>& userList) = 0;
 
 public:
 	// 获取站点类型

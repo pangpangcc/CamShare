@@ -180,33 +180,38 @@ bool SessionManager::StartSession(
 		mLiveChat2SessionMap.Unlock();
 	}
 
-	/**
-	 * 开始任务
-	 * 不需要等待返回的请求, 或者不是重复的请求
-	 */
-	if( !bNeedReturn || bRecord ) {
+	// 判断请求是否需要返回，且是否重复请求
+	if ( bNeedReturn && !bRecord ) {
+		// 若是，则返回true，且删除请求object
+		bFlag = true;
+		delete request;
+	}
+	else {
+		// 否则开始请求
 		bFlag = request->StartRequest();
 	}
 
 	/**
 	 * 清除任务
-	 * 启动失败, 并且需要返回, 并且不是重复
+	 * 启动失败（包括请求不用返回, 或需要返回且不是重复）
 	 */
 	if( !bFlag ) {
-		if( bNeedReturn && bRecord ) {
-			// 需要返回, 并且不是重复
+		if( bRecord ) {
+			// 需要返回且不是重复
 			mLiveChat2SessionMap.Lock();
 			Session* session = NULL;
 			LiveChat2SessionMap::iterator itr = mLiveChat2SessionMap.Find(livechat);
 			if( itr != mLiveChat2SessionMap.End() ) {
 				session = itr->second;
-				session->EraseRequest(identify);
+				IRequest* theRequest = session->EraseRequest(identify);
+				delete theRequest;
 			}
 			mLiveChat2SessionMap.Unlock();
 		}
-
-		// 释放请求
-		delete request;
+		else {
+			// 请求不用返回，删除请求object
+			delete request;
+		}
 	}
 
 	return bFlag;

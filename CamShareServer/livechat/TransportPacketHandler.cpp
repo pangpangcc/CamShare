@@ -35,8 +35,8 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 {
 	//printf("CTransportPacketHandler::Packet() task:%p, data:%p, dataLen:%d\n", task, data, dataLen);
 
-	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() begin");
-	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, data:%p", task, data);
+//	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() begin");
+//	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, data:%p", task, data);
 	bool result = false;
 
 	if (task->GetSendDataProtocolType() == NOHEAD_PROTOCOL) {
@@ -67,19 +67,19 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 				serverIdLength = 1;
 			}
 
-			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() "
-					"sendHeader->serverNamelength : %d, "
-					"sendHeader->serverName : %s",
-					sendHeader->serverNamelength,
-					serverId.c_str()
-					);
+//			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() "
+//					"sendHeader->serverNamelength : %d, "
+//					"sendHeader->serverName : %s",
+//					sendHeader->serverNamelength,
+//					serverId.c_str()
+//					);
 
 //		int headerLen = sizeof(TransportSendHeader) + sizeof(TransportHeader);
 //		if (dataSize > headerLen) {
 
 			int sendHeaderLen = sendHeader->GetHeaderLength();
 			int headerLen = sendHeaderLen + sizeof(TransportHeader);
-			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() sendHeaderLen:%d, headerLen:%d", sendHeaderLen, headerLen);
+//			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() sendHeaderLen:%d, headerLen:%d", sendHeaderLen, headerLen);
 
 			TransportProtocol* protocol = (TransportProtocol*)(sendHeader->serverName + serverIdLength);
 			protocol->header.shiftKey = 0;
@@ -92,20 +92,21 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 
 			unsigned int bodyLen = 0;
 			result = task->GetSendData(protocol->data, dataSize - headerLen, bodyLen);
-			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, result:%d", task, result);
+//			FileLog("LiveChatClient", "CTransportPacketHandler::Packet() task:%p, result:%d", task, result);
 			if (result)
 			{
 				dataLen = headerLen + bodyLen;
 
 				sendHeader->SetDataLength(sizeof(TransportHeader) + bodyLen);
-				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() sendHeader->length:%d, bodyLen:%d", sendHeader->length, bodyLen);
+				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, seq:%d, sendHeader->serverName:%s, sendHeader->serverNamelength:%d, sendHeader->length:%d, bodyLen:%d, dataLen:%d",
+						task->GetCmdCode(), task->GetSeq(), serverId.c_str(), sendHeader->serverNamelength, sendHeader->length, bodyLen, dataLen);
 				sendHeader->length = htonl(sendHeader->length);
 
 				protocol->SetDataLength(bodyLen);
 				protocol->header.length = ntohl(protocol->header.length);
 
-				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, seq:%d, dataLen:%d"
-						, task->GetCmdCode(), task->GetSeq(), dataLen);
+//				FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, seq:%d, dataLen:%d"
+//						, task->GetCmdCode(), task->GetSeq(), dataLen);
 			}
 		}
 	}
@@ -118,10 +119,10 @@ bool CTransportPacketHandler::Packet(ITask* task, void* data, unsigned int dataS
 			hex += temp;
 			hex += " ";
 		}
-		FileLog("LiveChatClient", "CTransportPacketHandler::Packet() hex:%s", hex.c_str());
+//		FileLog("LiveChatClient", "CTransportPacketHandler::Packet() cmd:%d, hex:%s", task->GetCmdCode(), hex.c_str());
 	}
 
-	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() end, result:%d", result);
+//	FileLog("LiveChatClient", "CTransportPacketHandler::Packet() end, result:%d", result);
 
 	return result;
 }
@@ -135,7 +136,7 @@ UNPACKET_RESULT_TYPE CTransportPacketHandler::Unpacket(void* data, unsigned int 
 	TransportProtocol* tp = (TransportProtocol*)data;
 	unsigned int length = 0;
 
-	FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() begin");
+//	FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() begin");
 
 	if (dataLen >= sizeof(tp->header.length))
 	{
@@ -182,11 +183,11 @@ UNPACKET_RESULT_TYPE CTransportPacketHandler::Unpacket(void* data, unsigned int 
 	}
 
 	if (result == UNPACKET_SUCCESS) {
-		FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() end, result:%d, cmd:%d, seq:%d, length:%d"
+		FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket(), cmd:%d, seq:%d, length:%d"
 				, result, tp->header.cmd, tp->header.seq, tp->header.length);
 	}
 	else {
-		FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() end, result:%d", result);
+//		FileLog("LiveChatClient", "CTransportPacketHandler::Unpacket() end, result:%d", result);
 	}
 
 	return result;

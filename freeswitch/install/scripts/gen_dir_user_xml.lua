@@ -55,7 +55,7 @@ if support_test == 1 then
     local size = string.len(value);
 --    freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
     
-    if( size < 6 ) then
+    if( size < 7 ) then
       result = 1
       freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
     else 

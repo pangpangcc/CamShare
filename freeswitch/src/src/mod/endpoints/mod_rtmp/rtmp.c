@@ -211,8 +211,12 @@ switch_status_t rtmp_check_auth(rtmp_session_t *rsession, const char *user, cons
 	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
 	switch_assert(locate_params);
 	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "source", "mod_rtmp");
-	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", site);
-	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", custom);
+	if( site ) {
+		switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", site);
+	}
+	if( custom ) {
+		switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", custom);
+	}
 
 	/* Locate user */
 	if (switch_xml_locate_user_merged("id", user, domain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {

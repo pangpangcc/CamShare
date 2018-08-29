@@ -24,10 +24,15 @@
 #include <string>
 using namespace std;
 
-typedef KSafeList<string> RtmpList;
+typedef struct RtmpObject {
+	string user;
+	string siteId;
+	string rtmpSession;
+}RtmpObject;
+typedef KSafeList<RtmpObject> RtmpObjectList;
 
 // username -> rmp_session list
-typedef KSafeMap<string, RtmpList*> RtmpSessionMap;
+typedef KSafeMap<string, RtmpObjectList*> RtmpSessionMap;
 
 // rmp_session -> username
 typedef KSafeMap<string, string> RtmpUserMap;
@@ -58,6 +63,17 @@ public:
 	virtual void OnFreeswitchEventConferenceDelMember(
 			FreeswitchClient* freeswitch,
 			const Channel* channel
+			) = 0;
+
+	virtual void OnFreeswitchEventOnlineList(
+			FreeswitchClient* freeswitch,
+			RtmpObjectList& rtmpObjectList
+			) = 0;
+
+	virtual void OnFreeswitchEventOnlineStatus(
+			FreeswitchClient* freeswitch,
+			const RtmpObject& rtmpObject,
+			bool online
 			) = 0;
 };
 
@@ -125,25 +141,35 @@ public:
 
 	/**
 	 * 重新验证当前所有会议室用户
-	 * @param bCreateChannel	true:创建频道,用于freeswitch断开连接时候重新纪录/false:仅定时重新验证
 	 * @return true:成功/false:失败
 	 */
-	bool AuthorizationAllConference(bool bCreateChannel = false);
+	bool AuthorizationAllConference();
 
 	/**
-	 * 创建频道
+	 * 根据会议室信息更新频道信息
 	 * @return true:成功/false:失败
 	 */
-	bool CreateChannel(
+	bool UpdateChannelWithConference(
 			const string& channelId,
-			const Channel& channel,
-			bool cover = false
+			const string& user,
+			const string& conference,
+			MemberType type,
+			const string& memberId,
+			const string& rtmp_session,
+			const string& serverId,
+			const string& siteId
 			);
+
 	/**
-	 * 销毁频道
+	 * 根据拨号计划更新频道信息
+	 * @return true:成功/false:失败
 	 */
-	void DestroyChannel(
-			const string& channelId
+	bool UpdateChannelWithDialplan(
+			const string& channelId,
+			const string& user,
+			const string& conference,
+			const string& serverId,
+			const string& siteId
 			);
 
 	/**
@@ -195,6 +221,7 @@ private:
 			const string& session,
 			string& uuid,
 			string& user,
+			string& siteId,
 			string& status
 			);
 
@@ -244,6 +271,20 @@ private:
 	 * @param	uuid	频道Id
 	 */
 	bool StartRecordChannel(const string& uuId);
+
+	/**
+	 * 创建频道
+	 * @return channel指针
+	 */
+	Channel* CreateChannel(
+			const string& channelId
+			);
+	/**
+	 * 销毁频道
+	 */
+	void DestroyChannel(
+			const string& channelId
+			);
 
 	/**
 	 * 获取会话变量
@@ -307,6 +348,7 @@ private:
 
 	/**
 	 * Freeswitch rtmp_session -> user map
+	 * 用户在线列表
 	 */
 	RtmpUserMap mRtmpUserMap;
 

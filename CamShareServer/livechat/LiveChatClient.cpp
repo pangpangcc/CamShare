@@ -13,9 +13,11 @@
 
 // task include
 #include "task/CheckVerTask.h"
+#include "task/HearbeatTask.h"
 #include "task/SendEnterConferenceTask.h"
 #include "task/SendMsgTask.h"
-#include "task/HearbeatTask.h"
+#include "task/SendOnlineListTask.h"
+#include "task/SendOnlineStatusTask.h"
 
 CLiveChatClient::CLiveChatClient()
 {
@@ -197,9 +199,9 @@ bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const
 				result = m_taskManager->HandleRequestTask(task);
 			}
 		}
-		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p end, siteId : %s", task, m_siteId.c_str());
+//		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p end, siteId : %s", task, m_siteId.c_str());
 	}
-	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() end, siteId : %s", m_siteId.c_str());
+//	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() end, siteId : %s", m_siteId.c_str());
 	return result;
 }
 
@@ -222,9 +224,57 @@ bool CLiveChatClient::SendMsg(int seq, const string& fromId, const string& toId,
 				result = m_taskManager->HandleRequestTask(task);
 			}
 		}
-		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, task:%p, siteId : %s", task, m_siteId.c_str());
+//		FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, task:%p, siteId : %s", task, m_siteId.c_str());
 	}
-	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, siteId : %s", m_siteId.c_str());
+//	FileLog("LiveChatClient", "CLiveChatClient::SendMsg() end, siteId : %s", m_siteId.c_str());
+	return result;
+}
+
+// 发送用户在线状态改变
+bool CLiveChatClient::SendOnlineStatus(int seq, const string& userId, bool login) {
+	bool result = false;
+	FileLog("LiveChatClient", "CLiveChatClient::SendOnlineStatus() begin");
+	if (NULL != m_taskManager
+		&& m_taskManager->IsStart())
+	{
+		SendOnlineStatusTask* task = new SendOnlineStatusTask();
+		FileLog("LiveChatClient", "CLiveChatClient::SendOnlineStatus() task:%p, siteId : %s", task, m_siteId.c_str());
+		if (NULL != task) {
+			result = task->Init(this, m_listener);
+			result = result && task->InitParam(userId, login);
+
+			if (result) {
+				task->SetSeq(seq);
+				result = m_taskManager->HandleRequestTask(task);
+			}
+		}
+//		FileLog("LiveChatClient", "CLiveChatClient::SendOnlineStatus() end, task:%p, siteId : %s", task, m_siteId.c_str());
+	}
+//	FileLog("LiveChatClient", "CLiveChatClient::SendOnlineStatus() end, siteId : %s", m_siteId.c_str());
+	return result;
+}
+
+// 发送用户在线列表
+bool CLiveChatClient::SendOnlineList(int seq, const list<string>& userList) {
+	bool result = false;
+	FileLog("LiveChatClient", "CLiveChatClient::SendOnlineList() begin");
+	if (NULL != m_taskManager
+		&& m_taskManager->IsStart())
+	{
+		SendOnlineListTask* task = new SendOnlineListTask();
+		FileLog("LiveChatClient", "CLiveChatClient::SendOnlineList() task:%p, siteId : %s", task, m_siteId.c_str());
+		if (NULL != task) {
+			result = task->Init(this, m_listener);
+			result = result && task->InitParam(userList);
+
+			if (result) {
+				task->SetSeq(seq);
+				result = m_taskManager->HandleRequestTask(task);
+			}
+		}
+//		FileLog("LiveChatClient", "CLiveChatClient::SendOnlineList() end, task:%p, siteId : %s", task, m_siteId.c_str());
+	}
+//	FileLog("LiveChatClient", "CLiveChatClient::SendOnlineList() end, siteId : %s", m_siteId.c_str());
 	return result;
 }
 

@@ -424,6 +424,7 @@ typedef struct rtmp_account rtmp_account_t;
 struct rtmp_account {
 	const char *user;
 	const char *domain;
+	const char *site;
 	rtmp_account_t *next;
 };
 
@@ -679,7 +680,7 @@ RTMP_INVOKE_FUNCTION(rtmp_i_setActive);
 rtmp_session_t *rtmp_session_locate(const char *uuid);
 void rtmp_session_rwunlock(rtmp_session_t *rsession);
 
-switch_status_t rtmp_session_login(rtmp_session_t *rsession, const char *user, const char *domain);
+switch_status_t rtmp_session_login(rtmp_session_t *rsession, const char *user, const char *domain, const char *site);
 switch_status_t rtmp_session_logout(rtmp_session_t *rsession, const char *user, const char *domain);
 switch_status_t rtmp_session_check_user(rtmp_session_t *rsession, const char *user, const char *domain);
 

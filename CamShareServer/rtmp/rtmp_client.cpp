@@ -586,9 +586,11 @@ public:
 
 		if( bSuccess ) {
 			char temp[1024];
-			sprintf(temp, "WW%d", client->GetIndex());
+//			int index = 1;
+			int index = client->GetIndex();
+			sprintf(temp, "WW%d", index);
 			clientDest[client->GetIndex()] = temp;
-			sprintf(temp, "WW%d|||PC0|||1", client->GetIndex());
+			sprintf(temp, "WW%d|||PC0|||1", index);
 
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
@@ -601,7 +603,9 @@ public:
 					temp
 					);
 
-			client->MakeCall(temp);
+			if( index % 3 == 0 ) {
+				client->MakeCall(temp);
+			}
 		}
 	}
 	void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) {
@@ -802,7 +806,7 @@ int main(int argc, char *argv[]) {
 					clientRandTimeMutext[i].lock();
 					if (clientRandTime[i] > 0 && gStart) {
 						clientRandTime[i] -= RECONN_CHECK_INTERVAL;
-					} else {
+					} else if( iReconnect > 0 ) {
 						// 只关闭socket, 等待接收线程停止, 再重连
 						client[i].Shutdown();
 					}

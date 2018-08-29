@@ -74,6 +74,7 @@ if( #tables >= 3 ) then
     if body ~= nil then
       json = cjson.decode(body);
       ret = json["ret"];
+      flags = "@default++flags{mute|vmute|deaf}";
       
       if ret == 1 then
         -- 会议
@@ -87,13 +88,14 @@ if( #tables >= 3 ) then
 --          进入自己会议室
 --          table.insert(ACTIONS, {"set", "enable_file_write_buffering=false"})
 --          table.insert(ACTIONS, {"record_fsv", "$${base_dir}/recordings/" .. destination_number .. "-${strftime(%Y-%m-%d-%H-%M-%S)}.fsv"})
-            table.insert(ACTIONS, {"conference", conference .. "@default++flags{moderator|mute|vmute|deaf}"})
-            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{moderator|mute|vmute|deaf}\n");
+            flags = "@default++flags{moderator|mute|vmute|deaf}";
         else
 --          进入别人会议室
-            table.insert(ACTIONS, {"conference", conference .. "@default++flags{mute|vmute|deaf}"})
-            session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. "@default++flags{mute|vmute|deaf}\n");
+            flags = "@default++flags{mute|vmute|deaf}";
         end
+        table.insert(ACTIONS, {"conference", conference .. flags})
+        session:consoleLog("NOTICE", "# 内网拨号计划->" .. conference .. flags .. "\n");
+        
       else
           session:consoleLog("NOTICE", "# 内网拨号计划->caller解析失败:" .. url .. "\n");
       end

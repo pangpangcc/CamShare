@@ -20,7 +20,7 @@ int BaseRespond::GetData(char* buffer, int len, bool &more) {
 	int ret = 0;
 	more = false;
 
-	snprintf(buffer, len, "{\"ret\":1}");
+	snprintf(buffer, len, "");
 	ret = strlen(buffer);
 	return ret;
 }

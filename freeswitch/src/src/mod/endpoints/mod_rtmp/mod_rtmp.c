@@ -1475,13 +1475,14 @@ void rtmp_clear_registration(rtmp_session_t *rsession, const char *auth, const c
 
 }
 
-switch_status_t rtmp_session_login(rtmp_session_t *rsession, const char *user, const char *domain)
+switch_status_t rtmp_session_login(rtmp_session_t *rsession, const char *user, const char *domain, const char *site)
 {
 	rtmp_account_t *account = switch_core_alloc(rsession->pool, sizeof(*account));
 	switch_event_t *event;
 
 	account->user = switch_core_strdup(rsession->pool, user);
 	account->domain = switch_core_strdup(rsession->pool, domain);
+	account->site = switch_core_strdup(rsession->pool, site);
 
 	switch_thread_rwlock_wrlock(rsession->account_rwlock);
 	account->next = rsession->account;
@@ -1500,6 +1501,9 @@ switch_status_t rtmp_session_login(rtmp_session_t *rsession, const char *user, c
 		rtmp_event_fill(rsession, event);
 		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "User", user);
 		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Domain", domain);
+		if( site ) {
+			switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Site", site);
+		}
 		switch_event_fire(&event);
 	}
 
@@ -1883,7 +1887,7 @@ SWITCH_STANDARD_API(rtmp_function)
 				{
 					switch_hash_index_t *hi;
 					stream->write_function(stream, "\nSessions:\n");
-					stream->write_function(stream, "uuid,address,user,domain,flashVer,state\n");
+					stream->write_function(stream, "uuid,address,user,domain,site,flashVer,state\n");
 					switch_thread_rwlock_rdlock(profile->session_rwlock);
 					for (hi = switch_core_hash_first(profile->session_hash); hi; hi = switch_core_hash_next(&hi)) {
 						void *val;
@@ -1893,10 +1897,11 @@ SWITCH_STANDARD_API(rtmp_function)
 						switch_core_hash_this(hi, &key, &keylen, &val);
 
 						item = (rtmp_session_t *)val;
-						stream->write_function(stream, "%s,%s:%d,%s,%s,%s,%s\n",
+						stream->write_function(stream, "%s,%s:%d,%s,%s,%s,%s,%s\n",
 											   item->uuid, item->remote_address, item->remote_port,
 											   item->account ? item->account->user : NULL,
 											   item->account ? item->account->domain : NULL,
+											   item->account ? item->account->site : NULL,
 											   item->flashVer, state2name(item->state));
 					}
 					switch_safe_free(hi);
@@ -1972,7 +1977,7 @@ SWITCH_STANDARD_API(rtmp_function)
 				switch_split_user_domain(argv[3], &user, &domain);
 
 				if (!zstr(user) && !zstr(domain)) {
-					rtmp_session_login(rsession, user, domain);
+					rtmp_session_login(rsession, user, domain, "");
 					stream->write_function(stream, "+OK\n");
 				} else {
 					stream->write_function(stream, "-ERR I need user@domain\n");
@@ -2022,7 +2027,11 @@ SWITCH_STANDARD_API(rtmp_function)
 						amf0_str(switch_str_nil(new_pvt->auth)),
 						NULL);
 
+					// Modify by Max 2017/02/27
+					switch_thread_rwlock_wrlock(rsession->rwlock);
 					rtmp_attach_private(rsession, switch_core_session_get_private(newsession));
+					switch_thread_rwlock_unlock(rsession->rwlock);
+//					rtmp_attach_private(rsession, switch_core_session_get_private(newsession));
 					stream->write_function(stream, "+OK\n");
 				}
 			} else {

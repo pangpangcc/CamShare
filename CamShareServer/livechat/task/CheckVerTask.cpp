@@ -72,8 +72,6 @@ bool CheckVerTask::GetSendData(void* data, unsigned int dataSize, unsigned int& 
 
 	// 填入buffer
 	if (json.length() + 1 < dataSize) {
-		// 打log
-		FileLog("LiveChatClient", "CheckVerTask::GetSendData() len:%d, json:%s", json.length(), json.c_str());
 		if( json.length() > 0 ) {
 			memcpy(data, json.c_str(), json.length());
 		}
@@ -83,8 +81,7 @@ bool CheckVerTask::GetSendData(void* data, unsigned int dataSize, unsigned int& 
 		result  = true;
 	}
 
-	// 打log
-	FileLog("LiveChatClient", "CheckVerTask::GetSendData() result:%d, json:%s", result, json.c_str());
+	FileLog("LiveChatClient", "CheckVerTask::GetSendData() result:%d, len:%d, json:%s", result, json.length(), json.c_str());
 
 	return result;
 }

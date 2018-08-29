@@ -45,8 +45,6 @@ bool SendEnterConferenceTask::GetSendData(void* data, unsigned int dataSize, uns
 
 	// 填入buffer
 	if (json.length() < dataSize) {
-		// 打log
-		FileLog("LiveChatClient", "SendEnterConferenceTask::GetSendData() len:%d, json:%s", json.length(), json.c_str());
 		if( json.length() > 0 ) {
 			memcpy(data, json.c_str(), json.length());
 		}
@@ -56,7 +54,7 @@ bool SendEnterConferenceTask::GetSendData(void* data, unsigned int dataSize, uns
 	}
 
 	// 打log
-	FileLog("LiveChatClient", "SendEnterConferenceTask::GetSendData() result:%d, json:%s", result, json.c_str());
+	FileLog("LiveChatClient", "SendEnterConferenceTask::GetSendData() cmd:%d, result:%d, len:%d, json:%s", GetCmdCode(), result, json.length(), json.c_str());
 
 	return result;
 }

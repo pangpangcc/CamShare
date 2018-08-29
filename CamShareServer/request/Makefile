@@ -18,8 +18,12 @@ endif
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
 CXXFLAGS +=	-I. -I.. -I../include -I../third_party -I../third_party/esl/include
 
-OBJS 		=	BaseRequest.o EnterConferenceRequest.o SendMsgExitConferenceRequest.o \
-				SendMsgEnterConferenceRequest.o
+OBJS 		=	BaseRequest.o \
+				EnterConferenceRequest.o \
+				SendMsgExitConferenceRequest.o \
+				SendMsgEnterConferenceRequest.o \
+				OnlineListRequest.o \
+				OnlineStatusRequest.o 
 		
 TARGET =	librequest.a
 

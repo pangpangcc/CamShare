@@ -100,8 +100,8 @@ bool WSClient::Connect(const string& hostName, const string& user, const string&
 				"this : %p, "
 				"[Client Already Running], "
 				"hostName : '%s' "
-				"user : %s, "
-				"dest : %s "
+				"user : '%s', "
+				"dest : '%s' "
 				")",
 				this,
 				hostName.c_str(),

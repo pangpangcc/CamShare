@@ -74,32 +74,65 @@ public:
 	/***************************** 录制完成记录 **************************************/
 	/**
 	 * 插入录制完成记录
+	 * @param	record		记录
 	 */
 	bool InsertRecord(const Record& record);
+
 	/**
 	 * 获取录制完成记录
+	 * @param	records[out]	记录列表
+	 * @param	maxSize			记录列表容量
+	 * @param	getSize			记录列表实际内容长度
 	 */
-	bool GetRecords(Record* records, int maxSize, int& getSize);
+	bool GetRecords(Record* pRecords, int maxSize, int& getSize);
+
 	/**
 	 * 删除录制完成记录
+	 * @param	record		记录
 	 */
 	bool RemoveRecord(const Record& record);
+
 	/**
 	 * 删除录制完成记录(批量)
+	 * @param	records		记录列表
+	 * @param	size		记录列表实际内容长度
 	 */
-	bool RemoveRecords(Record* records, int size);
+	bool RemoveRecords(const Record* pRecords, int size);
+
 	/**
 	 * 获取录制完成记录剩余数量
+	 * @param	getSize		记录列表实际内容长度
 	 */
 	bool GetRecordsCount(unsigned int& getSize);
 	/***************************** 录制完成记录 end **************************************/
 
+	/***************************** 录制完成错误记录 **************************************/
 	/**
-	 * 插入录制完成上传失败记录
+	 * 插入录制完成错误上传记录
 	 * @param	record		记录
 	 * @param	errorCode	错误码
 	 */
 	bool InsertErrorRecord(const Record& record, const string& errorCode);
+
+	/**
+	 * 删除录制完成错误记录
+	 * @param	recordId		记录
+	 */
+	bool RemoveErrorRecord(const string& recordId);
+
+	/**
+	 * 获取录制完成错误记录
+	 * @param	record[out]		记录
+	 * @param	recordId		记录ID
+	 */
+	bool GetErrorRecord(Record* pRecord, const string& recordId);
+
+	/**
+	 * 获取录制完成错误记录剩余数量
+	 * @param	getSize		记录列表实际内容长度
+	 */
+	bool GetRecordsErrorCount(unsigned int& getSize);
+	/***************************** 录制完成错误记录 end **************************************/
 
 private:
 	/**

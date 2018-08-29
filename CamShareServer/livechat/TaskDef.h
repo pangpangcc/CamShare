@@ -21,9 +21,12 @@ typedef enum {
 	TCMD_CHECKVER		    		= -1,	// 版本检测
 	TCMD_SENDENTERCONFERENCE		= 244,	// 进入会议室认证
 	TCMD_SENDMSG					= 246,	// 发送消息到客户端
+	TCMD_SEND_ONLINE_LIST			= 302,	// 发送用户在线列表
+	TCMD_SEND_ONLINE_STATUS_CHANGE	= 303,	// 发送用户在线状态改变
 	// 服务器主动请求命令
 	TCMD_RECVENTERCONFERENCE		= 243,	// 进入会议室认证结果
 	TCMD_RECVKICKUSERFROMCONFERENCE	= 254,	// 从会议室踢出用户
+	TCMD_RECV_GET_ONLINE_LIST		= 304,	// 接收获取用户在线状态列表
 } TASK_CMD_TYPE;
 
 // 判断是否客户端主动请求的命令

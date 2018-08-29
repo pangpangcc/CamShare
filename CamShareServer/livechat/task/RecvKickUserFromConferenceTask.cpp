@@ -68,10 +68,12 @@ bool RecvKickUserFromConferenceTask::Handle(const TransportProtocol* tp) {
 
 	// 打log
 	FileLog("LiveChatClient", "RecvKickUserFromConferenceTask::Handle() "
+			"cmd:%d, "
 			"errType:%d, "
 			"errMsg:%s, "
 			"mFromId:%s, "
 			"mToId:%s ",
+			GetCmdCode(),
 			m_errType,
 			m_errMsg.c_str(),
 			mFromId.c_str(),

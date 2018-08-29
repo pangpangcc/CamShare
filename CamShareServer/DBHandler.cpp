@@ -118,7 +118,7 @@ bool DBHandler::InsertRecord(const Record& record) {
 	return true;
 }
 
-bool DBHandler::GetRecords(Record* records, int maxSize, int& getSize) {
+bool DBHandler::GetRecords(Record* pRecords, int maxSize, int& getSize) {
 	// 执行查询
 	char sql[2048] = {'\0'};
 
@@ -133,7 +133,7 @@ bool DBHandler::GetRecords(Record* records, int maxSize, int& getSize) {
 	if( bResult && result && iRow > 0 && iColumn > 5 ) {
 		int min = MIN(maxSize, iRow + 1);
 		for(int i = 1, j = 0; i < min; i++, j++) {
-			Record* pRecord = &(records[j]);
+			Record* pRecord = &(pRecords[j]);
 			int rowIndex = i * iColumn;
 			if( result[rowIndex] ) {
 				pRecord->id = result[rowIndex];
@@ -202,15 +202,18 @@ bool DBHandler::RemoveRecord(const Record& record) {
 	return bResult;
 }
 
-bool DBHandler::RemoveRecords(Record* records, int size) {
+bool DBHandler::RemoveRecords(const Record* pRecords, int size) {
 	bool bResult = false;
 	char sql[2048] = {'\0'};
 
 	bResult = mSqliteManager.ExecSQL("BEGIN;");
 	if( bResult ) {
 		for(int i = 0; i < size; i++) {
-			Record record = records[i];
-			sprintf(sql, "DELETE FROM record WHERE conference = '%s' AND siteid = '%s';", record.conference.c_str(), record.siteId.c_str());
+			const Record* pRecord = &pRecords[i];
+			sprintf(sql, "DELETE FROM record WHERE conference = '%s' AND siteid = '%s';",
+					pRecord->conference.c_str(),
+					pRecord->siteId.c_str()
+					);
 			bResult = mSqliteManager.ExecSQL(sql);
 		}
 
@@ -264,6 +267,7 @@ bool DBHandler::GetRecordsCount(unsigned int& getSize) {
 }
 /***************************** 录制完成记录 end **************************************/
 
+/***************************** 录制完成错误记录 **************************************/
 bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode) {
 	char sql[2048] = {0};
 	snprintf(sql, sizeof(sql) - 1,
@@ -279,7 +283,7 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"DBHandler::InsertErrorRecord( "
-			"[插入录制完成上传失败记录], "
+			"[插入录制完成错误记录], "
 			"sql : %s "
 			")",
 			sql
@@ -289,7 +293,7 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"DBHandler::InsertErrorRecord( "
-				"[插入录制完成上传失败记录, 失败], "
+				"[插入录制完成错误记录, 失败], "
 				"sql : %s "
 				")",
 				sql
@@ -300,3 +304,113 @@ bool DBHandler::InsertErrorRecord(const Record& record, const string& errorCode)
 
 	return true;
 }
+
+bool DBHandler::RemoveErrorRecord(const string& recordId) {
+	bool bResult = false;
+	char sql[2048] = {'\0'};
+
+	sprintf(sql, "DELETE FROM record_error WHERE id = '%s';", recordId.c_str());
+	bResult = mSqliteManagerError.ExecSQL(sql);
+
+	LogManager::GetLogManager()->Log(
+			LOG_STAT,
+			"DBHandler::RemoveRecord( "
+			"[删除录制完成错误记录], "
+			"sql : %s "
+			")",
+			sql
+			);
+
+	if( !bResult ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::RemoveRecord( "
+				"[删除录制完成错误记录, 失败], "
+				"sql : %s "
+				")",
+				sql
+				);
+	}
+
+	return bResult;
+}
+
+bool DBHandler::GetErrorRecord(Record* pRecord, const string& recordId) {
+	char sql[2048] = {0};
+
+	bool bResult = false;
+	char** result = NULL;
+	int iRow = 0;
+	int iColumn = 0;
+
+	sprintf(sql, "SELECT * FROM record_error WHERE id = '%s';", recordId.c_str());
+	bResult = mSqliteManagerError.Query(sql, &result, &iRow, &iColumn);
+	if( bResult && result && iRow > 0 && iColumn > 5 ) {
+		int rowIndex = 1 * iColumn;
+		if( result[rowIndex] ) {
+			pRecord->id = result[rowIndex];
+		}
+		if( result[rowIndex + 1] ) {
+			pRecord->conference = result[rowIndex + 1];
+		}
+		if( result[rowIndex + 2] ) {
+			pRecord->siteId = result[rowIndex + 2];
+		}
+		if( result[rowIndex + 3] ) {
+			pRecord->filePath = result[rowIndex + 3];
+		}
+		if( result[rowIndex + 4] ) {
+			pRecord->startTime = result[rowIndex + 4];
+		}
+		if( result[rowIndex + 5] ) {
+			pRecord->endTime = result[rowIndex + 5];
+		}
+	}
+	mSqliteManagerError.FinishQuery(result);
+
+	if( !bResult ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::GetErrorRecord( "
+				"[获取录制完成错误记录, 失败], "
+				"sql : %s "
+				")",
+				sql
+				);
+	}
+
+	return true;
+}
+
+bool DBHandler::GetRecordsErrorCount(unsigned int& getSize) {
+	// 执行查询
+	char sql[2048] = {'\0'};
+
+	bool bResult = false;
+	char** result = NULL;
+	int iRow = 0;
+	int iColumn = 0;
+
+	sprintf(sql, "SELECT count(id) FROM record_error;");
+	bResult = mSqliteManagerError.Query(sql, &result, &iRow, &iColumn);
+	if( bResult && result && iRow > 0 && iColumn > 0 ) {
+		if( result[1 * iColumn] ) {
+			getSize = atoi(result[1 * iColumn]);
+		}
+	}
+	mSqliteManagerError.FinishQuery(result);
+
+	if( !bResult ) {
+		LogManager::GetLogManager()->Log(
+				LOG_ERR_USER,
+				"DBHandler::GetRecordsErrorCount( "
+				"[获取录制完成错误记录剩余数量, 失败], "
+				"sql : %s "
+				")",
+				sql
+				);
+	}
+
+	return bResult;
+}
+/***************************** 录制完成错误记录 end **************************************/

@@ -25,8 +25,8 @@
 #include <common/StringHandle.h>
 
 #include <request/IRequest.h>
-#include <respond/IRespond.h>
 #include <request/EnterConferenceRequest.h>
+#include <respond/IRespond.h>
 
 #include <livechat/ILiveChatClient.h>
 
@@ -34,7 +34,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.1.2"
+#define VERSION_STRING "1.1.6"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -59,6 +59,10 @@ typedef struct SiteConfig {
 typedef KSafeMap<int, Client*> ClientMap;
 // siteId -> livechat client
 typedef KSafeMap<string, ILiveChatClient*> LiveChatClientMap;
+// userId -> user
+typedef KSafeMap<string, int> UserMap;
+// siteId -> user map
+typedef KSafeMap<string, UserMap> SiteUserMap;
 // siteId -> site config
 typedef KSafeMap<string, SiteConfig*> SiteConfigMap;
 // client -> session
@@ -128,6 +132,8 @@ public:
 	void OnRequestGetDialplan(HttpParser* parser);
 	void OnRequestRecordFinish(HttpParser* parser);
 	void OnRequestReloadLogConfig(HttpParser* parser);
+	void OnRequestReSendErrorRecord(HttpParser* parser);
+	void OnRequestRemoveErrorRecord(HttpParser* parser);
 	void OnRequestUndefinedCommand(HttpParser* parser);
 	/***************************** 内部服务(HTTP), 命令回调 end **************************************/
 
@@ -145,6 +151,15 @@ public:
 			FreeswitchClient* freeswitch,
 			const Channel* channel
 			);
+	void OnFreeswitchEventOnlineList(
+			FreeswitchClient* freeswitch,
+			RtmpObjectList& rtmpObjectList
+			);
+	void OnFreeswitchEventOnlineStatus(
+			FreeswitchClient* freeswitch,
+			const RtmpObject& rtmpObject,
+			bool online
+			);
 	/***************************** 内部服务(Freeswitch), 命令回调 end **************************************/
 
 	/***************************** 外部服务(LiveChat), 任务回调 **************************************/
@@ -153,6 +168,7 @@ public:
 	void OnSendEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, const string& key, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvEnterConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, const string& key, bool bAuth, LCC_ERR_TYPE err, const string& errmsg);
 	void OnRecvKickUserFromConference(ILiveChatClient* livechat, int seq, const string& fromId, const string& toId, LCC_ERR_TYPE err, const string& errmsg);
+	void OnRecvGetOnlineList(ILiveChatClient* client, int seq, LCC_ERR_TYPE err, const string& errmsg);
 	/***************************** 外部服务(LiveChat), 任务回调 end **************************************/
 
 private:
@@ -214,6 +230,28 @@ private:
 			const string& fromId,
 			const string& toId,
 			const list<string>& userList
+			);
+
+	/**
+	 * 外部服务(LiveChat), 发送用户在线列表
+	 * @param	livechat
+	 * @param 	userList		用户列表
+	 */
+	bool SendOnlineList2LiveChat(
+			ILiveChatClient* livechat,
+			const list<string>& userList
+			);
+
+	/**
+	 * 外部服务(LiveChat), 发送用户在线状态改变
+	 * @param	livechat
+	 * @param 	userId		用户Id
+	 * @param 	online		上线/下线
+	 */
+	bool SendOnlineStatus2LiveChat(
+			ILiveChatClient* livechat,
+			const string& userId,
+			bool online
 			);
 
 	/**
@@ -361,7 +399,7 @@ private:
 	/**
 	 * Freeswitch定时验证会议室所有用户时间间隔(秒)
 	 */
-	unsigned int mAuthorizationTime;
+	int mAuthorizationTime;
 
 	/***************************** Freeswitch参数 end **************************************/
 
@@ -436,7 +474,9 @@ private:
 	/***************************** 统计参数 end **************************************/
 
 	/***************************** 运行参数 **************************************/
-
+	/**
+	 * 运行锁
+	 */
 	KMutex mServerMutex;
 	/**
 	 * 是否运行
@@ -456,6 +496,11 @@ private:
 	 * 站点查找配置
 	 */
 	SiteConfigMap mSiteConfigMap;
+
+	/**
+	 * 站点查找用户列表
+	 */
+	SiteUserMap mSiteUserMap;
 
 	/**
 	 * 内部服务(HTTP)

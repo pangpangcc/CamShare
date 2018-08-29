@@ -110,7 +110,7 @@ bool CTaskManager::Stop()
 // 是否已经开始
 bool CTaskManager::IsStart()
 {
-	FileLog("LiveChatClient", "CTaskManager::IsStart() m_bStart:%d", m_bStart);
+//	FileLog("LiveChatClient", "CTaskManager::IsStart() m_bStart:%d", m_bStart);
 	return m_bStart;
 }
 	
@@ -127,7 +127,7 @@ bool CTaskManager::IsConnected() {
 // 处理请求的task
 bool CTaskManager::HandleRequestTask(ITask* task)
 {
-	FileLog("LiveChatClient", "CTaskManager::HandleRequestTask() task:%p", task);
+//	FileLog("LiveChatClient", "CTaskManager::HandleRequestTask() task:%p", task);
 
 	bool result = false;
 	if (m_bInit && NULL != task) {
@@ -145,7 +145,7 @@ bool CTaskManager::HandleRequestTask(ITask* task)
 		}
 	}
 
-	FileLog("LiveChatClient", "CTaskManager::HandleRequestTask() result:%d", result);
+//	FileLog("LiveChatClient", "CTaskManager::HandleRequestTask() result:%d", result);
 
 	return result;
 }
@@ -200,8 +200,8 @@ void CTaskManager::OnDisconnect(const TaskList& listUnsentTask)
 // 发送callback
 void CTaskManager::OnSend(bool success, ITask* task)
 {
-	FileLog("LiveChatClient", "CTaskManager::OnSend() success:%d, task:%p, cmd:%d, seq:%d"
-			, success, task, task->GetCmdCode(), task->GetSeq());
+//	FileLog("LiveChatClient", "CTaskManager::OnSend() success:%d, task:%p, cmd:%d, seq:%d",
+//			success, task, task->GetCmdCode(), task->GetSeq());
 	if (success)
 	{
 		// 发送成功而且需要回复，则插入map
@@ -212,16 +212,15 @@ void CTaskManager::OnSend(bool success, ITask* task)
 			delete task;
 		}
 	}
-	FileLog("LiveChatClient", "CTaskManager::OnSend() end");
+//	FileLog("LiveChatClient", "CTaskManager::OnSend() end");
 	// 发送不成功，网络应已断开，程序会调用 OnDisconnect()，不用在此处理
 }
 	
 // 收到数据callback
 void CTaskManager::OnRecv(const TransportProtocol* tp)
 {
-	FileLog("LiveChatClient", "CTaskManager::OnRecv() tp:%p", tp);
-	FileLog("LiveChatClient", "CTaskManager::OnRecv() cmd:%d, seq:%d, lenght:%d, tp.dataLen:%d"
-			, tp->header.cmd, tp->header.seq, tp->header.length, tp->GetDataLength());
+//	FileLog("LiveChatClient", "CTaskManager::OnRecv() tp:%p, cmd:%d, seq:%d, lenght:%d, tp.dataLen:%d"
+//			, tp, tp->header.cmd, tp->header.seq, tp->header.length, tp->GetDataLength());
 
 	ITask* task = NULL;
 	if (IsRequestCmd(tp->header.cmd)) {
@@ -248,7 +247,7 @@ void CTaskManager::OnRecv(const TransportProtocol* tp)
 		}
 	}
 
-	FileLog("LiveChatClient", "CTaskManager::OnRecv() get task:%p, m_mgrListener:%p", task, m_mgrListener);
+//	FileLog("LiveChatClient", "CTaskManager::OnRecv() get task:%p, m_mgrListener:%p", task, m_mgrListener);
 
 	if (NULL != task) {
 		task->Handle(tp);
@@ -260,5 +259,5 @@ void CTaskManager::OnRecv(const TransportProtocol* tp)
 		delete task;
 	}
 
-	FileLog("LiveChatClient", "CTaskManager::OnRecv() end, tp:%p, tp.header.cmd:%d, tp.header.lenght:%d, tp.dataLen:%d", tp, tp->header.cmd, tp->header.length, tp->GetDataLength());
+//	FileLog("LiveChatClient", "CTaskManager::OnRecv() end, tp:%p, tp.header.cmd:%d, tp.header.lenght:%d, tp.dataLen:%d", tp, tp->header.cmd, tp->header.length, tp->GetDataLength());
 }

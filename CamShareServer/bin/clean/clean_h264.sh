@@ -1,9 +1,9 @@
 #!/bin/sh
 
 # get date
-clean_year=`date --date='3 months ago' +%Y`
-clean_month=`date --date='3 months ago' +%m`
-clean_day=`date --date='3 months ago' +%d`
+clean_year=`date --date='2 months ago' +%Y`
+clean_month=`date --date='2 months ago' +%m`
+clean_day=`date --date='2 months ago' +%d`
 
 # define h264 path
 h264_path="/usr/local/freeswitch/recordings/video_h264"

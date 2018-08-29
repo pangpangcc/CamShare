@@ -78,15 +78,15 @@ bool SqliteManager::Query(char* sql, char*** result, int* iRow, int* iColumn) {
 	bFlag = QuerySQL( db, sql, result, iRow, iColumn, &msg );
 	if( msg != NULL ) {
 		LogManager::GetLogManager()->Log(
-								LOG_ERR_USER,
-								"SqliteManager::Query( "
-								"[执行查询, 失败], "
-								"sql : %s, "
-								"msg : %s "
-								")",
-								sql,
-								msg
-								);
+				LOG_ERR_USER,
+				"SqliteManager::Query( "
+				"[执行查询, 失败], "
+				"sql : %s, "
+				"msg : %s "
+				")",
+				sql,
+				msg
+				);
 		bFlag = false;
 		sqlite3_free(msg);
 		msg = NULL;
@@ -113,7 +113,7 @@ bool SqliteManager::QuerySQL(sqlite3 *db, const char* sql, char*** result, int* 
 
 			if ( msg != NULL ) {
 				sqlite3_free(msg);
-				msg= NULL;
+				msg = NULL;
 			}
 			sleep(1);
 		}

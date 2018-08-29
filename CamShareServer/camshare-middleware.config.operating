@@ -13,7 +13,7 @@ TIMEOUT=0
 # 统计信息输出时间间隔(秒)
 STATETIME=60
 # flash客户端请求处理超时时间(秒), 0为不超时
-FLASH_TIMEOUT=5
+FLASH_TIMEOUT=15
 
 # 日志配置
 [LOG]
@@ -54,7 +54,7 @@ AUTHORIZATION_TIME=60
 # 站点配置
 [SITE]
 # 站点数量
-SITE_COUNT=4
+SITE_COUNT=5
 # 上传视频录制记录时间间隔(秒)
 UPLOADTIME=60
 
@@ -85,3 +85,10 @@ SITE_HTTP_RECORD_URL=http://www.charmdate.com/livechat/setstatus.php?action=save
 SITE_ID=5
 # 上传录制文件完成记录接口路径
 SITE_HTTP_RECORD_URL=http://www.latamdate.com/livechat/setstatus.php?action=savecamsharevideo
+
+# 站点配置(AM)
+[SITE_4]
+# 站点Id
+SITE_ID=6
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=http://www.asiame.com/livechat/setstatus.php?action=savecamsharevideo

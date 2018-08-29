@@ -16,6 +16,7 @@ loginPaths = {
   ["1"] = "http://www.idateasia.com/livechat/setstatus.php?action=getuserloginstatus",
   ["4"] = "http://www.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
   ["5"] = "http://www.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["6"] = "http://www.asiame.com/livechat/setstatus.php?action=getuserloginstatus"
 };
 
 function getLoginPath(siteId)

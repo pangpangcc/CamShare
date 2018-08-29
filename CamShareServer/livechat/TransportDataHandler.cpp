@@ -226,7 +226,7 @@ bool CTransportDataHandler::IsStart()
 // 发送task数据（把task放到发送列队）
 bool CTransportDataHandler::SendTaskData(ITask* task)
 {
-	FileLog("LiveChatClient", "CTransportDataHandler::SendTaskData() task:%p", task);
+//	FileLog("LiveChatClient", "CTransportDataHandler::SendTaskData() task:%p", task);
 	bool result = false;
 	if (m_bStart) {
 		m_sendTaskListLock->Lock();
@@ -234,7 +234,7 @@ bool CTransportDataHandler::SendTaskData(ITask* task)
 		m_sendTaskListLock->Unlock();
 		result = true;
 	}
-	FileLog("LiveChatClient", "CTransportDataHandler::SendTaskData() end, task:%p", task);
+//	FileLog("LiveChatClient", "CTransportDataHandler::SendTaskData() end, task:%p", task);
 	return result;
 }
 
@@ -340,7 +340,7 @@ void CTransportDataHandler::RecvProc(void)
 				// 本次收到的数据长度 + 之前未解包的数据长度
 				bufferLength += bufferOffset;
 
-				FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() bufferOffset:%d, bufferLength:%d, recvLength:%d", bufferOffset, bufferLength, bufferLength-bufferOffset);
+//				FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() bufferOffset:%d, bufferLength:%d, recvLength:%d", bufferOffset, bufferLength, bufferLength-bufferOffset);
 
 				// 开始解包
 				do {
@@ -368,12 +368,12 @@ void CTransportDataHandler::RecvProc(void)
 						break;
 					}
 
-					FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() unpack:%d, bufferLength:%d", unpackResult, bufferLength);
+//					FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() unpack:%d, bufferLength:%d", unpackResult, bufferLength);
 				} while (unpackResult != UNPACKET_MOREDATA);
 				// 记录未解包的数据长度
 				bufferOffset = bufferLength;
 
-				FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() Process OK, bufferOffset:%d", bufferOffset);
+//				FileLog("LiveChatClient", "CTransportDataHandler::RecvProc() Process OK, bufferOffset:%d", bufferOffset);
 			}
 			else
 			{
@@ -510,7 +510,7 @@ void CTransportDataHandler::DisconnectCallback()
 // 删除pBuffer头nRemoveLength个字节
 void CTransportDataHandler::RemoveData(unsigned char* pBuffer, int nBufferLength, int nRemoveLength)
 {
-	FileLog("LiveChatClient", "CTransportDataHandler::RemoveData() pBuffer:%p nBufferLength:%d, nRemoveLength:%d", pBuffer, nBufferLength, nRemoveLength);
+//	FileLog("LiveChatClient", "CTransportDataHandler::RemoveData() pBuffer:%p nBufferLength:%d, nRemoveLength:%d", pBuffer, nBufferLength, nRemoveLength);
 	unsigned char* pSrc = pBuffer + nRemoveLength;
 	unsigned char* pDes = pBuffer;
 	int i = 0;

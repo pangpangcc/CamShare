@@ -24,6 +24,8 @@ public:
 public:
 	// 调用所有接口函数前需要先调用Init
 	bool Init(const list<string>& svrIPs, unsigned int svrPort, ILiveChatClientListener* listener);
+	// 获取站点类型
+	const string& GetSiteId();
 	// 判断是否无效seq
 	bool IsInvalidSeq(int seq);
 	// 获取计数器
@@ -38,8 +40,10 @@ public:
 	bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key);
 	// 发送消息到客户端
 	bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg);
-	// 获取站点类型
-	const string& GetSiteId();
+	// 发送用户在线状态改变
+	bool SendOnlineStatus(int seq, const string& userId, bool login);
+	// 发送用户在线列表
+	bool SendOnlineList(int seq, const list<string>& userList);
 
 private:
 	// 连接服务器

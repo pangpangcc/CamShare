@@ -18,7 +18,7 @@ endif
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
 CXXFLAGS +=	-I. -I.. -I../third_party
 
-OBJS 		=	BaseRespond.o DialplanRespond.o RecordFinishRespond.o
+OBJS 		=	BaseRespond.o BaseResultRespond.o ReSendErrorRecordRespond.o
 		
 TARGET =	librespond.a
 

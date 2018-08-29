@@ -19,6 +19,7 @@ class KSafeList {
 
 public:
 	typedef typename SafeList::iterator iterator;
+	typedef typename SafeList::const_iterator const_iterator;
 
 	KSafeList() {
 		pthread_rwlock_init(&mLock, NULL);

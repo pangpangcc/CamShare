@@ -8,6 +8,7 @@
 #include "ITask.h"
 #include "RecvEnterConferenceTask.h"
 #include "RecvKickUserFromConferenceTask.h"
+#include "RecvGetOnlineListTask.h"
 
 // 根据 cmd 创建 task
 ITask* ITask::CreateTaskWithCmd(int cmd)
@@ -19,6 +20,9 @@ ITask* ITask::CreateTaskWithCmd(int cmd)
 		break;
 	case TCMD_RECVKICKUSERFROMCONFERENCE:
 		task = new RecvKickUserFromConferenceTask();
+		break;
+	case TCMD_RECV_GET_ONLINE_LIST:
+		task = new RecvGetOnlineListTask();
 		break;
 //	case TCMD_RECVEMOTION:
 //		task = new RecvEmotionTask();

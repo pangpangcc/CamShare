@@ -52,6 +52,12 @@ bool RecvEnterConferenceTask::Handle(const TransportProtocol* tp) {
 			mKey = keyObject->strValue;
 		}
 
+		// m_errMsg
+		amf_object_handle msgObject = root->get_child("msg");
+		if ( !msgObject.isnull() && msgObject->type == DT_STRING ) {
+			m_errMsg = msgObject->strValue;
+		}
+
 		if( mFromId.length() > 0 && mToId.length() > 0 && mKey.length() > 0 ) {
 			result = true;
 			m_errType = LCC_ERR_SUCCESS;
@@ -82,12 +88,14 @@ bool RecvEnterConferenceTask::Handle(const TransportProtocol* tp) {
 
 	// 打log
 	FileLog("LiveChatClient", "RecvEnterConferenceTask::Handle() "
+			"cmd:%d, "
 			"errType:%d, "
 			"errMsg:%s, "
 			"mFromId:%s, "
 			"mToId:%s, "
 			"mbAuth:%s, "
 			"mKey:%s",
+			GetCmdCode(),
 			m_errType,
 			m_errMsg.c_str(),
 			mFromId.c_str(),

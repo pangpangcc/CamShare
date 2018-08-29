@@ -1,0 +1,27 @@
+<!DOCTYPE HTML>
+<html>  
+<meta charset="utf-8">  
+<title>Camshare</title> 
+ 
+<script>  
+function refreshimg()
+{ 
+    var imgurl = 'http://192.168.88.152/jpg/W33.jpg';
+	var camimg = document.getElementById("camimg_1");		
+	camimg.src = imgurl + "?t=" + new Date().getTime();	   
+}
+
+function init(){ 
+    //初始化数据 
+	setInterval(refreshimg, 1000);//定期刷新视频截图。 
+} 
+</script>
+<body onload="JavaScript:init();"> 
+
+<div >
+<img id="camimg_1" src="http://192.168.88.152/jpg/W33.jpg"  />
+</div>
+ 
+ 
+</body>
+</html>  
