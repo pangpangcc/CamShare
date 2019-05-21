@@ -1330,10 +1330,8 @@ void CamShareMiddleware::OnRequestRemoveErrorRecord(HttpParser* parser) {
 
 	// 马上返回数据
 	BaseResultRespond respond;
-
 	// 成功失败
 	respond.SetParam(bFlag);
-
 	HttpSendRespond(parser, &respond);
 }
 
@@ -1347,7 +1345,10 @@ void CamShareMiddleware::OnRequestUndefinedCommand(HttpParser* parser) {
 			parser
 			);
 	Client* client = (Client *)parser->custom;
-	mAsyncIOServer.Disconnect(client);
+
+	// 马上返回数据
+	BaseResultRespond respond;
+	HttpSendRespond(parser, &respond);
 }
 /***************************** 内部服务(HTTP) 回调处理 end **************************************/
 

@@ -1556,7 +1556,7 @@ bool FreeswitchClient::StartRecordConference(
 		snprintf(timeBuffer, 64, "%d%02d%02d%02d%02d%02d", tTime.tm_year + 1900, tTime.tm_mon + 1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec);
 
 		char filePath[256] = {'\0'};
-		snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.h264",
+		snprintf(filePath, sizeof(filePath), "%s/%s_%s_%s.flv",
 				dirPath,
 				conference.c_str(),
 				siteId.c_str(),
