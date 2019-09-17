@@ -37,7 +37,7 @@ public:
 	// 断开连接
 	bool Disconnect();
 	// 进入聊天室
-	bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key);
+	bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key, ENTERCONFERENCETYPE type);
 	// 发送消息到客户端
 	bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg);
 	// 发送用户在线状态改变

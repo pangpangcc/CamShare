@@ -3583,6 +3583,21 @@ void conference_video_write_frame(conference_obj_t *conference, conference_membe
 			}
 
 			if (send_frame) {
+				/**
+				 * Add 4 Send SPS/PPS if imember get into conference later than member
+				 * Add by Max 2019/09/12
+				 */
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_write_frame(), Write Video, %d->%d %d\n", floor_holder->id, imember->id, vid_frame->datalen);
+				if ( !imember->already_sent_video ) {
+					if ( floor_holder->sps_frame && floor_holder->pps_frame ) {
+						imember->already_sent_video = SWITCH_TRUE;
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), Send sps %d->%d, sps_size : %d\n", floor_holder->id, imember->id, floor_holder->sps_frame->datalen);
+						switch_core_session_write_video_frame(imember->session, floor_holder->sps_frame, SWITCH_IO_FLAG_NONE, 0);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), Send pps %d->%d, pps_size : %d\n", floor_holder->id, imember->id, floor_holder->pps_frame->datalen);
+						switch_core_session_write_video_frame(imember->session, floor_holder->pps_frame, SWITCH_IO_FLAG_NONE, 0);
+					}
+				}
+
 				if (vid_frame->img) {
 					if (conference->canvases[0]) {
 						tmp_frame.packet = buf;
@@ -3617,6 +3632,7 @@ void conference_video_write_frame(conference_obj_t *conference, conference_membe
 			}
 			
 			if (switch_channel_test_flag(imember->channel, CF_VIDEO_READY) ) {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_write_frame(), Refresh Video, %d->%d %d\n", floor_holder->id, imember->id, vid_frame->datalen);
 				switch_core_session_request_video_refresh(imember->session);	
 			}
 			
@@ -3631,8 +3647,8 @@ void conference_video_write_frame(conference_obj_t *conference, conference_membe
 
 switch_status_t conference_video_thread_callback(switch_core_session_t *session, switch_frame_t *frame, void *user_data)
 {
-	//switch_channel_t *channel = switch_core_session_get_channel(session);
-	//char *name = switch_channel_get_name(channel);
+	switch_channel_t *channel = switch_core_session_get_channel(session);
+	char *name = switch_channel_get_name(channel);
 	conference_member_t *member = (conference_member_t *)user_data;
 	conference_relationship_t *rel = NULL, *last = NULL;
 
@@ -3650,6 +3666,27 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 		return SWITCH_STATUS_FALSE;
 	}
 
+	/**
+	 * Add 4 Mark SPS/PPS
+	 * Add by Max 2019/09/12
+	 */
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), %s %d, frame : %p\n", name, member->id, (void *)frame);
+	if ( switch_test_flag(frame, SFF_KEY_FRAME_SPS) ) {
+		if ( member->sps_frame ) {
+			switch_frame_free(&member->sps_frame);
+			member->sps_frame = NULL;
+		}
+		switch_frame_dup(frame, &member->sps_frame);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark sps %s %d, sps_size : %d\n", name, member->id, member->sps_frame->datalen);
+	}
+	if ( switch_test_flag(frame, SFF_KEY_FRAME_PPS) ) {
+		if ( member->pps_frame ) {
+			switch_frame_free(&member->pps_frame);
+			member->pps_frame = NULL;
+		}
+		switch_frame_dup(frame, &member->pps_frame);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark pps %s %d, pps_size : %d\n", name, member->id, member->pps_frame->datalen);
+	}
 
 	if (conference_utils_test_flag(member->conference, CFLAG_VIDEO_BRIDGE_FIRST_TWO)) {
 		if (member->conference->members_with_video < 3) {
@@ -3686,7 +3723,7 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 //		if ((imember = conference_member_get(member->conference, rel->id)) && conference_utils_member_test_flag(imember, MFLAG_RECEIVING_VIDEO)) {
 		if ( (imember = conference_member_get(member->conference, rel->id)) ) {
 			if( conference_utils_member_test_flag(imember, MFLAG_RECEIVING_VIDEO) ) {
-				//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "%s %d->%d %d\n", name, member->id, imember->id, frame->datalen);
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), Write Video To Member, %s %d->%d %d\n", name, member->id, imember->id, frame->datalen);
 				switch_core_session_write_video_frame(imember->session, frame, SWITCH_IO_FLAG_NONE, 0);
 			}
 			switch_thread_rwlock_unlock(imember->rwlock);
@@ -3716,8 +3753,10 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 			conference_member_t *fmember;
 
 			if ((fmember = conference_member_get(member->conference, member->conference->video_floor_holder))) {
-				if (!conference_utils_member_test_flag(fmember, MFLAG_RECEIVING_VIDEO))
+				if (!conference_utils_member_test_flag(fmember, MFLAG_RECEIVING_VIDEO)) {
+					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), Write Video To Holder, %s %d->%d %d\n", name, member->id, fmember->id, frame->datalen);
 					switch_core_session_write_video_frame(fmember->session, frame, SWITCH_IO_FLAG_NONE, 0);
+				}
 				switch_thread_rwlock_unlock(fmember->rwlock);
 			}
 		}

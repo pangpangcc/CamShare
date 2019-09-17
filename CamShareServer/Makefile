@@ -35,7 +35,7 @@ LIBS =		-L. \
 			-Wl,-Bstatic -Lthird_party/esl/libs -lesl \
 			-Wl,-Bstatic -Lthird_party/curl/lib/.libs -lcurl \
 			-Wl,-Bstatic -Lthird_party/sqlite/.libs -lsqlite3 \
-			-Wl,-Bdynamic -ldl -lz -lpthread -lidn
+			-Wl,-Bdynamic -ldl -lz -lpthread -lidn -lrt
 
 OBJS 		=	main.o CamShareMiddleware.o  \
 				Session.o FreeswitchClient.o SessionManager.o \

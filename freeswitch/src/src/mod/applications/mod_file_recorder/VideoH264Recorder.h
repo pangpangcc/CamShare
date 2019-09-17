@@ -1,64 +1,54 @@
 /*
- * VideoRecorder.h
+ * VideoH264Recorder.h
  *
  *  Created on: 2016-04-26
  *      Author: Samson.Fan
- * Description: 录制视频文件及监控截图
+ * Description: 录制h264视频文件及监控截图
  */
 
-#ifndef SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDER_H_
-#define SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDER_H_
+#ifndef SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_VIDEOH264RECORDER_H_
+#define SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_VIDEOH264RECORDER_H_
 
 #include <switch.h>
+#include "IVideoRecorder.h"
 
-#define FILE_RECORDER_EVENT_MAINT "file_recorder::maintenance"
-
-#define MAX_PATH_LENGTH	512
-
-class VideoRecorder;
-class VideoRecorderCallback {
-public:
-	virtual ~VideoRecorderCallback() {};
-	virtual void OnStop(VideoRecorder* recorder) = 0;
-};
-
-class VideoRecorder
+class VideoH264Recorder : public IVideoRecorder
 {
 public:
-	VideoRecorder();
-	virtual ~VideoRecorder();
+	VideoH264Recorder();
+	virtual ~VideoH264Recorder();
 
 // 对外接口函数
 public:
 	// 开始录制
-	bool StartRecord(switch_file_handle_t *handle
-			, const char *path, const char* mp4dir, const char* closeshell
-			, const char* pich264dir, const char* picdir, const char* picshell, int picinterval);
+	virtual bool StartRecord(switch_file_handle_t *handle
+			, const char *videoRecPath, const char* videoDstDir, const char* finishShell
+			, const char *picRecDir, const char* picDstDir, const char* picShell, int picInterval);
 	// 停止录制
-	void StopRecord();
+	virtual void StopRecord();
 	// 是否正在视频录制
-	bool IsRecord();
+	virtual bool IsRecord();
 	// 设置视频是否正在处理
-	void SetVideoHandling(bool isHandling);
+	virtual void SetVideoHandling(bool isHandling);
 	// 设置监控截图是否正在处理
-	void SetPicHandling(bool isHandling);
+	virtual void SetPicHandling(bool isHandling);
 
 	// 录制视频frame
-	bool RecordVideoFrame(switch_frame_t *frame);
+	virtual bool RecordVideoFrame(switch_frame_t *frame);
 
 	// 重置(包括重置参数及执行close_shell)
-	void Reset();
+	virtual void Reset();
 
 	// 设置回调
-	void SetCallback(VideoRecorderCallback* callback);
+	virtual void SetCallback(IVideoRecorderCallback* callback);
 
 // 外部线程调用函数
 public:
 	// 视频录制处理函数
-	bool RecordVideoFrame2FileProc();
+	virtual bool RecordVideoFrame2FileProc();
 	void PutVideoBuffer2FileProc();
 	// 监控截图处理函数
-	bool RecordPicture2FileProc();
+	virtual bool RecordPicture2FileProc();
 
 private:
 	// ----- 公共处理函数 -----
@@ -123,9 +113,9 @@ private:
 	bool file_record_send_command_lua(const char* cmd);
 
 private:
-	char mcH264Path[2048];
-	char mcMp4Dir[2048];
-	char mcCloseShell[2048];
+	char mcVideoRecPath[2048];
+	char mcVideoDstDir[2048];
+	char mcFinishShell[2048];
 
 	switch_file_handle_t*	mpHandle;
 	FILE*	mpFile;
@@ -150,8 +140,8 @@ private:
 	// 监控图片生成
 	bool mIsPicHandling;					// 是否监控截图正在处理中
 	switch_mutex_t*		mpPicMutex;			// 监控截图处理锁
-	char mcPicH264Path[2048];
-	char mcPicPath[2048];
+	char mcPicRecPath[2048];
+	char mcPicDstPath[2048];
 	char mcPicShell[2048];
 	int					miPicInterval;
 	switch_buffer_t*	mpPicBuffer;		// 待生成图片的视频帧buffer
@@ -160,8 +150,8 @@ private:
 	uint32_t			miPicDataBufferSize;	// 监控图片h264数据缓存size
 
 	// 处理回调
-	VideoRecorderCallback* mpCallback;
+	IVideoRecorderCallback* mpCallback;
 	switch_mutex_t*		mpMutex;		// 状态锁
 };
 
-#endif /* SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDER_H_ */
+#endif /* SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_VIDEOH264RECORDER_H_ */

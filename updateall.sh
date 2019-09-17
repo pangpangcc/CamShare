@@ -14,6 +14,7 @@ if [ "$param_err" != "0" ]; then
 fi
 
 # build update package
+chmod +x ./update.sh
 ./update.sh develop $ver &&
 ./update.sh demo $ver &&
 ./update.sh operating $ver

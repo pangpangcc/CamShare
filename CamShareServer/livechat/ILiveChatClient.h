@@ -54,7 +54,7 @@ public:
 	// 断开服务器连接
 	virtual bool Disconnect() = 0;
 	// 进入聊天室
-	virtual bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key) = 0;
+	virtual bool SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key, ENTERCONFERENCETYPE type) = 0;
 	// 发送消息到客户端
 	virtual bool SendMsg(int seq, const string& fromId, const string& toId, const string& msg) = 0;
 	// 发送用户在线状态改变

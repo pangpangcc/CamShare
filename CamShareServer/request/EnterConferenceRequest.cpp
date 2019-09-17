@@ -20,6 +20,7 @@ EnterConferenceRequest::EnterConferenceRequest() {
 	mToId = "";
 	mType = Member;
 	mCheckType = Timer;
+    mChatType = ENTERCONFERENCETYPE_CAMSHARE;
 }
 
 EnterConferenceRequest::~EnterConferenceRequest() {
@@ -29,7 +30,7 @@ EnterConferenceRequest::~EnterConferenceRequest() {
 bool EnterConferenceRequest::StartRequest() {
 	// 向LiveChat client发送进入聊天室内请求
 	string key = GetKey();
-	return mpLivechat->SendEnterConference(mSeq, mServerId, mFromId, mToId, key);
+	return mpLivechat->SendEnterConference(mSeq, mServerId, mFromId, mToId, key, mChatType);
 }
 
 void EnterConferenceRequest::FinisRequest(bool bSuccess) {
@@ -53,7 +54,8 @@ void EnterConferenceRequest::SetParam(
 		const string& fromId,
 		const string& toId,
 		MemberType type,
-		EnterConferenceRequestCheckType checkType
+		EnterConferenceRequestCheckType checkType,
+        ENTERCONFERENCETYPE chatType
 		) {
 	mpFreeswitch = freeswitch;
 	mpLivechat = livechat;
@@ -63,6 +65,7 @@ void EnterConferenceRequest::SetParam(
 	mToId = toId;
 	mType = type;
 	mCheckType = checkType;
+    mChatType = chatType;
 }
 
 MemberType EnterConferenceRequest::GetMemberType() {

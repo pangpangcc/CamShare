@@ -24,9 +24,10 @@ static const char c64[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 #define HTTP_URL_FIRSTLINE_PARAM_COUNT 3
 #define HTTP_URL_FIRSTLINE_PARAM_MAX_COUNT HTTP_URL_FIRSTLINE_PARAM_COUNT + 1
 // 暂时不做PHP验证
-#define HTTP_URL_PATH_PARAM_COUNT 5
-//#define HTTP_URL_PATH_PARAM_COUNT 3
-#define HTTP_URL_PATH_PARAM_MAX_COUNT HTTP_URL_PATH_PARAM_COUNT + 1
+// Alex, 增加了登录类型
+#define HTTP_URL_PATH_PARAM_MIN_COUNT 5
+#define HTTP_URL_PATH_PARAM_TYPE_COUNT HTTP_URL_PATH_PARAM_MIN_COUNT + 1
+#define HTTP_URL_PATH_PARAM_MAX_COUNT HTTP_URL_PATH_PARAM_TYPE_COUNT + 1
 
 #define HTTP_PARAM_SEP ":"
 #define HTTP_LINE_SEP "\r\n"
@@ -102,6 +103,8 @@ WSClientParser::WSClientParser() {
 	mpSite = NULL;
 	mpCustom = NULL;
 	mpChannel = NULL;
+    // Alex, 初始化
+    mpChatTypeString = NULL;
 	memset(mWebSocketKey, '\0', sizeof(mWebSocketKey));
 
 	// 创建内存池
@@ -123,6 +126,7 @@ WSClientParser::~WSClientParser() {
 	switch_core_destroy_memory_pool(&mpPool);
 	mpPool = NULL;
 
+	mpChatTypeString = NULL;
 }
 
 int WSClientParser::ParseData(char* buffer, int len) {
@@ -399,22 +403,22 @@ bool WSClientParser::Login() {
 	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "site", mpSite);
 	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", mpCustom);
 
-	/* Locate user */
-	if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
-		switch_log_printf(
-				SWITCH_CHANNEL_UUID_LOG(this->uuid),
-				SWITCH_LOG_ERROR,
-				"WSClientParser::Login( "
-				"[Fail], "
-				"this : %p, "
-				"user : '%s', "
-				"domain : '%s' ",
-				this,
-				mpUser,
-				mpDomain
-				);
-		bFlag = false;
-	}
+    /* Locate user */
+    if (switch_xml_locate_user_merged("id", mpUser, mpDomain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {
+        switch_log_printf(
+                SWITCH_CHANNEL_UUID_LOG(this->uuid),
+                SWITCH_LOG_ERROR,
+                "WSClientParser::Login( "
+                "[Fail], "
+                "this : %p, "
+                "user : '%s', "
+                "domain : '%s' ",
+                this,
+                mpUser,
+                mpDomain
+                );
+        bFlag = false;
+    }
 
 	switch_event_destroy(&locate_params);
 
@@ -528,6 +532,11 @@ WSChannel* WSClientParser::CreateCall(
 		switch_channel_set_caller_profile(channel, caller_profile);
 		switch_core_session_add_stream(session, NULL);
 		switch_channel_set_variable(channel, "caller", user);
+        // Alex, 设置会话类型（在CHANNEL_CREATE，返回到中间件）
+        if (mpChatTypeString != NULL) {
+            switch_channel_set_variable(channel, "chat_type_string", mpChatTypeString);
+        }
+        
 		switch_channel_set_state(channel, CS_INIT);
 
 		wsChannel = CreateChannel(session);
@@ -955,6 +964,10 @@ const char* WSClientParser::GetDestNumber() {
 	return mpDestNumber;
 }
 
+const char* WSClientParser::GetType() {
+    return mpChatTypeString;
+}
+
 bool WSClientParser::ParseFirstLine(char* line) {
 	bool bFlag = false;
 
@@ -987,8 +1000,9 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				p++;
 			}
 
-			char *array2[HTTP_URL_PATH_PARAM_MAX_COUNT];
-			if( switch_separate_string_string(p, delim, array2, HTTP_URL_PATH_PARAM_MAX_COUNT) >= HTTP_URL_PATH_PARAM_COUNT ) {
+			char *array2[HTTP_URL_PATH_PARAM_MAX_COUNT] = {0};
+			int count = switch_separate_string_string(p, delim, array2, HTTP_URL_PATH_PARAM_MAX_COUNT);
+			if( count >= HTTP_URL_PATH_PARAM_MIN_COUNT ) {
 				mpUser = switch_core_strdup(mpPool, array2[0]);
 				mpDomain = switch_core_strdup(mpPool, array2[1]);
 				mpDestNumber = switch_core_strdup(mpPool, array2[2]);
@@ -997,7 +1011,11 @@ bool WSClientParser::ParseFirstLine(char* line) {
 				mpCustom = switch_core_strdup(mpPool, array2[4]);
 //				mpSite = switch_core_strdup(mpPool, "");
 //				mpCustom = switch_core_strdup(mpPool, "");
-
+                // Alex, 增加登录类型
+				if( count >= HTTP_URL_PATH_PARAM_TYPE_COUNT ) {
+					mpChatTypeString = switch_core_strdup(mpPool, array2[5]);
+				}
+                
 				switch_log_printf(
 						SWITCH_CHANNEL_UUID_LOG(this->uuid),
 						SWITCH_LOG_INFO,
@@ -1007,14 +1025,16 @@ bool WSClientParser::ParseFirstLine(char* line) {
 						"domain : '%s', "
 						"destnumber : '%s', "
 						"site : '%s', "
-						"custom : '%s' "
+						"custom : '%s', "
+                        "chat_type_string : '%s' "
 						") \n",
 						this,
 						mpUser,
 						mpDomain,
 						mpDestNumber,
 						mpSite,
-						mpCustom
+						mpCustom,
+                        mpChatTypeString
 						);
 
 				bFlag = true;

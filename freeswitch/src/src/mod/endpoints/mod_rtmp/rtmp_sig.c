@@ -39,6 +39,100 @@
 // Add by Max 2017-01-12
 #include "rtmp_common.h"
 
+/**
+ * Add 4 make call automatically when get invoke FCPublish
+ * Add by Max 2019/09/12
+ */
+void HandleRtmpCall(rtmp_session_t *rsession, const RtmpStreamParamItem* items, int itemCount, switch_bool_t recvVideo)
+{
+	if (NULL != rsession
+		&& NULL != rsession->app && strcmp(rsession->app, "mediaserver") == 0
+		&& NULL != items && itemCount > 0)
+	{
+		const char* uid = NULL;
+		const char* auth = NULL;
+		const char* site = NULL;
+		const char* custom = NULL;
+		const char* room = NULL;
+		for (int i = 0; i < itemCount; i++) {
+			if (strcmp(items[i].key, "uid") == 0) {
+				uid = items[i].value;
+			}
+			if (strcmp(items[i].key, "auth") == 0) {
+				auth = items[i].value;
+			}
+			if (strcmp(items[i].key, "site") == 0) {
+				site = items[i].value;
+			}
+			if (strcmp(items[i].key, "custom") == 0) {
+				custom = items[i].value;
+			}
+			else if (strcmp(items[i].key, "room") == 0) {
+				room = items[i].value;
+			}
+		}
+
+		/**
+		 * Add 4 indicate client connected from mediaserver
+		 * Add by Max 2019-09-11
+		 */
+		rsession->client_from_mediaserver = 1;
+
+		if (NULL != uid && NULL != room) {
+			char* domain = switch_core_get_domain(SWITCH_TRUE);
+
+			// do login
+			int success = 0;
+			if (rtmp_check_auth(rsession, uid, domain, auth, site, custom) == SWITCH_STATUS_SUCCESS) {
+				rtmp_session_login(rsession, uid, domain, site);
+				success = 1;
+			}
+
+			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO
+					, "do login, uid:%s, auth:%s, site:%s, custom:%s, room:%s, domain:%s, success:%d.\n"
+					, uid, auth, site, custom, room, domain, success);
+
+			// do MakeCall
+			if (success) {
+				switch_core_session_t *newsession = NULL;
+				switch_event_t *event = NULL;
+
+				switch_event_create(&event, SWITCH_EVENT_CUSTOM);
+				if (NULL != event) {
+					switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "wantVideo", "true");
+
+					rtmp_session_create_call(rsession, &newsession, 0, RTMP_DEFAULT_STREAM_AUDIO, room, uid, domain, event);
+					if (NULL != newsession) {
+						switch_thread_rwlock_wrlock(rsession->rwlock);
+						rtmp_attach_private(rsession, switch_core_session_get_private(newsession));
+						switch_thread_rwlock_unlock(rsession->rwlock);
+						success = 1;
+					}
+					else {
+						success = 0;
+					}
+
+					switch_event_destroy(&event);
+					event = NULL;
+
+					if ( recvVideo ) {
+					switch_set_flag(rsession, SFLAG_VIDEO);
+						if (rsession->tech_pvt) {
+							switch_set_flag(rsession->tech_pvt, TFLAG_VID_WAIT_KEYFRAME);
+						}
+					}
+				}
+
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO
+						, "do makecall, uid:%s, auth:%s, site:%s, custom:%s, room:%s, domain:%s, success:%d.\n"
+						, uid, auth, site, custom, room, domain, success);
+			}
+
+			switch_safe_free(domain);
+		}
+	}
+}
+
 /* RTMP_INVOKE_FUNCTION is a macro that expands to:
 switch_status_t function(rtmp_session_t *rsession, rtmp_state_t *state, int amfnumber, int transaction_id, int argc, amf0_data *argv[])
 */
@@ -198,8 +292,27 @@ RTMP_INVOKE_FUNCTION(rtmp_i_play)
 	amf0_data *obj = amf0_object_new();
 	amf0_data *object = amf0_object_new();
 
-	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Got play for %s on stream %d\n", switch_str_nil(amf0_get_string(argv[1])),
+	/**
+	 * Add 4 make call automatically when get invoke publish
+	 * Add by Max 2019/09/12
+	 */
+	const int itemSize = 10;
+	int itemCount = 0;
+	RtmpStreamParamItem items[itemSize];
+	char *stream = "";
+	memset(items, 0, sizeof(items));
+
+	stream = switch_str_nil(amf0_get_string(argv[1]));
+	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Got play for %s on stream %d\n", stream,
 		state->stream_id);
+
+	if ( strcmp(rsession->app, "mediaserver") == 0 ) {
+		itemCount = GetRtmpStreamParam(stream, items, itemSize);
+		HandleRtmpCall(rsession, items, itemCount, SWITCH_TRUE);
+	}
+
+//	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Got play for %s on stream %d\n", switch_str_nil(amf0_get_string(argv[1])),
+//		state->stream_id);
 
 	/* Set outgoing chunk size to 1024 bytes */
 	rtmp_set_chunksize(rsession, 1024);
@@ -275,6 +388,25 @@ RTMP_INVOKE_FUNCTION(rtmp_i_publish)
 		INT32(state->stream_id)
 	};
 
+	/**
+	 * Add 4 make call automatically when get invoke publish
+	 * Add by Max 2019/09/12
+	 */
+	const int itemSize = 10;
+	int itemCount = 0;
+	RtmpStreamParamItem items[itemSize];
+	char *stream = "";
+	memset(items, 0, sizeof(items));
+
+	stream = switch_str_nil(amf0_get_string(argv[1]));
+	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Got publish for %s on stream %d\n", stream,
+		state->stream_id);
+
+	if ( strcmp(rsession->app, "mediaserver") == 0 ) {
+		itemCount = GetRtmpStreamParam(stream, items, itemSize);
+		HandleRtmpCall(rsession, items, itemCount, SWITCH_FALSE);
+	}
+
 	rtmp_send_message(rsession, 2, 0, RTMP_TYPE_USERCTRL, 0, buf, sizeof(buf), 0);
 
 	amf0_object_add(object, "level", amf0_str("status"));
@@ -282,15 +414,14 @@ RTMP_INVOKE_FUNCTION(rtmp_i_publish)
 	amf0_object_add(object, "description", amf0_str("description"));
 	amf0_object_add(object, "details", amf0_str("details"));
 	amf0_object_add(object, "clientid", amf0_number_new(217834719));
-	
+
 	rtmp_send_invoke_free(rsession, RTMP_DEFAULT_STREAM_NOTIFY, 0, state->stream_id,
 		amf0_str("onStatus"),
 		amf0_number_new(0),
 		amf0_null_new(),
 		object, NULL);
 
-
-	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "Got publish on stream %u.\n", state->stream_id);
+//	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "Got publish on stream %u.\n", state->stream_id);
 
 	return SWITCH_STATUS_SUCCESS;
 }

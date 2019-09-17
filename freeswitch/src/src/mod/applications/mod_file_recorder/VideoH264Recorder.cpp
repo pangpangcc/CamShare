@@ -1,40 +1,41 @@
 /*
- * VideoRecorder.cpp
+ * VideoH264Recorder.cpp
  *
  *  Created on: 2016-04-26
  *      Author: Samson.Fan
- * Description: 录制视频文件及监控截图
+ * Description: 录制h264视频文件及监控截图
  */
 
-#include "VideoRecorder.h"
+#include "VideoH264Recorder.h"
 #include "CommonFunc.h"
 
 #define H264_BUFFER_SIZE (1024 * 128)
 
-VideoRecorder::VideoRecorder()
+VideoH264Recorder::VideoH264Recorder()
 {
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: VideoRecorder::VideoRecorder()\n");
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: VideoH264Recorder::VideoH264Recorder()\n");
 
 	ResetParam();
+	mpMemoryPool = NULL;
 }
 
-VideoRecorder::~VideoRecorder()
+VideoH264Recorder::~VideoH264Recorder()
 {
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: VideoRecorder::~VideoRecorder()\n");
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_file_recorder: VideoH264Recorder::~VideoH264Recorder()\n");
 
 //	StopRecord();
 }
 
 // 重置参数
-void VideoRecorder::ResetParam()
+void VideoH264Recorder::ResetParam()
 {
 	mIsRecord = false;
 	mHasStartRecord = false;
 	mIsVideoHandling = false;
 //	mpVideoMutex = NULL;
-	memset(mcH264Path, 0, sizeof(mcH264Path));
-	memset(mcMp4Dir, 0, sizeof(mcMp4Dir));
-	memset(mcCloseShell, 0, sizeof(mcCloseShell));
+	memset(mcVideoRecPath, 0, sizeof(mcVideoRecPath));
+	memset(mcVideoDstDir, 0, sizeof(mcVideoDstDir));
+	memset(mcFinishShell, 0, sizeof(mcFinishShell));
 
 	mpFile = NULL;
 	mpHandle = NULL;
@@ -42,7 +43,6 @@ void VideoRecorder::ResetParam()
 	mpVideoQueue = NULL;
 	mpFreeBufferQueue = NULL;
 
-	mpMemoryPool = NULL;
 	mbNaluStart = SWITCH_FALSE;
 	mpNaluBuffer = NULL;
 
@@ -52,8 +52,8 @@ void VideoRecorder::ResetParam()
 	miCreateBufferCount = 0;
 
 	mIsPicHandling = false;
-	memset(mcPicH264Path, 0, sizeof(mcPicH264Path));
-	memset(mcPicPath, 0, sizeof(mcPicPath));
+	memset(mcPicRecPath, 0, sizeof(mcPicRecPath));
+	memset(mcPicDstPath, 0, sizeof(mcPicDstPath));
 	memset(mcPicShell, 0, sizeof(mcPicShell));
 	miPicInterval = 0;
 
@@ -63,32 +63,32 @@ void VideoRecorder::ResetParam()
 }
 
 // 开始录制
-bool VideoRecorder::StartRecord(switch_file_handle_t *handle
-			, const char *path, const char* mp4dir, const char* closeshell
-			, const char* pich264dir, const char* picdir, const char* picshell, int picinterval)
+bool VideoH264Recorder::StartRecord(switch_file_handle_t *handle
+		, const char *videoRecPath, const char* videoDstDir, const char* finishShell
+		, const char *picRecDir, const char* picDstDir, const char* picShell, int picInterval)
 {
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::StartRecord() handle:%p, memory_pool:%p"
-//			  ", path:%s, mp4dir:%s, closeshell:%s"
-//			  ", pich264dir:%s, picdir:%s, picshell:%s, picinterval:%d\n"
+//			, "mod_file_recorder: VideoH264Recorder::StartRecord() handle:%p, memory_pool:%p"
+//			  ", videoRecPath:%s, videoDstDir:%s, finishShell:%s"
+//			  ", picRecDir:%s, picDstDir:%s, picShell:%s, picInterval:%d\n"
 //			, handle
 //			, (NULL!= handle ? handle->memory_pool : NULL)
-//			, path, mp4dir, closeshell
-//			, pich264dir, picdir, picshell, picinterval);
+//			, videoRecPath, videoDstDir, finishShell
+//			, picRecDir, picDstDir, picShell, picInterval);
 
 	// 确保不是正在运行，且目录没有问题
 	if (!mIsRecord
-		&& BuildH264FilePath(path)
-		&& IsDirExist(mp4dir))
+		&& BuildH264FilePath(videoRecPath)
+		&& IsDirExist(videoDstDir))
 	{
 		bool success = true;
 
-		strcpy(mcCloseShell, closeshell);
-		strcpy(mcMp4Dir, mp4dir);
+		strcpy(mcFinishShell, finishShell);
+		strcpy(mcVideoDstDir, videoDstDir);
 
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::StartRecord() mcH264Path:%s, mcMp4Dir:%s, mcCloseShell:%s\n"
-//				, mcH264Path, mcMp4Dir, mcCloseShell);
+//				, "mod_file_recorder: VideoH264Recorder::StartRecord() mcVideoRecPath:%s, mcVideoDstDir:%s, mcFinishShell:%s\n"
+//				, mcVideoRecPath, mcVideoDstDir, mcFinishShell);
 
 		// 创建内存池
 		if (success) {
@@ -96,7 +96,7 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 					&& (SWITCH_STATUS_SUCCESS == switch_core_new_memory_pool(&mpMemoryPool));
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() mpMemoryPool:%p\n"
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() mpMemoryPool:%p\n"
 //							, mpMemoryPool);
 		}
 
@@ -114,18 +114,18 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 
 		// 打开文件
 		if (success) {
-			mpFile = fopen(mcH264Path, "w+b");
+			mpFile = fopen(mcVideoRecPath, "w+b");
 			success = success && (NULL != mpFile);
 
 			if (!success) {
 				// error
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-					, "mod_file_recorder: VideoRecorder::StartRecord() open file fail, handle:%p, path:%s\n"
-					, handle, path);
+					, "mod_file_recorder: VideoH264Recorder::StartRecord() open file fail, handle:%p, videoRecPath:%s\n"
+					, handle, videoRecPath);
 			}
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//											, "mod_file_recorder: VideoRecorder::StartRecord() mpFile:%p, success:%d\n"
+//											, "mod_file_recorder: VideoH264Recorder::StartRecord() mpFile:%p, success:%d\n"
 //											, mpFile, success);
 		}
 
@@ -137,7 +137,7 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 			mHasStartRecord = mIsRecord;
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() load video recorder source start\n");
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() load video recorder source start\n");
 
 			// 创建空闲buffer队列
 			success = success
@@ -145,14 +145,14 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 							== switch_queue_create(&mpFreeBufferQueue, SWITCH_CORE_QUEUE_LEN, mpMemoryPool));
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() load free buffer queue, success:%d\n"
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() load free buffer queue, success:%d\n"
 //							, success);
 
 			// 创建Nalu缓冲
 			success = success && RenewNaluBuffer();
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() renew nalu buffer, success:%d\n"
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() renew nalu buffer, success:%d\n"
 //							, success);
 
 			// 创建缓存队列
@@ -164,7 +164,7 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 //							== switch_mutex_init(&mpVideoMutex, SWITCH_MUTEX_NESTED, mpMemoryPool));
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() load video queue, success:%d\n"
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() load video queue, success:%d\n"
 //							, success);
 
 			// 创建视频处理缓存
@@ -175,23 +175,23 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::StartRecord() load video thread, success:%d\n"
+//							, "mod_file_recorder: VideoH264Recorder::StartRecord() load video thread, success:%d\n"
 //							, success);
 
 			// 截图处理
 			if (success)
 			{
-				if (picinterval > 0
-					&& BuildPicH264FilePath(path, pich264dir)
-					&& BuildPicFilePath(path, picdir)
-					&& strlen(picshell) > 0)
+				if (picInterval > 0
+					&& BuildPicH264FilePath(videoRecPath, picRecDir)
+					&& BuildPicFilePath(videoRecPath, picDstDir)
+					&& strlen(picShell) > 0)
 				{
 					// 设置参数
-					miPicInterval = picinterval;
-					strcpy(mcPicShell, picshell);
+					miPicInterval = picInterval;
+					strcpy(mcPicShell, picShell);
 
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//									, "mod_file_recorder: VideoRecorder::StartRecord() load cut picture start, success:%d\n"
+//									, "mod_file_recorder: VideoH264Recorder::StartRecord() load cut picture start, success:%d\n"
 //									, success);
 
 					// 创建锁
@@ -205,30 +205,30 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 							&& (NULL != (mpPicDataBuffer = (uint8_t*)switch_core_alloc(mpMemoryPool, miPicDataBufferSize)));
 
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//									, "mod_file_recorder: VideoRecorder::StartRecord() load cut picture thread, success:%d\n"
+//									, "mod_file_recorder: VideoH264Recorder::StartRecord() load cut picture thread, success:%d\n"
 //									, success);
 				}
 				else
 				{
 					// log
 					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder::StartRecord() handle:%p, picinterval:%d, pich264dir:%s, picdir:%s"
-						  ", picshell:%s, path:%s\n"
-						, handle, picinterval, pich264dir, picdir
-						, picshell, path);
+						, "mod_file_recorder: VideoH264Recorder::StartRecord() handle:%p, picInterval:%d, picRecDir:%s, picDstDir:%s"
+						  ", picShell:%s, videoRecPath:%s\n"
+						, handle, picInterval, picRecDir, picDstDir
+						, picShell, videoRecPath);
 
-					if (!IsDirExist(pich264dir)) {
+					if (!IsDirExist(picRecDir)) {
 						// 目录不存在
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-							, "mod_file_recorder: VideoRecorder::StartRecord() pich264dir:%s not exist\n"
-							, pich264dir);
+							, "mod_file_recorder: VideoH264Recorder::StartRecord() picRecDir:%s not exist\n"
+							, picRecDir);
 					}
 
-					if (!IsDirExist(picdir)) {
+					if (!IsDirExist(picDstDir)) {
 						// 目录不存在
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-							, "mod_file_recorder: VideoRecorder::StartRecord() picdir:%s not exist\n"
-							, picdir);
+							, "mod_file_recorder: VideoH264Recorder::StartRecord() picDstDir:%s not exist\n"
+							, picDstDir);
 					}
 				}
 			}
@@ -243,16 +243,16 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 	{
 		// log
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-				, "mod_file_recorder: VideoRecorder::StartRecord() fail! path:%s, mp4dir:%s, handle:%p"
+				, "mod_file_recorder: VideoH264Recorder::StartRecord() fail! videoRecPath:%s, videoDstDir:%s, handle:%p"
 				  ", mpFile:%p, mpMemoryPool:%p, mpVideoQueue:%p\n"
-				, path, mp4dir, handle
+				, videoRecPath, videoDstDir, handle
 				, mpFile, mpMemoryPool, mpVideoQueue);
 
-		if (!IsDirExist(mp4dir)) {
+		if (!IsDirExist(videoDstDir)) {
 			// 目录不存在
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-				, "mod_file_recorder: VideoRecorder::StartRecord() mp4dir:%s not exist\n"
-				, mp4dir);
+				, "mod_file_recorder: VideoH264Recorder::StartRecord() videoDstDir:%s not exist\n"
+				, videoDstDir);
 		}
 
 		// 释放资源
@@ -261,18 +261,18 @@ bool VideoRecorder::StartRecord(switch_file_handle_t *handle
 
 	// 打log
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::StartRecord() finish, handle:%p, mIsRecord:%d, path:%s\n"
-//			, handle, mIsRecord, path);
+//			, "mod_file_recorder: VideoH264Recorder::StartRecord() finish, handle:%p, mIsRecord:%d, videoRecPath:%s\n"
+//			, handle, mIsRecord, videoRecPath);
 
 	return mIsRecord;
 }
 
 // 停止录制
-void VideoRecorder::StopRecord()
+void VideoH264Recorder::StopRecord()
 {
 	// log for test
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::StopRecord() start, handle:%p, mpMemoryPool:%p, mpFile:%p, mIsRecord:%d\n"
+//			, "mod_file_recorder: VideoH264Recorder::StopRecord() start, handle:%p, mpMemoryPool:%p, mpFile:%p, mIsRecord:%d\n"
 //			, mpHandle, mpMemoryPool, mpFile, mIsRecord);
 
 //	switch_mutex_lock(mpVideoMutex);
@@ -281,17 +281,17 @@ void VideoRecorder::StopRecord()
 }
 
 // 重置(包括重置参数及执行close_shell)
-void VideoRecorder::Reset()
+void VideoH264Recorder::Reset()
 {
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::Reset() start, isRecord:%d\n"
+//				, "mod_file_recorder: VideoH264Recorder::Reset() start, isRecord:%d\n"
 //				, mIsRecord);
 
 	// 把剩余的VideoBuffer写入文件
 	PutVideoBuffer2FileProc();
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::Reset() over thread\n");
+//					, "mod_file_recorder: VideoH264Recorder::Reset() over thread\n");
 
 	// 关闭文件
 	if(NULL != mpFile)
@@ -301,7 +301,7 @@ void VideoRecorder::Reset()
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::Reset() close file\n");
+//					, "mod_file_recorder: VideoH264Recorder::Reset() close file\n");
 
 	// ----- 释放视频录制资源 -----
 	// 释放Nalu缓冲
@@ -320,48 +320,49 @@ void VideoRecorder::Reset()
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::Reset() destroy mpNaluBuffer\n");
+//					, "mod_file_recorder: VideoH264Recorder::Reset() destroy mpNaluBuffer\n");
 
 
 	// 释放空闲buffer队列
 	DestroyFreeBufferQueue();
-	// 释放内存池
-	if (NULL != mpMemoryPool)
-	{
-		switch_core_destroy_memory_pool(&mpMemoryPool);
-		mpMemoryPool = NULL;
-	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::Reset() running close shell, hasRecord:%d, handle:%p, path:%s, mcCloseShell:%s\n"
-//				, mHasStartRecord, mpHandle, mcH264Path, mcCloseShell);
+//				, "mod_file_recorder: VideoH264Recorder::Reset() running close shell, hasRecord:%d, handle:%p, path:%s, mcFinishShell:%s\n"
+//				, mHasStartRecord, mpHandle, mcVideoRecPath, mcFinishShell);
 
 	// 之前状态为running，执行关闭shell
 	if (mHasStartRecord)
 	{
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::Reset() runing close shell, handle:%p\n"
+//				, "mod_file_recorder: VideoH264Recorder::Reset() runing close shell, handle:%p\n"
 //				, mpHandle);
 		RunCloseShell();
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::Reset() finish, handle:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::Reset() finish, handle:%p\n"
 //			, mpHandle);
 
 	// 重置参数
 	switch_mutex_lock(mpMutex);
 	ResetParam();
 	switch_mutex_unlock(mpMutex);
+
+	// 释放内存池
+	if (NULL != mpMemoryPool)
+	{
+		switch_core_destroy_memory_pool(&mpMemoryPool);
+		mpMemoryPool = NULL;
+	}
 }
 
-void VideoRecorder::SetCallback(VideoRecorderCallback* callback) {
+void VideoH264Recorder::SetCallback(IVideoRecorderCallback* callback) {
 	mpCallback = callback;
 }
 
 // 录制视频frame
-bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
+bool VideoH264Recorder::RecordVideoFrame(switch_frame_t *frame)
 {
 	bool bFlag = true;
 
@@ -369,13 +370,13 @@ bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
 //	switch_mutex_lock(mpVideoMutex);
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame() start handle:%p\n"
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() start handle:%p\n"
 //					, mpHandle);
 
 	if (mIsRecord)
 	{
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::RecordVideoFrame() handle:%p, datalen:%d\n"
+//				, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() handle:%p, datalen:%d\n"
 //				, mpHandle,	frame->datalen);
 
 		// 解析h264包
@@ -391,8 +392,8 @@ bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
 
 			// log for test
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame() handle:%p, SWITCH_STATUS_RESTART, mcH264Path:%s\n"
-//					, mpHandle, mcH264Path);
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() handle:%p, SWITCH_STATUS_RESTART, mcVideoRecPath:%s\n"
+//					, mpHandle, mcVideoRecPath);
 
 		}
 		else if (frame->m && switch_buffer_inuse(mpNaluBuffer) > 0)
@@ -409,21 +410,21 @@ bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
 
 			// log for test
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame() push queue, handle:%p, mcH264Path:%s\n"
-//					, mpHandle, mcH264Path);
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() push queue, handle:%p, mcVideoRecPath:%s\n"
+//					, mpHandle, mcVideoRecPath);
 		}
 	}
 	else {
 		// error
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder::RecordVideoFrame() stoped, mIsRecord:%d\n"
+						, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() stoped, mIsRecord:%d\n"
 						, mIsRecord);
 
 		bFlag = false;
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame() end handle:%p\n"
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame() end handle:%p\n"
 //					, mpHandle);
 
 //	switch_mutex_unlock(mpVideoMutex);
@@ -432,24 +433,24 @@ bool VideoRecorder::RecordVideoFrame(switch_frame_t *frame)
 }
 
 // 是否正在视频录制
-bool VideoRecorder::IsRecord()
+bool VideoH264Recorder::IsRecord()
 {
 	return mIsRecord;
 }
 
 // 录制视频线程处理
-bool VideoRecorder::RecordVideoFrame2FileProc()
+bool VideoH264Recorder::RecordVideoFrame2FileProc()
 {
 	bool result = false;
 	// log for test
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() start, handle:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() start, handle:%p\n"
 //			, mpHandle);
 
 	if (mIsRecord)
 	{
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() pop start\n");
+//				, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() pop start\n");
 
 		// 获取缓存视频frame
 		void* pop = NULL;
@@ -482,8 +483,8 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 
 						// error
 //						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-//										, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() write file fail, handle:%p, dataBufferLen:%d, writeLen:%d, mcH264Path:%s\n"
-//										, mpHandle, miVideoDataBufferLen, writeLen, mcH264Path);
+//										, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() write file fail, handle:%p, dataBufferLen:%d, writeLen:%d, mcVideoRecPath:%s\n"
+//										, mpHandle, miVideoDataBufferLen, writeLen, mcVideoRecPath);
 					}
 				}
 
@@ -505,8 +506,8 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 
 			// log for test
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() write finish, inuseSize:%d, bFreak:%d, mcH264Path:%s\n"
-//					, inuseSize, bFreak, mcH264Path);
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() write finish, inuseSize:%d, bFreak:%d, mcVideoRecPath:%s\n"
+//					, inuseSize, bFreak, mcVideoRecPath);
 
 			bool isDestroyBuffer = true;
 			if (!bFreak)
@@ -521,7 +522,7 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 				}
 
 //				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() check i-frame, i-frame:%d, isDestroyBuffer:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() check i-frame, i-frame:%d, isDestroyBuffer:%d\n"
 //						, isIFrame, isDestroyBuffer);
 
 //				if (!isDestroyBuffer)
@@ -553,7 +554,7 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 //					}
 //
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc()"
+//						, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc()"
 //						  " inuseSize:%d, bFreak:%d, isDestroyBuffer:%d, isIFrame:%d, mpPicBuffer:%p\n"
 //						  "%s"
 //						, inuseSize, bFreak, isDestroyBuffer, isIFrame, mpPicBuffer
@@ -562,7 +563,7 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 			}
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() do destroy buffer, isDestroyBuffer:%d\n"
+//					, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() do destroy buffer, isDestroyBuffer:%d\n"
 //					, isDestroyBuffer);
 
 			if (isDestroyBuffer)
@@ -574,25 +575,25 @@ bool VideoRecorder::RecordVideoFrame2FileProc()
 			// 读buffer数据失败
 			if( bFreak ) {
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder:RecordVideoFrame2FileProc() read buffer fail, handle:%p, inuse:%d, dataBufferLen:%d, dataBufferSize:%d, mcH264Path:%s\n"
-						, mpHandle, inuseSize, miVideoDataBufferLen, miVideoDataBufferSize, mcH264Path);
+						, "mod_file_recorder: VideoH264Recorder:RecordVideoFrame2FileProc() read buffer fail, handle:%p, inuse:%d, dataBufferLen:%d, dataBufferSize:%d, mcVideoRecPath:%s\n"
+						, mpHandle, inuseSize, miVideoDataBufferLen, miVideoDataBufferSize, mcVideoRecPath);
 				break;
 			}
 
 		}
 
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() pop end\n");
+//				, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() pop end\n");
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::RecordVideoFrame2FileProc() end, handle:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::RecordVideoFrame2FileProc() end, handle:%p\n"
 //			, mpHandle);
 
 	return result;
 }
 
-void VideoRecorder::PutVideoBuffer2FileProc()
+void VideoH264Recorder::PutVideoBuffer2FileProc()
 {
 	// 把剩下的缓存写入文件
 	if (miVideoDataBufferLen > 0)
@@ -601,14 +602,14 @@ void VideoRecorder::PutVideoBuffer2FileProc()
 		if (!WriteVideoData2File(mpVideoDataBuffer, miVideoDataBufferLen, writeLen)) {
 			// 写入文件不成功
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-							, "mod_file_recorder: VideoRecorder::PutVideoBuffer2FileProc() write file fail, handle:%p, dataBufferLen:%d, writeLen:%d\n"
+							, "mod_file_recorder: VideoH264Recorder::PutVideoBuffer2FileProc() write file fail, handle:%p, dataBufferLen:%d, writeLen:%d\n"
 							, mpHandle, miVideoDataBufferLen, writeLen);
 		}
 	}
 }
 
 // 设置视频是否正在处理
-void VideoRecorder::SetVideoHandling(bool isHandling)
+void VideoH264Recorder::SetVideoHandling(bool isHandling)
 {
 	switch_mutex_lock(mpMutex);
 	if( mIsVideoHandling != isHandling ) {
@@ -622,7 +623,7 @@ void VideoRecorder::SetVideoHandling(bool isHandling)
 }
 
 // 设置监控截图是否正在处理
-void VideoRecorder::SetPicHandling(bool isHandling)
+void VideoH264Recorder::SetPicHandling(bool isHandling)
 {
 	switch_mutex_lock(mpMutex);
 	if( mIsPicHandling != isHandling ) {
@@ -636,11 +637,11 @@ void VideoRecorder::SetPicHandling(bool isHandling)
 }
 
 // 监制截图线程处理
-bool VideoRecorder::RecordPicture2FileProc()
+bool VideoH264Recorder::RecordPicture2FileProc()
 {
 	bool result = false;
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::RecordPicture2FileProc() start, handle:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::RecordPicture2FileProc() start, handle:%p\n"
 //			, mpHandle);
 
 	if (mIsRecord && mIsPicHandling)
@@ -651,7 +652,7 @@ bool VideoRecorder::RecordPicture2FileProc()
 
 			// log for test
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RecordPicture2FileProc() BuildPicture start\n");
+//						, "mod_file_recorder: VideoH264Recorder::RecordPicture2FileProc() BuildPicture start\n");
 
 			// 生成图片
 			bool bBuildPicResult = false;
@@ -672,20 +673,20 @@ bool VideoRecorder::RecordPicture2FileProc()
 
 			// log for test
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RecordPicture2FileProc() BuildPicture finish, buffer:%p, result:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::RecordPicture2FileProc() BuildPicture finish, buffer:%p, result:%d\n"
 //						, mpPicBuffer, bBuildPicResult);
 		}
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::RecordPicture2FileProc() stop, handle:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::RecordPicture2FileProc() stop, handle:%p\n"
 //			, mpHandle);
 
 	return result;
 }
 
 // 判断是否i帧
-bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
+bool VideoH264Recorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 {
 	bool isIFrame = false;
 	static const unsigned char nalHead[] = {0x00, 0x00, 0x00, 0x01};
@@ -707,12 +708,12 @@ bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 	{
 		if (0 == memcmp(nalHead, data, nalHeadSize))
 		{
-			nalTypeCount = data[currNalOffset + 4] & nalIdcBit;
+			nalTypeCount = data[currNalOffset + nalHeadSize] & nalIdcBit;
 			nalTypeCount = nalTypeCount >> 5;
 		}
 		else {
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::IsIFrame() memcmp() false\n");
+//				, "mod_file_recorder: VideoH264Recorder::IsIFrame() memcmp() false\n");
 		}
 
 		unsigned char i = 0;
@@ -731,7 +732,7 @@ bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 					isIFrame = true;
 
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::IsIFrame() nalType:%d, isIFrame:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::IsIFrame() nalType:%d, isIFrame:%d\n"
 //						, nalType, isIFrame);
 					break;
 				}
@@ -744,7 +745,7 @@ bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 //					currNalOffset += nalHeadSize + nalSpsSize;
 //
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::IsIFrame() nalType:%d, nalHeadSize:%d, nalSpsSize:%d, currNalOffset:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::IsIFrame() nalType:%d, nalHeadSize:%d, nalSpsSize:%d, currNalOffset:%d\n"
 //						, nalType, nalHeadSize, nalSpsSize, currNalOffset);
 				}
 				else if (8 == nalType) {
@@ -752,32 +753,32 @@ bool VideoRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 					currNalOffset += nalHeadSize + nalPpsSize;
 
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::IsIFrame() nalType:%d, nalHeadSize:%d, nalPpsSize:%d, currNalOffset:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::IsIFrame() nalType:%d, nalHeadSize:%d, nalPpsSize:%d, currNalOffset:%d\n"
 //						, nalType, nalHeadSize, nalPpsSize, currNalOffset);
 				}
 				else {
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::IsIFrame() nalType:%d, currNalOffset:%d\n"
+//						, "mod_file_recorder: VideoH264Recorder::IsIFrame() nalType:%d, currNalOffset:%d\n"
 //						, nalType, currNalOffset);
 				}
 			}
 			else {
 //				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::IsIFrame() memcmp() false, currNalOffset:%d, nalHeadSize:%d\n"
+//					, "mod_file_recorder: VideoH264Recorder::IsIFrame() memcmp() false, currNalOffset:%d, nalHeadSize:%d\n"
 //					, currNalOffset, nalHeadSize);
 			}
 		}
 	}
 	else {
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::IsIFrame() inuse > nalHeadSize false, inuse:%d, nalHeadSize:%d\n"
+//			, "mod_file_recorder: VideoH264Recorder::IsIFrame() inuse > nalHeadSize false, inuse:%d, nalHeadSize:%d\n"
 //			, inuse, nalHeadSize);
 	}
 
 	return isIFrame;
 }
 
-switch_status_t VideoRecorder::buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* nalu_buffer, switch_bool_t& nalu_28_start)
+switch_status_t VideoH264Recorder::buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* nalu_buffer, switch_bool_t& nalu_28_start)
 {
 	uint8_t nalu_type = 0;
 	uint8_t *data = (uint8_t *)frame->data;
@@ -860,7 +861,7 @@ switch_status_t VideoRecorder::buffer_h264_nalu(switch_frame_t *frame, switch_bu
 }
 
 // 重新建Nalu缓冲
-bool VideoRecorder::RenewNaluBuffer()
+bool VideoH264Recorder::RenewNaluBuffer()
 {
 	bool result = false;
 	if (IsRecord()
@@ -873,46 +874,46 @@ bool VideoRecorder::RenewNaluBuffer()
 }
 
 // 执行关闭shell
-void VideoRecorder::RunCloseShell()
+void VideoH264Recorder::RunCloseShell()
 {
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RunCloseShell() start\n");
+//					, "mod_file_recorder: VideoH264Recorder::RunCloseShell() start\n");
 
-	if (strlen(mcCloseShell) > 0)
+	if (strlen(mcFinishShell) > 0)
 	{
 		// get mp4Path
 		char mp4Path[MAX_PATH_LENGTH] = {0};
-		GetMp4FilePath(mp4Path, mcMp4Dir);
+		GetMp4FilePath(mp4Path, mcVideoDstDir);
 
 		// get userId
 		char userId[MAX_PATH_LENGTH] = {0};
-		GetUserIdWithFilePath(userId, mcH264Path);
+		GetUserIdWithFilePath(userId, mcVideoRecPath);
 
 		// get siteId
 		char siteId[MAX_PATH_LENGTH] = {0};
-		GetSiteIdWithFilePath(siteId, mcH264Path);
+		GetSiteIdWithFilePath(siteId, mcVideoRecPath);
 
 		// get startTime
 		char startTime[MAX_PATH_LENGTH] = {0};
-		GetStartTimeWithFilePath(startTime, mcH264Path);
+		GetStartTimeWithFilePath(startTime, mcVideoRecPath);
 		char startStandardTime[32] = {0};
 		GetStandardTime(startStandardTime, startTime);
 
 		// print param
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecorder::RunCloseShell() run close shell, 0:%s, 1:%s, 2:%s, 3:%s, 4:%s, 5:%s, 6:%s\n"
-//						, mcCloseShell, mcH264Path, mp4Path, mcPicPath, userId, siteId, startStandardTime);
+//						, "mod_file_recorder: VideoH264Recorder::RunCloseShell() run close shell, 0:%s, 1:%s, 2:%s, 3:%s, 4:%s, 5:%s, 6:%s\n"
+//						, mcFinishShell, mcVideoRecPath, mp4Path, mcPicDstPath, userId, siteId, startStandardTime);
 
 		// build shell处理文件
 		// shell h264Path mp4Path jpgPath userId siteId startTime
 		char cmd[MAX_PATH_LENGTH] = {0};
 		snprintf(cmd, sizeof(cmd), "%s \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\""
-				, mcCloseShell, mcH264Path, mp4Path, mcPicPath, mcPicH264Path
+				, mcFinishShell, mcVideoRecPath, mp4Path, mcPicDstPath, mcPicRecPath
 				, userId, siteId, startStandardTime);
 
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 start, cmd:%s\n"
+//					, "mod_file_recorder: VideoH264Recorder::RunCloseShell() transcode to mp4 start, cmd:%s\n"
 //					, cmd);
 
 		// run shell
@@ -924,13 +925,13 @@ void VideoRecorder::RunCloseShell()
 //		if( bFlag ) {
 			// success
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 success, cmd:%s\n"
+						, "mod_file_recorder: VideoH264Recorder::RunCloseShell() transcode to mp4 success, cmd:%s\n"
 						, cmd);
 		}
 		else {
 			// error
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder::RunCloseShell() transcode to mp4 fail!, cmd:%s\n"
+						, "mod_file_recorder: VideoH264Recorder::RunCloseShell() transcode to mp4 fail!, cmd:%s\n"
 						, cmd);
 		}
 	}
@@ -940,7 +941,7 @@ void VideoRecorder::RunCloseShell()
 }
 
 // 根据源文件路径获取SiteID
-bool VideoRecorder::GetSiteIdWithFilePath(char* buffer, const char* srcPath)
+bool VideoH264Recorder::GetSiteIdWithFilePath(char* buffer, const char* srcPath)
 {
 	bool result = false;
 	const int siteIdIndex = 1;
@@ -955,7 +956,7 @@ bool VideoRecorder::GetSiteIdWithFilePath(char* buffer, const char* srcPath)
 }
 
 // 根据源文件路径获取起始时间
-bool VideoRecorder::GetStartTimeWithFilePath(char* buffer, const char* srcPath)
+bool VideoH264Recorder::GetStartTimeWithFilePath(char* buffer, const char* srcPath)
 {
 	bool result = false;
 	const int startTimeIndex = 2;
@@ -970,7 +971,7 @@ bool VideoRecorder::GetStartTimeWithFilePath(char* buffer, const char* srcPath)
 }
 
 // 获取标准时间格式
-bool VideoRecorder::GetStandardTime(char* buffer, const char* srcTime)
+bool VideoH264Recorder::GetStandardTime(char* buffer, const char* srcTime)
 {
 	bool result = false;
 	if (NULL != srcTime && strlen(srcTime) == 14)
@@ -1006,7 +1007,7 @@ bool VideoRecorder::GetStandardTime(char* buffer, const char* srcTime)
 }
 
 // 获取用户ID
-bool VideoRecorder::GetUserIdWithFilePath(char* buffer, const char* srcPath)
+bool VideoH264Recorder::GetUserIdWithFilePath(char* buffer, const char* srcPath)
 {
 	bool result = false;
 	const int userIdIndex = 0;
@@ -1021,7 +1022,7 @@ bool VideoRecorder::GetUserIdWithFilePath(char* buffer, const char* srcPath)
 }
 
 // 获取没有后缀的文件名
-bool VideoRecorder::GetFileNameWithoutExt(char* buffer, const char* filePath)
+bool VideoH264Recorder::GetFileNameWithoutExt(char* buffer, const char* filePath)
 {
 	bool result = false;
 
@@ -1056,7 +1057,7 @@ bool VideoRecorder::GetFileNameWithoutExt(char* buffer, const char* filePath)
 }
 
 // 获取文件名中的第index个参数(从0开始)
-bool VideoRecorder::GetParamWithFileName(char* buffer, const char* fileName, int index)
+bool VideoH264Recorder::GetParamWithFileName(char* buffer, const char* fileName, int index)
 {
 	bool result = false;
 
@@ -1100,19 +1101,19 @@ bool VideoRecorder::GetParamWithFileName(char* buffer, const char* fileName, int
 }
 
 // 生成录制文件路径
-bool VideoRecorder::BuildH264FilePath(const char* srcPath)
+bool VideoH264Recorder::BuildH264FilePath(const char* srcPath)
 {
 	bool result = false;
 	if (NULL != srcPath && srcPath[0] != '\0')
 	{
-		strcat(mcH264Path, srcPath);
+		strcat(mcVideoRecPath, srcPath);
 		result = true;
 	}
 	return result;
 }
 
 // 获取mp4文件路径
-bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* dir)
+bool VideoH264Recorder::GetMp4FilePath(char* mp4Path, const char* dir)
 {
 	bool result = false;
 	if (NULL != dir && dir[0] != '\0')
@@ -1136,7 +1137,7 @@ bool VideoRecorder::GetMp4FilePath(char* mp4Path, const char* dir)
 }
 
 // 把视频数据写入文件
-bool VideoRecorder::WriteVideoData2File(const uint8_t* buffer, size_t bufferLen, size_t& writeLen)
+bool VideoH264Recorder::WriteVideoData2File(const uint8_t* buffer, size_t bufferLen, size_t& writeLen)
 {
 	bool result = false;
 
@@ -1150,7 +1151,7 @@ bool VideoRecorder::WriteVideoData2File(const uint8_t* buffer, size_t bufferLen,
 }
 
 // 释放视频录制队列里所有buffer及空闲队列
-void VideoRecorder::DestroyVideoQueue()
+void VideoH264Recorder::DestroyVideoQueue()
 {
 	// 释放队列所有buffer
 	if (NULL != mpVideoQueue) {
@@ -1163,7 +1164,7 @@ void VideoRecorder::DestroyVideoQueue()
 }
 
 // 生成截图的h264生成路径
-bool VideoRecorder::BuildPicH264FilePath(const char* srcPath, const char* dir)
+bool VideoH264Recorder::BuildPicH264FilePath(const char* srcPath, const char* dir)
 {
 	bool result = false;
 	if (NULL != srcPath && srcPath[0] != '\0'
@@ -1173,19 +1174,19 @@ bool VideoRecorder::BuildPicH264FilePath(const char* srcPath, const char* dir)
 		if (dirLen > 0)
 		{
 			// copy dir path
-			strcpy(mcPicH264Path, dir);
+			strcpy(mcPicRecPath, dir);
 			if (dir[dirLen-1] != '/'
 				&& dir[dirLen-1] != '\\')
 			{
-				strcat(mcPicH264Path, "/");
+				strcat(mcPicRecPath, "/");
 			}
 
 			// copy file user id
 			char userId[MAX_PATH_LENGTH] = {0};
 			if (GetUserIdWithFilePath(userId, srcPath))
 			{
-				strcat(mcPicH264Path, userId);
-				strcat(mcPicH264Path, ".h264");
+				strcat(mcPicRecPath, userId);
+				strcat(mcPicRecPath, ".h264");
 
 				result = true;
 			}
@@ -1195,7 +1196,7 @@ bool VideoRecorder::BuildPicH264FilePath(const char* srcPath, const char* dir)
 }
 
 // 生成截图图片路径
-bool VideoRecorder::BuildPicFilePath(const char* srcPath, const char* dir)
+bool VideoH264Recorder::BuildPicFilePath(const char* srcPath, const char* dir)
 {
 	bool result = false;
 	if (NULL != srcPath && srcPath[0] != '\0'
@@ -1205,19 +1206,19 @@ bool VideoRecorder::BuildPicFilePath(const char* srcPath, const char* dir)
 		if (dirLen > 0)
 		{
 			// copy dir path
-			strcpy(mcPicPath, dir);
+			strcpy(mcPicDstPath, dir);
 			if (dir[dirLen-1] != '/'
 				&& dir[dirLen-1] != '\\')
 			{
-				strcat(mcPicPath, "/");
+				strcat(mcPicDstPath, "/");
 			}
 
 			// copy file user id
 			char userId[MAX_PATH_LENGTH] = {0};
 			if (GetUserIdWithFilePath(userId, srcPath))
 			{
-				strcat(mcPicPath, userId);
-				strcat(mcPicPath, ".jpg");
+				strcat(mcPicDstPath, userId);
+				strcat(mcPicDstPath, ".jpg");
 
 				result = true;
 			}
@@ -1227,7 +1228,7 @@ bool VideoRecorder::BuildPicFilePath(const char* srcPath, const char* dir)
 }
 
 // 重建pic缓冲
-bool VideoRecorder::RenewPicBuffer(switch_buffer_t* buffer)
+bool VideoH264Recorder::RenewPicBuffer(switch_buffer_t* buffer)
 {
 	switch_mutex_lock(mpPicMutex);
 
@@ -1245,7 +1246,7 @@ bool VideoRecorder::RenewPicBuffer(switch_buffer_t* buffer)
 }
 
 // pop出pic缓冲
-switch_buffer_t* VideoRecorder::PopPicBuffer()
+switch_buffer_t* VideoH264Recorder::PopPicBuffer()
 {
 	switch_buffer_t* buffer = NULL;
 
@@ -1257,7 +1258,7 @@ switch_buffer_t* VideoRecorder::PopPicBuffer()
 }
 
 // 生成截图
-bool VideoRecorder::BuildPicture(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen)
+bool VideoH264Recorder::BuildPicture(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen)
 {
 	bool result = false;
 
@@ -1268,7 +1269,7 @@ bool VideoRecorder::BuildPicture(switch_buffer_t* buffer, uint8_t* dataBuffer, s
 }
 
 // 生成截图的H264文件
-bool VideoRecorder::BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen)
+bool VideoH264Recorder::BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffer, switch_size_t dataBufLen)
 {
 	bool result = false;
 	if (NULL != buffer
@@ -1276,7 +1277,7 @@ bool VideoRecorder::BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffe
 		&& switch_buffer_inuse(buffer) < dataBufLen)
 	{
 		// 打开文件
-		FILE* pFile = fopen(mcPicH264Path, "w+b");
+		FILE* pFile = fopen(mcPicRecPath, "w+b");
 		if (NULL != pFile)
 		{
 			// 数据写入文件
@@ -1294,34 +1295,34 @@ bool VideoRecorder::BuildPicH264File(switch_buffer_t* buffer, uint8_t* dataBuffe
 		else {
 			// error
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecorder::BuildPicH264File() fail! path:%s\n"
-						, mcPicH264Path);
+						, "mod_file_recorder: VideoH264Recorder::BuildPicH264File() fail! path:%s\n"
+						, mcPicRecPath);
 		}
 	}
 
 	// log
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//		, "mod_file_recorder: VideoRecorder::BuildPicH264File() result:%d, path:%s\n"
-//		, result, mcPicH264Path);
+//		, "mod_file_recorder: VideoH264Recorder::BuildPicH264File() result:%d, path:%s\n"
+//		, result, mcPicRecPath);
 
 	return result;
 }
 
 // 执行生成截图shell
-bool VideoRecorder::RunPictureShell()
+bool VideoH264Recorder::RunPictureShell()
 {
 	bool result = false;
 
 	// build shell处理文件
 	char cmd[MAX_PATH_LENGTH] = {0};
 //	snprintf(cmd, sizeof(cmd), "%s %s %s"
-//			, mcPicShell, mcPicH264Path, mcPicPath);
+//			, mcPicShell, mcPicRecPath, mcPicDstPath);
 	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -i %s -y -s 240x180 -vframes 1 %s"
-			, mcPicH264Path, mcPicPath);
+			, mcPicRecPath, mcPicDstPath);
 
 	// log
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg start, cmd:%s\n"
+//				, "mod_file_recorder: VideoH264Recorder::RunPictureShell() transcode to jpeg start, cmd:%s\n"
 //				, cmd);
 
 	// run shell
@@ -1334,30 +1335,30 @@ bool VideoRecorder::RunPictureShell()
 	if (result) {
 		// log for test
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg success, cmd:%s\n"
+//					, "mod_file_recorder: VideoH264Recorder::RunPictureShell() transcode to jpeg success, cmd:%s\n"
 //					, cmd);
 	}
 	else {
 		// error
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-					, "mod_file_recorder: VideoRecorder::RunPictureShell() transcode to jpeg fail!, cmd:%s\n"
+					, "mod_file_recorder: VideoH264Recorder::RunPictureShell() transcode to jpeg fail!, cmd:%s\n"
 					, cmd);
 	}
 
 	return result;
 }
 
-bool VideoRecorder::SendCommand(const char* cmd) {
+bool VideoH264Recorder::SendCommand(const char* cmd) {
 //	switch_log_printf(
 //			SWITCH_CHANNEL_LOG,
 //			SWITCH_LOG_DEBUG,
-//			"mod_file_recorder: VideoRecorder::SendCommand() cmd : \"%s\"\n",
+//			"mod_file_recorder: VideoH264Recorder::SendCommand() cmd : \"%s\"\n",
 //			cmd
 //			);
 	return file_record_send_command_lua(cmd);
 }
 
-bool VideoRecorder::file_record_send_command(const char* cmd) {
+bool VideoH264Recorder::file_record_send_command(const char* cmd) {
 	switch_status_t status = SWITCH_STATUS_FALSE;
 	switch_event_t *event;
 	if ( (status = switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, FILE_RECORDER_EVENT_MAINT)) == SWITCH_STATUS_SUCCESS) {
@@ -1369,7 +1370,7 @@ bool VideoRecorder::file_record_send_command(const char* cmd) {
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_ERROR,
-				"VideoRecorder::file_record_send_command( "
+				"VideoH264Recorder::file_record_send_command( "
 				"[Send event Fail], "
 				"this : %p, "
 				"cmd : '%s' "
@@ -1382,7 +1383,7 @@ bool VideoRecorder::file_record_send_command(const char* cmd) {
 	return status == SWITCH_STATUS_SUCCESS;
 }
 
-bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
+bool VideoH264Recorder::file_record_send_command_lua(const char* cmd) {
 	bool bFlag = true;
 
 	char result[SWITCH_CMD_CHUNK_LEN];
@@ -1408,7 +1409,7 @@ bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
 //	switch_log_printf(
 //			SWITCH_CHANNEL_LOG,
 //			SWITCH_LOG_INFO,
-//			"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+//			"mod_file_recorder::VideoH264Recorder::file_record_send_command_lua( "
 //			"[LUA call], "
 //			"this : %p, "
 //			"path : %s "
@@ -1422,7 +1423,7 @@ bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
 //		switch_log_printf(
 //				SWITCH_CHANNEL_LOG,
 //				SWITCH_LOG_INFO,
-//				"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+//				"mod_file_recorder::VideoH264Recorder::file_record_send_command_lua( "
 //				"[LUA call OK], "
 //				"this : %p, "
 //				"stream.data : '%s' "
@@ -1434,7 +1435,7 @@ bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
 				SWITCH_LOG_ERROR,
-				"mod_file_recorder::VideoRecorder::file_record_send_command_lua( "
+				"mod_file_recorder::VideoH264Recorder::file_record_send_command_lua( "
 				"[LUA call Fail], "
 				"this : %p, "
 				"stream.data : '%s' "
@@ -1450,7 +1451,7 @@ bool VideoRecorder::file_record_send_command_lua(const char* cmd) {
 }
 
 // 获取空闲buffer
-switch_buffer_t* VideoRecorder::GetFreeBuffer()
+switch_buffer_t* VideoH264Recorder::GetFreeBuffer()
 {
 	switch_buffer_t* buffer = NULL;
 	if (NULL != mpFreeBufferQueue)
@@ -1465,7 +1466,7 @@ switch_buffer_t* VideoRecorder::GetFreeBuffer()
 
 				// error
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-							, "mod_file_recorder: VideoRecorder::GetFreeBuffer() get free buffer fail! mpFreeBufferQueue:%p, mpMemoryPool:%p\n"
+							, "mod_file_recorder: VideoH264Recorder::GetFreeBuffer() get free buffer fail! mpFreeBufferQueue:%p, mpMemoryPool:%p\n"
 							, mpFreeBufferQueue, mpMemoryPool);
 			}
 			else {
@@ -1473,7 +1474,7 @@ switch_buffer_t* VideoRecorder::GetFreeBuffer()
 				miCreateBufferCount++;
 
 //				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//							, "mod_file_recorder: VideoRecorder::GetFreeBuffer() miCreateBufferCount:%d, buffer:%p\n"
+//							, "mod_file_recorder: VideoH264Recorder::GetFreeBuffer() miCreateBufferCount:%d, buffer:%p\n"
 //							, miCreateBufferCount, buffer);
 			}
 		}
@@ -1482,10 +1483,10 @@ switch_buffer_t* VideoRecorder::GetFreeBuffer()
 }
 
 // 回收空闲buffer
-void VideoRecorder::RecycleFreeBuffer(switch_buffer_t* buffer)
+void VideoH264Recorder::RecycleFreeBuffer(switch_buffer_t* buffer)
 {
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//			, "mod_file_recorder: VideoRecorder::RecycleFreeBuffer() start! buffer:%p, mpFreeBufferQueue:%p\n"
+//			, "mod_file_recorder: VideoH264Recorder::RecycleFreeBuffer() start! buffer:%p, mpFreeBufferQueue:%p\n"
 //			, buffer, mpFreeBufferQueue);
 
 	if (NULL != buffer
@@ -1493,7 +1494,7 @@ void VideoRecorder::RecycleFreeBuffer(switch_buffer_t* buffer)
 	{
 		// log
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//				, "mod_file_recorder: VideoRecorder::RecycleFreeBuffer() recycle free buffer success! buffer:%p\n"
+//				, "mod_file_recorder: VideoH264Recorder::RecycleFreeBuffer() recycle free buffer success! buffer:%p\n"
 //				, buffer);
 
 		switch_buffer_zero(buffer);
@@ -1502,13 +1503,13 @@ void VideoRecorder::RecycleFreeBuffer(switch_buffer_t* buffer)
 	else {
 		// log
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-				, "mod_file_recorder: VideoRecorder::RecycleFreeBuffer() recycle free buffer error! buffer:%p, mpFreeBufferQueue:%p\n"
+				, "mod_file_recorder: VideoH264Recorder::RecycleFreeBuffer() recycle free buffer error! buffer:%p, mpFreeBufferQueue:%p\n"
 				, buffer, mpFreeBufferQueue);
 	}
 }
 
 // 释放空闲队列里所有buffer及空闲队列
-void VideoRecorder::DestroyFreeBufferQueue()
+void VideoH264Recorder::DestroyFreeBufferQueue()
 {
 	// 释放队列里所有buffer
 	if (NULL != mpFreeBufferQueue) {

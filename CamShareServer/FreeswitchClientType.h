@@ -9,6 +9,8 @@
 #define FREESWITCHCLIENTTYPE_H_
 
 #include <string>
+// Alex, 增加ENTERCONFERENCETYPE
+#include <livechat/ILiveChatClientDef.h>
 using namespace std;
 
 typedef enum MemberType {
@@ -28,6 +30,7 @@ typedef struct Channel {
 		serverId = "";
 		siteId = "";
 		recordFilePath = "";
+        chatType = ENTERCONFERENCETYPE_CAMSHARE;
 	}
 	Channel(
 			const string& channelId,
@@ -46,6 +49,7 @@ typedef struct Channel {
 		this->siteId = siteId;
 		this->identify = user + conference;
 		this->recordFilePath = "";
+		this->chatType = ENTERCONFERENCETYPE_CAMSHARE;
 	}
 	Channel(
 			const string& channelId,
@@ -55,7 +59,8 @@ typedef struct Channel {
 			const string& memberId,
 			const string& rtmp_session,
 			const string& serverId,
-			const string& siteId
+			const string& siteId,
+			ENTERCONFERENCETYPE chatType
 			) {
 		this->channelId = channelId;
 		this->user = user;
@@ -67,6 +72,7 @@ typedef struct Channel {
 		this->siteId = siteId;
 		this->identify = user + conference;
 		this->recordFilePath = "";
+		this->chatType = chatType;
 	}
 	Channel(const Channel& item) {
 		this->channelId = item.channelId;
@@ -79,6 +85,7 @@ typedef struct Channel {
 		this->siteId = item.siteId;
 		this->identify = this->user + this->conference;
 		this->recordFilePath = item.recordFilePath;
+		this->chatType = item.chatType;
 	}
 	Channel& operator=(const Channel& item) {
 		this->channelId = item.channelId;
@@ -91,6 +98,7 @@ typedef struct Channel {
 		this->siteId = item.siteId;
 		this->identify = item.user + item.conference;
 		this->recordFilePath = item.recordFilePath;
+		this->chatType = item.chatType;
 		return *this;
 	}
 
@@ -108,6 +116,10 @@ typedef struct Channel {
 	string serverId;
 	string siteId;
 	string recordFilePath;
+    /*
+     * Alex, 验证类型
+     */
+    ENTERCONFERENCETYPE chatType;
 
 } Channel;
 

@@ -770,6 +770,13 @@ struct conference_member {
 	int force_bw_in;
 	int max_bw_out;
 	int reset_media;
+	/**
+	 * Add 4 Mark down SPS/PPS
+	 * Add by Max 2019/09/12
+	 */
+	switch_bool_t already_sent_video;
+	switch_frame_t *sps_frame;
+	switch_frame_t *pps_frame;
 };
 
 typedef enum {

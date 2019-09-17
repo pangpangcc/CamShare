@@ -29,7 +29,7 @@ DEBUGMODE=1
 # 端口
 PORT=4311
 # IP
-IP=203.169.146.66
+IP=218.213.92.12
 # 服务器对本应用唯一标识,不能重复
 NAME=CAM17
 #NAME=CAMDEMO
@@ -63,14 +63,16 @@ UPLOADTIME=60
 # 站点Id
 SITE_ID=0
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://www.chnlove.com/livechat/setstatus.php?action=savecamsharevideo
+#SITE_HTTP_RECORD_URL=http://www.chnlove.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://www.asiame.com/livechat/setstatus.php?action=savecamsharevideo
 
 # 站点配置(IDA)
 [SITE_1]
 # 站点Id
 SITE_ID=1
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://www.idateasia.com/livechat/setstatus.php?action=savecamsharevideo
+#SITE_HTTP_RECORD_URL=http://www.idateasia.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://www.asiame.com/livechat/setstatus.php?action=savecamsharevideo
 
 # 站点配置(CD)
 [SITE_2]

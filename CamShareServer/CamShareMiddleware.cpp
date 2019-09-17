@@ -1379,7 +1379,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAuthorizationMember(
 		if( !CheckTestAccount(channel->user) ) {
 			// 非测试账号
 			// 发送进入聊天室认证命令
-			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Timer) ) {
+			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Timer, channel->chatType) ) {
 				// 断开指定用户视频
 				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
 			}
@@ -1409,14 +1409,16 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 			"type : %s, "
 			"memberId : %s, "
 			"serverId : %s, "
-			"siteId : %s "
+			"siteId : %s, "
+            "chatType : %d "
 			")",
 			channel->user.c_str(),
 			channel->conference.c_str(),
 			(channel->type == Moderator)?"Moderator":"Member",
 			channel->memberId.c_str(),
 			channel->serverId.c_str(),
-			channel->siteId.c_str()
+			channel->siteId.c_str(),
+            channel->chatType
 			);
 
 	// 踢出相同账户已经进入的其他连接
@@ -1440,7 +1442,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 			string serverId = channel->serverId;
 
 			// 发送进入聊天室认证命令
-			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active) ) {
+			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active, channel->chatType) ) {
 				// 断开指定用户视频
 				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
 			}
@@ -1461,7 +1463,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 	} else {
 		// 进入自己会议室, 直接通过
 		// 开放成员视频
-		mFreeswitch.StartUserRecvVideo(channel->user, channel->conference, channel->type);
+		mFreeswitch. StartUserRecvVideo(channel->user, channel->conference, channel->type);
 	}
 
 }
@@ -1989,7 +1991,8 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 		const string& toId,
 		MemberType type,
 		const string& serverId,
-		EnterConferenceRequestCheckType checkType
+		EnterConferenceRequestCheckType checkType,
+        ENTERCONFERENCETYPE chatType
 		) {
 	bool bFlag = true;
 
@@ -2012,13 +2015,15 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 			"toId : %s, "
 			"type : %u, "
 			"serverId : %s, "
-			"siteId : %s "
+			"siteId : %s, "
+            "chatType : %d "
 			")",
 			fromId.c_str(),
 			toId.c_str(),
 			type,
 			serverId.c_str(),
-			siteId.c_str()
+			siteId.c_str(),
+            chatType
 			);
 
 	if( bFlag ) {
@@ -2026,7 +2031,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 
 		// 处理是否需要记录请求
 		EnterConferenceRequest* request = new EnterConferenceRequest();
-		request->SetParam(&mFreeswitch, livechat, seq, serverId, fromId, toId, type, checkType);
+		request->SetParam(&mFreeswitch, livechat, seq, serverId, fromId, toId, type, checkType, chatType);
 
 		// 生成会话
 		string key = request->GetKey();

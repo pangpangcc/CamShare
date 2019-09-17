@@ -449,6 +449,7 @@ typedef struct rtp2rtmp_helper_s
 	uint8_t         last_mark;
 	uint16_t        last_seq;
 	switch_bool_t   sps_changed;
+	switch_bool_t  	idr_recv;
 } rtp2rtmp_helper_t;
 
 struct rtmp_session {
@@ -538,6 +539,13 @@ struct rtmp_session {
 	// Modify by Max 4 check active timeout 2017-01-12
 	long long active_time;
 	int8_t check_timeout;
+
+	/**
+	 * Add 4 indicate client connected from mediaserver
+	 * 	1.No timeout check
+	 * Add by Max 2019-09-11
+	 */
+	int8_t client_from_mediaserver;
 	// ------------------------
 };
 

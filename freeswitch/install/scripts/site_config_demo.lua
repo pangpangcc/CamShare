@@ -12,8 +12,8 @@
 
 -- php接口路径
 loginPaths = {
-  ["0"] = "http://test:5179@demo.chnlove.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["1"] = "http://test:5179@demo.idateasia.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["0"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["1"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus",
   ["4"] = "http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
   ["5"] = "http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
   ["6"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus"

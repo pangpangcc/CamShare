@@ -14,6 +14,7 @@ if [ "$param_err" != "0" ]; then
 fi
 
 # build install package
+chmod +x ./package.sh
 ./package.sh develop $ver &&
 ./package.sh demo $ver &&
 ./package.sh operating $ver

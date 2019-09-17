@@ -22,5 +22,5 @@ cd -
 cd third_party/curl &&
 autoreconf -ivf &&
 chmod +x configure &&
-./configure --disable-shared --enable-static --without-ssl &&
+./configure --disable-shared --enable-static --without-ssl --without-librtmp &&
 cd -

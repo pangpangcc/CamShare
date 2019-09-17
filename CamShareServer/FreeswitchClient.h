@@ -157,7 +157,8 @@ public:
 			const string& memberId,
 			const string& rtmp_session,
 			const string& serverId,
-			const string& siteId
+			const string& siteId,
+			ENTERCONFERENCETYPE chatType
 			);
 
 	/**
@@ -294,6 +295,12 @@ private:
 			const string& key
 			);
 
+    /**
+     * Alex, 字符串转登录认证类型
+     */
+    ENTERCONFERENCETYPE GetEnterConferenceTypeWithString(const string& value);
+    ENTERCONFERENCETYPE GetChatTypeWithChannelVar(const string& value);
+    
 	/**
 	 * 事件处理分发
 	 */

@@ -35,7 +35,8 @@ public:
 			const string& fromId,
 			const string& toId,
 			MemberType type,
-			EnterConferenceRequestCheckType checkType
+			EnterConferenceRequestCheckType checkType,
+            ENTERCONFERENCETYPE chatType
 			);
 
 	MemberType GetMemberType();
@@ -58,6 +59,10 @@ private:
 	MemberType mType;
 	string mKey;
 	EnterConferenceRequestCheckType mCheckType;
+    /*
+     *  Alex, 验证类型
+     */
+    ENTERCONFERENCETYPE mChatType;
 };
 
 #endif /* ENTERCONFERENCERequest_H_ */

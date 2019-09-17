@@ -15,6 +15,7 @@ SendEnterConferenceTask::SendEnterConferenceTask(void)
 	mFromId = "";
 	mToId = "";
 	mKey = "";
+    mType = "";
 }
 
 SendEnterConferenceTask::~SendEnterConferenceTask(void)
@@ -40,6 +41,9 @@ bool SendEnterConferenceTask::GetSendData(void* data, unsigned int dataSize, uns
 	root["toId"] = mToId;
 	root["server"] = mServer;
 	root["key"] = mKey;
+    if (!mType.empty()) {
+        root["type"] = mType;
+    }
 	Json::FastWriter writer;
 	string json = writer.write(root);
 
@@ -77,7 +81,8 @@ bool SendEnterConferenceTask::InitParam(
 		const string& server,
 		const string& fromId,
 		const string& toId,
-		const string& key
+		const string& key,
+        ENTERCONFERENCETYPE type
 		)
 {
 	bool bFlag = false;
@@ -86,6 +91,16 @@ bool SendEnterConferenceTask::InitParam(
 		mFromId = fromId;
 		mToId = toId;
 		mKey = key;
+        switch (type) {
+            case ENTERCONFERENCETYPE_CAMSHARE:
+                mType = "C";
+                break;
+            case ENTERCONFERENCETYPE_VIDEO:
+                mType = "V";
+                break;
+            default:
+                break;
+        }
 		bFlag = true;
 	}
 

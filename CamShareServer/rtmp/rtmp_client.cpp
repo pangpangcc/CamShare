@@ -13,8 +13,11 @@
 #include <signal.h>
 #include <time.h>
 #include <stdlib.h>
+#include <iostream>
+#include <dirent.h>
 
 #include <string>
+#include <vector>
 using namespace std;
 
 #include "RtmpClient.h"
@@ -28,8 +31,11 @@ using namespace std;
 char ip[128] = {"192.168.88.152"};
 int iTotal = 1;
 int iReconnect = 120;
+int iMinReconnectMS = 1;
 bool bPlay = false;
 bool bNoVideo = false;
+string strDir("");
+int iStartIndex = 0;
 
 bool Parse(int argc, char *argv[]);
 
@@ -37,6 +43,38 @@ bool Parse(int argc, char *argv[]);
 bool testReconnect = true;
 #define RECONN_MAX_TIME_S (10*1000*1000)
 #define RECONN_CHECK_INTERVAL (100*1000)
+
+// add by Samson for send flv file
+#pragma pack(push)
+#pragma pack(1)
+
+typedef struct {
+    unsigned char signature[3];   // always FLV
+    unsigned char version;        // file version
+    unsigned char flags;          // video/audio tags present
+    unsigned int dataOffset;    // the length of this header in bytes
+} FlvHeader;
+
+typedef struct {
+    unsigned char tagType;        // 2bit - reserved  1bit - filter  5bit - tagType
+    unsigned char dataSize[3];    // length of the message, from streamID to end of tag(equal to tag-11)
+    unsigned char timestamp[3];   // time in milliseconds
+    unsigned char timestampEx;    // extension of the timestamp field
+    unsigned char streamID[3];    // always 0
+} TagHeader;
+
+#pragma pack(pop)
+
+// read Big-Endian byte array into Little-Endian integer
+unsigned int ReadBigEndian(const unsigned char *data, unsigned int length)
+{
+    int result = 0;
+    for (unsigned int i = 0; i < length; i++) {
+        result |= (*(data + i) << ((length - 1 - i) * 8));
+    }
+    return result;
+}
+// --------------------------------
 
 unsigned char frame0[] = {
 		0x17,0x00,0x00,0x00,0x00,0x01,0x42,0x00,0x1f,0xff,0xe1,0x00,0x19,0x67,0x42,0x80,
@@ -308,7 +346,7 @@ void SignalFunc(int sign_no);
 RtmpClient client[MAX_CLIENT];
 KThread* clientThreads[MAX_CLIENT];
 KMutex clientRandTimeMutext[MAX_CLIENT];
-int clientRandTime[MAX_CLIENT];
+long long clientRandTime[MAX_CLIENT];
 string clientDest[MAX_CLIENT];
 
 KThread sendVideoThread[MAX_CLIENT];
@@ -352,9 +390,168 @@ class SendVideoRunnable : public KRunnable {
 public:
 	SendVideoRunnable(RtmpClient *container) {
 		mContainer = container;
+
+		mInitFile = false;
+		mFile = NULL;
+		mFileBuffer = NULL;
+		mFileBufferLen = 0;
+		mFileBufferSize = 0;
+		mPrevBufferTimestamp = 0;
 	}
 	virtual ~SendVideoRunnable() {
 		mContainer = NULL;
+
+		if (NULL != mFileBuffer) {
+			delete[] mFileBuffer;
+			mFileBuffer = NULL;
+		}
+		mFileBufferLen = 0;
+		mFileBufferSize = 0;
+	}
+	bool InitFile(const string& filePath, FILE* file) {
+		mFile = file;
+		if (SeekToBuffer()) {
+			mFilePath = filePath;
+			mInitFile = true;
+		}
+		else {
+			mFile = NULL;
+		}
+		return true;
+	}
+private:
+	bool SeekToBuffer() {
+		bool result = false;
+
+		do {
+			// open file
+			if (NULL != mFile) {
+				fseek(mFile, 0, SEEK_SET);
+			}
+
+			// seek to buffer
+			size_t readHeader = 0;
+			FlvHeader flvHeader;
+			readHeader = fread(&flvHeader, 1, sizeof(flvHeader), mFile);
+			if (readHeader != sizeof(flvHeader)) {
+				// add by Samson for test
+				printf("SeekToBuffer() read header fail, readSize:%lu, dataSize:%lu, user:%s, path:%s\n"
+						, readHeader, sizeof(flvHeader), mContainer->GetUser().c_str(), mFilePath.c_str());
+				break;
+			}
+			unsigned int dataOffset = ReadBigEndian((unsigned char *)&flvHeader.dataOffset, sizeof(flvHeader.dataOffset));
+			if (0 != fseek(mFile, dataOffset, SEEK_SET)) {
+				// add by Samson for test
+				printf("SeekToBuffer() seek to buffer fail, dataOffset:%u, user:%s, path:%s\n"
+						, dataOffset, mContainer->GetUser().c_str(), mFilePath.c_str());
+				break;
+			}
+
+			// finish
+			result = true;
+		} while (false);
+		return result;
+	}
+	bool SendFileBuffer() {
+		bool result = false;
+		if (NULL != mContainer) {
+			size_t readSize = 0;
+			do {
+				// previous tag size
+				unsigned char prevTagSizeTmp[4] = { 0 };
+				readSize = fread(prevTagSizeTmp, 1, sizeof(prevTagSizeTmp), mFile);
+				if (readSize != sizeof(prevTagSizeTmp)) {
+					// add by Samson for test
+					printf("SendFileBuffer() read prev tag size fail, readSize:%lu, dataSize:%lu, user:%s, path:%s\n"
+							, readSize, sizeof(prevTagSizeTmp), mContainer->GetUser().c_str(), mFilePath.c_str());
+					break;
+				}
+				size_t prevTagSize = ReadBigEndian(prevTagSizeTmp, sizeof(prevTagSizeTmp));
+
+				// tag header
+				TagHeader tagHeader;
+				readSize = fread(&tagHeader, 1, sizeof(tagHeader), mFile);
+				if (readSize != sizeof(tagHeader)) {
+					// add by Samson for test
+					printf("SendFileBuffer() read tag header fail, readSize:%lu, dataSize:%lu, user:%s, path:%s\n"
+							, readSize, sizeof(tagHeader), mContainer->GetUser().c_str(), mFilePath.c_str());
+					break;
+				}
+				unsigned int tagDataSize = ReadBigEndian(tagHeader.dataSize, sizeof(tagHeader.dataSize));
+				unsigned int tagTimestamp = ReadBigEndian(tagHeader.timestamp, sizeof(tagHeader.timestamp));
+
+				// renew buffer
+				if (!RenewFileBuffer(tagDataSize)) {
+					// add by Samson for test
+					printf("SendFileBuffer() renew buffer fail, dataSize:%u, user:%s, path:%s\n"
+							, tagDataSize, mContainer->GetUser().c_str(), mFilePath.c_str());
+					break;
+				}
+
+				// data
+				readSize = fread(mFileBuffer, 1, tagDataSize, mFile);
+				if (readSize != tagDataSize) {
+					// add by Samson for test
+					printf("SendFileBuffer() read video data fail, readSize:%lu, user:%s, path:%s\n"
+							, readSize, mContainer->GetUser().c_str(), mFilePath.c_str());
+					break;
+				}
+				mFileBufferLen = tagDataSize;
+
+				// send data
+				if( !mContainer->SendVideoData(mFileBuffer, mFileBufferLen, tagTimestamp) ) {
+					// add by Samson for test
+					printf("SendFileBuffer() send video data fail, len:%lu, user:%s, path:%s\n"
+							, mFileBufferLen, mContainer->GetUser().c_str(), mFilePath.c_str());
+					break;
+				}
+
+				// sleep
+				if (tagTimestamp - mPrevBufferTimestamp > 0) {
+					usleep((tagTimestamp - mPrevBufferTimestamp) * 1000);
+					mPrevBufferTimestamp = tagTimestamp;
+				}
+
+				result = true;
+			} while (false);
+
+			if (!result || feof(mFile)) {
+				usleep(100 * 1000);
+				bool seekResult = SeekToBuffer();
+
+				// add by Samson for test
+				printf("SendFileBuffer() reset file, user:%s, path:%s, result:%d\n"
+						, mContainer->GetUser().c_str(), mFilePath.c_str(), seekResult);
+			}
+		}
+		return result;
+	}
+	bool RenewFileBuffer(size_t bufferSize) {
+		bool result = false;
+
+		// check renew
+		if (bufferSize > mFileBufferSize) {
+			// new buffer
+			size_t newFileBufferSize = bufferSize;
+			char* newFileBuffer = new char[newFileBufferSize];
+			if (NULL != newFileBuffer) {
+				// renew
+				if (NULL != mFileBuffer) {
+					delete[] mFileBuffer;
+					mFileBuffer = NULL;
+				}
+				mFileBuffer = newFileBuffer;
+				mFileBufferSize = newFileBufferSize;
+				mFileBufferLen = 0;
+
+				result = true;
+			}
+		}
+		else {
+			mFileBufferLen = 0;
+			result = true;
+		}
+		return result;
 	}
 protected:
 	void onRun() {
@@ -362,47 +559,52 @@ protected:
 		unsigned int start = 0, end = 0;
 
 		while( mContainer->IsRunning() ) {
-			start = timestamp;
-			timestamp += timestamps[0];
-			if( !mContainer->SendVideoData((const char* )frame0, sizeof(frame0), timestamp) ) {
-				break;
+			if (!mInitFile) {
+				// send buffer
+				start = timestamp;
+				timestamp += timestamps[0];
+				if( !mContainer->SendVideoData((const char* )frame0, sizeof(frame0), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[1];
+				if( !mContainer->SendVideoData((const char* )frame1, sizeof(frame1), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[2];
+				if( !mContainer->SendVideoData((const char* )frame2, sizeof(frame2), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[3];
+				if( !mContainer->SendVideoData((const char* )frame3, sizeof(frame3), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[4];
+				if( !mContainer->SendVideoData((const char* )frame4, sizeof(frame4), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[5];
+				if( !mContainer->SendVideoData((const char* )frame5, sizeof(frame5), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[6];
+				if( !mContainer->SendVideoData((const char* )frame6, sizeof(frame6), timestamp) ) {
+					break;
+				}
+
+				timestamp += timestamps[7];
+
+				end = timestamp - start;
+				usleep(end * 1000);
 			}
-
-			timestamp += timestamps[1];
-			if( !mContainer->SendVideoData((const char* )frame1, sizeof(frame1), timestamp) ) {
-				break;
+			else {
+				SendFileBuffer();
 			}
-
-			timestamp += timestamps[2];
-			if( !mContainer->SendVideoData((const char* )frame2, sizeof(frame2), timestamp) ) {
-				break;
-			}
-
-			timestamp += timestamps[3];
-			if( !mContainer->SendVideoData((const char* )frame3, sizeof(frame3), timestamp) ) {
-				break;
-			}
-
-			timestamp += timestamps[4];
-			if( !mContainer->SendVideoData((const char* )frame4, sizeof(frame4), timestamp) ) {
-				break;
-			}
-
-			timestamp += timestamps[5];
-			if( !mContainer->SendVideoData((const char* )frame5, sizeof(frame5), timestamp) ) {
-				break;
-			}
-
-			timestamp += timestamps[6];
-			if( !mContainer->SendVideoData((const char* )frame6, sizeof(frame6), timestamp) ) {
-				break;
-			}
-
-			timestamp += timestamps[7];
-
-			end = timestamp - start;
-			usleep(end * 1000);
-
 		}
 
 		LogManager::GetLogManager()->Log(
@@ -416,6 +618,14 @@ protected:
 	}
 private:
 	RtmpClient *mContainer;
+
+	bool mInitFile;
+	string mFilePath;
+	FILE* mFile;
+	char* mFileBuffer;
+	size_t mFileBufferLen;
+	size_t mFileBufferSize;
+	size_t mPrevBufferTimestamp;
 };
 
 class ClientRunnable : public KRunnable {
@@ -431,8 +641,13 @@ protected:
 		while( gStart ) {
 			clientRandTimeMutext[mContainer->GetIndex()].lock();
 			if( clientRandTime[mContainer->GetIndex()] <= 0 ) {
-				if( iReconnect ) {
-					clientRandTime[mContainer->GetIndex()] = rand() % iReconnect;
+				if( iReconnect > 0 ) {
+					long long reconnectTime = (rand() % (iReconnect * 1000)) * 1000;
+					long long minReconnectTime = iMinReconnectMS * 1000;
+					if (reconnectTime < minReconnectTime) {
+						reconnectTime = minReconnectTime;
+					}
+					clientRandTime[mContainer->GetIndex()] = reconnectTime;
 				}
 			}
 			clientRandTimeMutext[mContainer->GetIndex()].unlock();
@@ -522,6 +737,44 @@ private:
 };
 
 class RtmpClientListenerImp : public RtmpClientListener {
+private:
+	string mFlvPath;
+	FILE* mpFile;
+
+public:
+	RtmpClientListenerImp() {
+		mpFile = NULL;
+	}
+	virtual ~RtmpClientListenerImp() {
+		CloseFile();
+	}
+public:
+	void SetFlvFile(const char* flvPath) {
+		mFlvPath = flvPath;
+		if (!OpenFile()) {
+			printf("open file fail:%s\n"
+					, flvPath);
+			mFlvPath.clear();
+		}
+	}
+private:
+	bool OpenFile() {
+		bool result = false;
+		if (NULL != mpFile) {
+			result = true;
+		}
+		else {
+			mpFile = fopen(mFlvPath.c_str(), "rb");
+			result = (NULL != mpFile);
+		}
+		return result;
+	}
+	void CloseFile() {
+		if (NULL != mpFile) {
+			fclose(mpFile);
+			mpFile = NULL;
+		}
+	}
 public:
 	void OnConnect(RtmpClient* client, const string& sessionId) {
 		LogManager::GetLogManager()->Log(
@@ -603,56 +856,72 @@ public:
 					temp
 					);
 
-			if( index % 3 == 0 ) {
-				client->MakeCall(temp);
-			}
+			client->MakeCall(temp);
+		}
+		else {
+			printf("rtmp_client::OnLogin( "
+					"[MakeCall], "
+					"index : '%d'"
+					") fail\n",
+					client->GetIndex()
+					);
 		}
 	}
 	void OnMakeCall(RtmpClient* client, bool bSuccess, const string& channelId) {
-		if( client->GetUser() == clientDest[client->GetIndex()] ) {
-			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
-					"rtmp_client::OnMakeCall( "
-					"[进入自己会议室, 上传], "
-					"index : '%d', "
-					"bSuccess : %d, "
-					"user : '%s', "
-					"dest : '%s', "
-					"channelId : '%s', "
-					"client : %p "
-					")",
-					client->GetIndex(),
-					bSuccess,
-					client->GetUser().c_str(),
-					clientDest[client->GetIndex()].c_str(),
-					channelId.c_str(),
-					client
-					);
+		if (bSuccess) {
+			if( client->GetUser() == clientDest[client->GetIndex()] ) {
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"rtmp_client::OnMakeCall( "
+						"[进入自己会议室, 上传], "
+						"index : '%d', "
+						"bSuccess : %d, "
+						"user : '%s', "
+						"dest : '%s', "
+						"channelId : '%s', "
+						"client : %p "
+						")",
+						client->GetIndex(),
+						bSuccess,
+						client->GetUser().c_str(),
+						clientDest[client->GetIndex()].c_str(),
+						channelId.c_str(),
+						client
+						);
 
-			// 进入自己会议室, 上传
-			client->CreatePublishStream();
-		} else {
-			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
-					"rtmp_client::OnMakeCall( "
-					"[进入别人的会议室, 下载], "
-					"index : '%d', "
-					"bSuccess : %d, "
-					"user : '%s', "
-					"dest : '%s', "
-					"channelId : '%s', "
-					"client : %p "
-					")",
-					client->GetIndex(),
-					bSuccess,
-					client->GetUser().c_str(),
-					clientDest[client->GetIndex()].c_str(),
-					channelId.c_str(),
-					client
-					);
+				// 进入自己会议室, 上传
+				client->CreatePublishStream();
+			} else {
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"rtmp_client::OnMakeCall( "
+						"[进入别人的会议室, 下载], "
+						"index : '%d', "
+						"bSuccess : %d, "
+						"user : '%s', "
+						"dest : '%s', "
+						"channelId : '%s', "
+						"client : %p "
+						")",
+						client->GetIndex(),
+						bSuccess,
+						client->GetUser().c_str(),
+						clientDest[client->GetIndex()].c_str(),
+						channelId.c_str(),
+						client
+						);
 
-			// 进入别人的会议室, 下载
-			client->CreateReceiveStream();
+				// 进入别人的会议室, 下载
+				client->CreateReceiveStream();
+			}
+		}
+		else {
+			printf("rtmp_client::OnMakeCall( "
+					"[MakeCall], "
+					"index : '%d'"
+					") fail\n",
+					client->GetIndex()
+					);
 		}
 	}
 	void OnCreatePublishStream(RtmpClient* client) {
@@ -669,7 +938,11 @@ public:
 				);
 
 		if( !bNoVideo ) {
-			sendVideoThread[client->GetIndex()].start(new SendVideoRunnable(client));
+			SendVideoRunnable* runnable = new SendVideoRunnable(client);
+			if (NULL != runnable && NULL != mpFile) {
+				runnable->InitFile(mFlvPath, mpFile);
+			}
+			sendVideoThread[client->GetIndex()].start(runnable);
 		}
 	}
 
@@ -702,7 +975,7 @@ public:
 		LogManager::GetLogManager()->Log(
 				LOG_WARNING,
 				"rtmp_client::OnHangup( "
-				"[MakeCall], "
+				"[Shutdown], "
 				"index : '%d', "
 				"temp : '%s' "
 				")",
@@ -710,7 +983,7 @@ public:
 				temp
 				);
 
-		client->MakeCall(temp);
+		client->Shutdown();
 	}
 
 	void OnHeartBeat(RtmpClient* client) {
@@ -743,7 +1016,46 @@ public:
 //				);
 	}
 };
-RtmpClientListenerImp gRtmpClientListenerImp;
+//RtmpClientListenerImp gRtmpClientListenerImp;
+
+typedef vector<string> FileVector;
+void GetFileVector(const char* dir, FileVector& fileVector)
+{
+	if (NULL != dir && *dir != '\0') {
+		DIR* pDir = NULL;
+		struct dirent* findData;
+
+		pDir = opendir(dir);
+		if (NULL != pDir) {
+			do {
+				findData = readdir(pDir);
+				if (NULL != findData) {
+					if (strcmp(findData->d_name, ".") != 0
+						&& strcmp(findData->d_name, "..") != 0)
+					{
+						string filePath = dir;
+						if (filePath[filePath.length() - 1] != '/'
+							&& filePath[filePath.length() - 1] != '\\')
+						{
+							filePath += '/';
+						}
+						filePath += findData->d_name;
+
+						struct stat s;
+						if (stat(filePath.c_str(), &s) == 0
+							&& S_ISREG(s.st_mode))
+						{
+							fileVector.push_back(filePath);
+						}
+					}
+				}
+				else {
+					break;
+				}
+			} while (true);
+		}
+	}
+}
 
 int main(int argc, char *argv[]) {
 	printf("############## rtmp client ############## \n");
@@ -756,7 +1068,6 @@ int main(int argc, char *argv[]) {
 	printf("# total : %d \n", iTotal);
 	printf("# reconnect time : %d \n", iReconnect);
 	printf("# play : %s \n", bPlay?"true":"false");
-	iReconnect *= 1000 * 1000;
 
 	/* Ignore */
 	struct sigaction sa;
@@ -786,10 +1097,23 @@ int main(int argc, char *argv[]) {
 	LogManager::GetLogManager()->Start(LOG_WARNING, "log");
 	LogManager::GetLogManager()->SetDebugMode(true);
 
+	FileVector fileVector;
+	if (!strDir.empty()) {
+		GetFileVector(strDir.c_str(), fileVector);
+	}
+
 	gStart = true;
 	for(int i = 0; i < iTotal; i++) {
-		client[i].SetRtmpClientListener(&gRtmpClientListenerImp);
-		client[i].SetIndex(i);
+		RtmpClientListenerImp* imp = new RtmpClientListenerImp;
+		client[i].SetRtmpClientListener(imp);
+		int iIndex = i + iStartIndex;
+		string filePath;
+		if (!fileVector.empty()) {
+			filePath = fileVector[i % fileVector.size()];
+			imp->SetFlvFile(filePath.c_str());
+		}
+		client[i].SetIndex(iIndex);
+//		printf("rtmp-client, index:%d, path:%s\n", iIndex, filePath.c_str());
 		ClientRunnable* runnable = new ClientRunnable(&(client[i]));
 		clientThreads[i] = new KThread();
 		clientThreads[i]->start(runnable);
@@ -838,6 +1162,7 @@ void SignalFunc(int sign_no) {
 	default:{
 		for(int i = 0; i < iTotal; i++) {
 			client[i].Shutdown();
+			client[i].Close();
 		}
 
 		for(int i = 0; i < iTotal; i++) {
@@ -873,8 +1198,13 @@ bool Parse(int argc, char *argv[]) {
 			bNoVideo = atoi(value.c_str());
 		} else if( key.compare("-reconnect") == 0 ) {
 			iReconnect = atoi(value.c_str());
+		} else if( key.compare("-min-reconnect") == 0 ) {
+			iMinReconnectMS = atoi(value.c_str());
+		} else if ( key.compare("-dir") == 0 ) {
+			strDir = value;
+		} else if ( key.compare("-index") == 0 ) {
+			iStartIndex = atoi(value.c_str());
 		}
-
 	}
 
 	return true;

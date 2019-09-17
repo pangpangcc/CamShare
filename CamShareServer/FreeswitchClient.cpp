@@ -10,6 +10,8 @@
 #include <common/LogManager.h>
 #include <common/StringHandle.h>
 #include <common/CommonFunc.h>
+#include <common/Arithmetic.h>
+#include <algorithm>
 
 #define CHANNEL_CREATE "CHANNEL_CREATE"
 #define CHANNEL_DESTROY "CHANNEL_DESTROY"
@@ -857,11 +859,12 @@ bool FreeswitchClient::AuthorizationAllConference() {
 							if( user.length() > 0 && conferenceName.length() > 0 ) {
 								string serverId = GetChannelParam(uuId, "serverId");
 								string siteId = GetChannelParam(uuId, "siteId");
-
+								string chatTypeString = GetChannelParam(uuId, "chat_type_string");
+								ENTERCONFERENCETYPE chatType = GetChatTypeWithChannelVar(chatTypeString);
 								// 获取rtmp_session
 								string rtmp_session = GetChannelParam(uuId, "rtmp_session");
 								// 根据会议室更新频道信息
-								UpdateChannelWithConference(uuId, user, conferenceName, memberType, memberId, rtmp_session, serverId, siteId);
+								UpdateChannelWithConference(uuId, user, conferenceName, memberType, memberId, rtmp_session, serverId, siteId, chatType);
 
 								LogManager::GetLogManager()->Log(
 										LOG_WARNING,
@@ -873,7 +876,9 @@ bool FreeswitchClient::AuthorizationAllConference() {
 										"memberId : %s, "
 										"channelId : %s, "
 										"serverId : %s, "
-										"siteId : %s "
+										"siteId : %s, "
+										"chatTypeString : %s, "
+										"chatType : %s "
 										")",
 										user.c_str(),
 										conferenceName.c_str(),
@@ -881,12 +886,14 @@ bool FreeswitchClient::AuthorizationAllConference() {
 										memberId.c_str(),
 										uuId.c_str(),
 										serverId.c_str(),
-										siteId.c_str()
+										siteId.c_str(),
+										chatTypeString.c_str(),
+										(chatType == ENTERCONFERENCETYPE_CAMSHARE)?"C":"V"
 										);
 
 							    // 回调重新验证聊天室用户
 								if( mpFreeswitchClientListener ) {
-									Channel channel(uuId, user, conferenceName, memberType, memberId, rtmp_session, serverId, siteId);
+									Channel channel(uuId, user, conferenceName, memberType, memberId, rtmp_session, serverId, siteId, chatType);
 									mpFreeswitchClientListener->OnFreeswitchEventConferenceAuthorizationMember(this, &channel);
 								}
 							}
@@ -937,7 +944,8 @@ bool FreeswitchClient::UpdateChannelWithConference(
 		const string& memberId,
 		const string& rtmp_session,
 		const string& serverId,
-		const string& siteId
+		const string& siteId,
+		ENTERCONFERENCETYPE chatType
 		) {
 	bool bFlag = false;
 
@@ -954,7 +962,8 @@ bool FreeswitchClient::UpdateChannelWithConference(
 				"channelId : %s, "
 				"rtmp_session : %s, "
 				"serverId : %s, "
-				"siteId : %s "
+				"siteId : %s, "
+				"chatType : %d, "
 				")",
 				user.c_str(),
 				conference.c_str(),
@@ -963,7 +972,8 @@ bool FreeswitchClient::UpdateChannelWithConference(
 				channelId.c_str(),
 				rtmp_session.c_str(),
 				serverId.c_str(),
-				siteId.c_str()
+				siteId.c_str(),
+				chatType
 				);
 
 		mRtmpChannel2UserMap.Lock();
@@ -973,6 +983,7 @@ bool FreeswitchClient::UpdateChannelWithConference(
 		channel->conference = conference;
 		channel->serverId = serverId;
 		channel->siteId = siteId;
+		channel->chatType = chatType;
 		mRtmpChannel2UserMap.Unlock();
 
 		bFlag = true;
@@ -1365,6 +1376,34 @@ string FreeswitchClient::GetChannelParam(
 	}
 
 	return result;
+}
+
+ENTERCONFERENCETYPE FreeswitchClient::GetEnterConferenceTypeWithString(const string& value) {
+    ENTERCONFERENCETYPE type = ENTERCONFERENCETYPE_CAMSHARE;
+    if (value.compare("c") == 0) {
+        type = ENTERCONFERENCETYPE_CAMSHARE;
+    } else if (value.compare("v") == 0) {
+        type = ENTERCONFERENCETYPE_VIDEO;
+    }
+    return type;
+}
+
+ENTERCONFERENCETYPE FreeswitchClient::GetChatTypeWithChannelVar(const string& value) {
+	ENTERCONFERENCETYPE type = ENTERCONFERENCETYPE_CAMSHARE;
+
+    // Alex, variable_key_type 是websocket传过来的BASE64字符串（v+时间戳 或 c+时间戳），解BASE64后获取第一个字符
+    const int bufferSize = 1024;
+    char buffer[bufferSize] = {0};
+    Arithmetic ari;
+    ari.Base64Decode(value.c_str(), value.length(), buffer);
+    string decodeString = buffer;
+    string chatTypeString = decodeString.substr(0,1);
+    // Alex, chatType全转小写
+    transform(chatTypeString.begin(), chatTypeString.end(), chatTypeString.begin(), ::tolower);
+
+    type = GetEnterConferenceTypeWithString(chatTypeString);
+
+    return type;
 }
 
 string FreeswitchClient::GetUserByUUID(const string& uuId) {
@@ -1884,7 +1923,7 @@ void FreeswitchClient::FreeswitchEventRtmpLogin(const Json::Value& root) {
     	rtmpObject.siteId = siteId;
     	rtmpObject.rtmpSession = rtmp_session;
 
-    	// 插入 user -> session
+    	// 插入 user -> sessiond
     	RtmpSessionMap::iterator itr = mRtmpSessionMap.Find(user);
     	if( itr == mRtmpSessionMap.End() ) {
     		// 插入新的用户
@@ -2202,22 +2241,36 @@ void FreeswitchClient::FreeswitchEventChannelCreate(const Json::Value& root) {
     if( root["variable_rtmp_session"].isString() ) {
     	rtmp_session = root["variable_rtmp_session"].asString();
     }
+    
+    // Alex, 增加的登录验证类型
+    string chatTypeString = "";
+    if ( root["variable_chat_type_string"].isString() ) {
+    	chatTypeString = root["variable_chat_type_string"].asString();
+    }
+    
+    ENTERCONFERENCETYPE chatType = GetChatTypeWithChannelVar(chatTypeString);
 
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"FreeswitchClient::FreeswitchEventChannelCreate( "
 			"event : [Freeswitch-事件处理-创建频道], "
 			"channelId : %s, "
-			"rtmp_session : %s "
+			"rtmp_session : %s, "
+            "chatTypeString : %s, "
+            "chatType : %d "
 			")",
 			channelId.c_str(),
-			rtmp_session.c_str()
+			rtmp_session.c_str(),
+			chatTypeString.c_str(),
+            chatType
 			);
 
 	mRtmpChannel2UserMap.Lock();
 	// 更新信息
 	Channel* channel = CreateChannel(channelId);
 	channel->rtmpSession = rtmp_session;
+    // Alex, 增加的l登录验证类型
+    channel->chatType = chatType;
 	mRtmpChannel2UserMap.Unlock();
 
 }

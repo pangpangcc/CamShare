@@ -1003,6 +1003,12 @@ switch_status_t rtmp_session_request(rtmp_profile_t *profile, rtmp_session_t **n
 	switch_mutex_init(&((*newsession)->handle_count_mutex), SWITCH_MUTEX_NESTED, pool);
 	// ------------------------
 
+	/**
+	 * Add 4 indicate client connected from mediaserver
+	 * Add by Max 2019-09-11
+	 */
+	(*newsession)->client_from_mediaserver = 0;
+
 	return SWITCH_STATUS_SUCCESS;
 }
 

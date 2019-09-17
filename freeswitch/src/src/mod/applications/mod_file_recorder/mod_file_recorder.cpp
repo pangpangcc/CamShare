@@ -7,7 +7,8 @@
  */
 
 #include <switch.h>
-#include "VideoRecorder.h"
+//#include "VideoH264Recorder.h"
+//#include "VideoFlvRecorder.h"
 #include "VideoRecordManager.h"
 
 //static const char modname[] = "mod_file_record";
@@ -48,8 +49,8 @@ static switch_status_t record_file_get_string(switch_file_handle_t *handle, swit
 /**
  * free_recorder_queue处理函数
  */
-static VideoRecorder* GetVideoRecorder();
-static void RecycleVideoRecorder(VideoRecorder* recorder);
+//static VideoRecorder* GetVideoRecorder();
+//static void RecycleVideoRecorder(VideoRecorder* recorder);
 
 /**
  * 加载录制文件模块
@@ -64,7 +65,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_file_recorder_load)
 
 //	supported_formats[i++] = "av";
 //	supported_formats[i++] = "rtmp";
-	supported_formats[i++] = (char*)"h264";
+//	supported_formats[i++] = (char*)"h264";
+	supported_formats[i++] = (char*)"flv";
 //	supported_formats[i++] = "mov";
 
 	/* create/register custom event message type */
@@ -207,9 +209,9 @@ static switch_status_t record_file_open(switch_file_handle_t *handle, const char
 {
 	switch_status_t status = SWITCH_STATUS_FALSE;
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: open() handle:%p, path:%s\n"
-//					, handle, path);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+					, "mod_file_recorder: open() handle:%p, path:%s\n"
+					, handle, path);
 
 	// 开始录制
 	if( LoadConfig()
@@ -229,9 +231,9 @@ static switch_status_t record_file_open(switch_file_handle_t *handle, const char
 						, handle, path);
 	}
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: open() handle:%p, status:%d\n"
-//					, handle, status);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+					, "mod_file_recorder: open() handle:%p, status:%d\n"
+					, handle, status);
 
 	return status;
 }
@@ -240,9 +242,9 @@ static switch_status_t record_file_close(switch_file_handle_t *handle)
 {
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: close() handle:%p\n"
-//					, handle);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+					, "mod_file_recorder: close() handle:%p\n"
+					, handle);
 
 	// 停止录制
 	g_videoRecordMgr.StopRecord(handle);

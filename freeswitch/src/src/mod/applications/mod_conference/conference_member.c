@@ -701,6 +701,12 @@ switch_status_t conference_member_add(conference_obj_t *conference, conference_m
 		conference->recording_members++;
 	}
 
+	/**
+	 * Add 4 Send SPS/PPS if imember get into conference later than member
+	 * Add by Max 2019/09/12
+	 */
+	member->already_sent_video = SWITCH_FALSE;
+
 	member->join_time = switch_epoch_time_now(NULL);
 	member->conference = conference;
 	member->next = conference->members;
@@ -1270,6 +1276,19 @@ switch_status_t conference_member_del(conference_obj_t *conference, conference_m
 
 	if (member->session) {
 		switch_core_media_hard_mute(member->session, SWITCH_FALSE);
+	}
+
+	/**
+	 * Add 4 Mark down SPS/PPS
+	 * Add by Max 2019/09/12
+	 */
+	if (member->sps_frame) {
+		switch_frame_free(&member->sps_frame);
+		member->sps_frame = NULL;
+	}
+	if (member->pps_frame) {
+		switch_frame_free(&member->pps_frame);
+		member->pps_frame = NULL;
 	}
 
 	switch_mutex_unlock(conference->mutex);

@@ -7,6 +7,8 @@
  */
 
 #include "VideoRecordManager.h"
+#include "VideoFlvRecorder.h"
+#include "VideoH264Recorder.h"
 #include "CommonFunc.h"
 
 VideoRecordManager::VideoRecordManager()
@@ -284,15 +286,19 @@ bool VideoRecordManager::StartRecord(switch_file_handle_t *handle, const char *p
 {
 	bool result = false;
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoRecordManager::StartRecord() start handle:%p, path:%s, start:%d\n"
-//					, handle, path, m_isStartVideo);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+					, "mod_file_recorder: VideoRecordManager::StartRecord() start recorder:%p, path:%s, start:%d\n"
+					, this, path, m_isStartVideo);
 
 	if (m_isStartVideo)
 	{
-		VideoRecorder* recorder = GetVideoRecorder();
+		IVideoRecorder* recorder = GetVideoRecorder();
 		if (NULL != recorder)
 		{
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+							, "mod_file_recorder: VideoRecordManager::StartRecord() record start recorder:%p, path:%s\n"
+							, recorder, path);
+
 			recorder->SetCallback(this);
 
 			// 启动录制视频
@@ -316,15 +322,31 @@ bool VideoRecordManager::StartRecord(switch_file_handle_t *handle, const char *p
 			else
 			{
 				// 启动失败，回收recorder
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+								, "mod_file_recorder: VideoRecordManager::StartRecord() start record fail, recorder:%p, path:%s, result:%d\n"
+								, recorder, path, result);
+
 				RecycleVideoRecorder(recorder);
 			}
 		}
+		else {
+			// 获取recorder失败
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+							, "mod_file_recorder: VideoRecordManager::StartRecord() get record fail, handle:%p, path:%s, result:%d\n"
+							, handle, path, result);
+		}
+	}
+	else {
+		// 还没开始录制
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+						, "mod_file_recorder: VideoRecordManager::StartRecord() is stoped, handle:%p, path:%s, result:%d\n"
+						, handle, path, result);
 	}
 
 	if (!result) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecordManager::StartRecord() handle:%p, path:%s, result:%d\n"
-						, handle, path, result);
+						, "mod_file_recorder: VideoRecordManager::StartRecord() fail, handle:%p, recorder:%p, path:%s, result:%d\n"
+						, handle, handle->private_info, path, result);
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -344,16 +366,20 @@ void VideoRecordManager::StopRecord(switch_file_handle_t *handle)
 	if (NULL != handle && NULL != handle->private_info)
 	{
 		// 获取recorder
-		VideoRecorder* recorder = (VideoRecorder*)handle->private_info;
+		IVideoRecorder* recorder = (IVideoRecorder*)handle->private_info;
 
-//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//						, "mod_file_recorder: VideoRecordManager::StopRecord() stop record, recorder:%p\n"
-//						, handle);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+						, "mod_file_recorder: VideoRecordManager::StopRecord() stop record, recorder:%p\n"
+						, recorder);
 
 		// 停止录制
 		recorder->StopRecord();
 		// 取消绑定
 		handle->private_info = NULL;
+
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+						, "mod_file_recorder: VideoRecordManager::StopRecord() stop record end, recorder:%p\n"
+						, recorder);
 	}
 
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -373,14 +399,14 @@ bool VideoRecordManager::RecordVideoFrame(switch_file_handle_t *handle, switch_f
 	if (NULL != handle && NULL != handle->private_info)
 	{
 		// 获取recorder
-		VideoRecorder* recorder = (VideoRecorder*)handle->private_info;
+		IVideoRecorder* recorder = (IVideoRecorder*)handle->private_info;
 
 		// 录制视频
 		result = recorder->RecordVideoFrame(frame);
 	}
 	else {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-						, "mod_file_recorder: VideoRecordManager::RecordVideoFrame() fail, handle:%p, private_info:%p\n"
+						, "mod_file_recorder: VideoRecordManager::RecordVideoFrame() fail, handle:%p, recorder:%p\n"
 						, handle, handle->private_info);
 	}
 
@@ -404,7 +430,7 @@ void VideoRecordManager::RecordVideoFrame2FileProc()
 {
 	void* pop = NULL;
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
-	VideoRecorder* recorder = NULL;
+	IVideoRecorder* recorder = NULL;
 	switch_interval_time_t timeout = 500 * 1000;
 	bool procResult = false;
 
@@ -417,7 +443,7 @@ void VideoRecordManager::RecordVideoFrame2FileProc()
 		status = switch_queue_pop_timeout(m_queueVideo, &pop, timeout);
 		if (SWITCH_STATUS_SUCCESS == status)
 		{
-			recorder = (VideoRecorder*)pop;
+			recorder = (IVideoRecorder*)pop;
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //							, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() start recorder:%p\n"
@@ -443,24 +469,15 @@ void VideoRecordManager::RecordVideoFrame2FileProc()
 				}
 				else {
 					// 已经停止录制，设置不再处理
+					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling start, recorder:%p\n"
+									, recorder);
+
 					recorder->SetVideoHandling(false);
-//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() CanReset, recorder:%p, result:%d\n"
-//									, recorder, recorder->CanReset());
 
-//					if (recorder->CanReset()) {
-//						// 可以重置，插入回收队列
-//						switch_queue_push(m_queueToRecycle, (void*)recorder);
-//					}
-//					else {
-//						// Modify by Max 2017/01/24
-//						// 放回处理队列之前需要释放CPU给截图线程处理(当停止录制会标记为处理完成), 否则会吃光CPU
-//						switch_sleep(50 * 1000);
-//
-//						// 未可重置，插入当前队列
-//						switch_queue_push(m_queueVideo, (void*)recorder);
-//					}
-
+					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling end, recorder:%p\n"
+									, recorder);
 				}
 			}
 			else {
@@ -491,7 +508,7 @@ void VideoRecordManager::RecordPicture2FileProc()
 {
 	void* pop = NULL;
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
-	VideoRecorder* recorder = NULL;
+	IVideoRecorder* recorder = NULL;
 	switch_interval_time_t timeout = 500 * 1000;
 	bool procResult = false;
 
@@ -503,7 +520,7 @@ void VideoRecordManager::RecordPicture2FileProc()
 		status = switch_queue_pop_timeout(m_queuePicture, &pop, timeout);
 		if (SWITCH_STATUS_SUCCESS == status)
 		{
-			recorder = (VideoRecorder*)pop;
+			recorder = (IVideoRecorder*)pop;
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //							, "mod_file_recorder: VideoRecordManager::RecordPicture2FileProc() start recorder:%p\n"
@@ -522,7 +539,15 @@ void VideoRecordManager::RecordPicture2FileProc()
 					switch_queue_push(m_queuePicture, (void*)recorder);
 				}
 				else {
+					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling start, recorder:%p\n"
+									, recorder);
+
 					recorder->SetPicHandling(false);
+
+					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling end, recorder:%p\n"
+									, recorder);
 				}
 			}
 			else {
@@ -552,7 +577,7 @@ void* SWITCH_THREAD_FUNC VideoRecordManager::RecycleVideoRecorderThread(switch_t
 void VideoRecordManager::RecycleVideoRecorderProc()
 {
 	void* pop = NULL;
-	VideoRecorder* recorder = NULL;
+	IVideoRecorder* recorder = NULL;
 	switch_interval_time_t timeout = 500 * 1000;
 	bool procResult = false;
 
@@ -564,15 +589,28 @@ void VideoRecordManager::RecycleVideoRecorderProc()
 		// 直到把队列处理完才能退出
 		while (SWITCH_STATUS_SUCCESS == switch_queue_pop_timeout(m_queueToRecycle, &pop, timeout))
 		{
-			recorder = (VideoRecorder*)pop;
+			recorder = (IVideoRecorder*)pop;
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //							, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() start reset, recorder:%p\n"
 //							, recorder);
 
 			if (NULL != recorder) {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() recorder->Reset start, recorder:%p\n"
+								, recorder);
+
 				recorder->Reset();
+
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder start, recorder:%p\n"
+								, recorder);
+
 				RecycleVideoRecorder(recorder);
+
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder end, recorder:%p\n"
+								, recorder);
 			}
 			else {
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
@@ -649,11 +687,11 @@ void VideoRecordManager::StopRecycle()
 }
 
 // 获取VideoRecorder
-VideoRecorder* VideoRecordManager::GetVideoRecorder()
+IVideoRecorder* VideoRecordManager::GetVideoRecorder()
 {
-	VideoRecorder* recorder = NULL;
+	IVideoRecorder* recorder = NULL;
 	if (SWITCH_STATUS_SUCCESS != switch_queue_trypop(m_queueFree, (void**)&recorder)) {
-		recorder = new VideoRecorder;
+		recorder = new VideoFlvRecorder;
 		switch_mutex_lock(mpVideoRecorderCountMutex);
 		m_videoRecorderCount++;
 		switch_mutex_unlock(mpVideoRecorderCountMutex);
@@ -684,7 +722,7 @@ VideoRecorder* VideoRecordManager::GetVideoRecorder()
 }
 
 // 回收VideoRecorder
-void VideoRecordManager::RecycleVideoRecorder(VideoRecorder* recorder)
+void VideoRecordManager::RecycleVideoRecorder(IVideoRecorder* recorder)
 {
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
 //					, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() recycle VideoRecorder, "
@@ -701,10 +739,10 @@ void VideoRecordManager::RecycleVideoRecorder(VideoRecorder* recorder)
 			switch_mutex_unlock(mpVideoRecorderCountMutex);
 
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-							, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() free VideoRecorder, "
-							"recorder:%p, "
-							"m_videoRecorderCount:%d, "
-							"queueFreeSize:%d\n"
+							, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() free VideoRecorder"
+							", recorder:%p"
+							", m_videoRecorderCount:%d"
+							", queueFreeSize:%d\n"
 							, recorder
 							, m_videoRecorderCount
 							, switch_queue_size(m_queueFree));
@@ -714,10 +752,10 @@ void VideoRecordManager::RecycleVideoRecorder(VideoRecorder* recorder)
 		} else {
 			// 放回空闲队列
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-							, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() recycle VideoRecorder, "
-							"recorder:%p, "
-							"m_videoRecorderCount:%d, "
-							"queueFreeSize:%d\n"
+							, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorder() recycle VideoRecorder"
+							", recorder:%p"
+							", m_videoRecorderCount:%d"
+							", queueFreeSize:%d\n"
 							, recorder
 							, m_videoRecorderCount
 							, switch_queue_size(m_queueFree));
@@ -727,11 +765,17 @@ void VideoRecordManager::RecycleVideoRecorder(VideoRecorder* recorder)
 	}
 }
 
-void VideoRecordManager::OnStop(VideoRecorder* recorder) {
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "VideoRecordManager::OnStop() recorder:%p\n"
-//					, recorder
-//					);
+void VideoRecordManager::OnStop(IVideoRecorder* recorder) {
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+					, "VideoRecordManager::OnStop() start recorder:%p\n"
+					, recorder
+					);
+
 	// 可以重置，插入回收队列
 	switch_queue_push(m_queueToRecycle, (void*)recorder);
+
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+					, "VideoRecordManager::OnStop() end recorder:%p\n"
+					, recorder
+					);
 }

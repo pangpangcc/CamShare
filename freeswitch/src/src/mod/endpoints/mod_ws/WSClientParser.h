@@ -142,6 +142,8 @@ public:
 	const char* GetUser();
 	const char* GetDomain();
 	const char* GetDestNumber();
+    // Alex, 增加登录类型
+    const char* GetType();
 
 private:
 	// 频道管理
@@ -172,6 +174,10 @@ private:
 	char* mpDestNumber;
 	char* mpSite;
 	char* mpCustom;
+    /**
+     * Alex, 会话类型字符串
+     */
+    char* mpChatTypeString;
 	char mWebSocketKey[256];
 
 	/**

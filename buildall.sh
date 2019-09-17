@@ -15,17 +15,20 @@ if [ "$param_err" != "0" ]; then
 fi
 
 if [ "$noclean" == "noclean" ]; then
-	echo "# build withou clean"
+	echo "# build without clean"
 else
   echo "# build with clean"
   noclean=""
 fi
 
 # compile
+chmod +x ./compile.sh
 ./compile.sh $noclean &&
 
 # build install package
+chmod +x ./packageall.sh
 ./packageall.sh $ver &&
 
 # build update package
+chmod +x ./updateall.sh
 ./updateall.sh $ver

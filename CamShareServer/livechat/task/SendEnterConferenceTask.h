@@ -33,11 +33,12 @@ public:
 
 public:
 	// 初始化参数
-	bool InitParam(const string& server, const string& fromId, const string& toId, const string& key);
+    bool InitParam(const string& server, const string& fromId, const string& toId, const string& key, ENTERCONFERENCETYPE type);
 
 private:
 	string mServer;
 	string mFromId;
 	string mToId;
 	string mKey;
+    string mType;
 };

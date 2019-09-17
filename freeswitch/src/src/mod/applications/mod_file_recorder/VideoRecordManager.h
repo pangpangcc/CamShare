@@ -10,11 +10,11 @@
 #define SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_FILERECORDMANAGER_H_
 
 #include <switch.h>
-#include "VideoRecorder.h"
+#include "IVideoRecorder.h"
 
 using namespace std;
 
-class VideoRecordManager : public VideoRecorderCallback
+class VideoRecordManager : public IVideoRecorderCallback
 {
 public:
 	VideoRecordManager();
@@ -34,17 +34,19 @@ public:
 	// 录制视频frame
 	bool RecordVideoFrame(switch_file_handle_t *handle, switch_frame_t *frame);
 
-	void OnStop(VideoRecorder* recorder);
-
-// VideoRecorder回收线程函数
+// IVideoRecorderCallback回调
 private:
-	// VideoRecorder回收线程
+	virtual void OnStop(IVideoRecorder* recorder);
+
+// IVideoRecorder回收线程函数
+private:
+	// IVideoRecorder回收线程
 	static void* SWITCH_THREAD_FUNC RecycleVideoRecorderThread(switch_thread_t* thread, void* obj);
-	// VideoRecorder回收线程处理函数
+	// IVideoRecorder回收线程处理函数
 	void RecycleVideoRecorderProc();
-	// 启动VideoRecorder回收线程
+	// 启动IVideoRecorder回收线程
 	void StartRecycle();
-	// 停止VideoRecorder回收线程
+	// 停止IVideoRecorder回收线程
 	void StopRecycle();
 
 // 视频录制线程函数
@@ -69,12 +71,12 @@ private:
 	// 停止监控截图线程
 	void StopPicture();
 
-// VideoRecorder管理函数
+// IVideoRecorder管理函数
 private:
 	// 获取VideoRecorder
-	VideoRecorder* GetVideoRecorder();
+	IVideoRecorder* GetVideoRecorder();
 	// 回收VideoRecorder
-	void RecycleVideoRecorder(VideoRecorder* recorder);
+	void RecycleVideoRecorder(IVideoRecorder* recorder);
 
 // Member
 private:

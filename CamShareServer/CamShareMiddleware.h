@@ -34,7 +34,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.1.6"
+#define VERSION_STRING "1.1.7"
 
 typedef struct SiteConfig {
 	SiteConfig() {
@@ -194,6 +194,8 @@ private:
 	 * @param 	toId		对方Id
 	 * @param	type		会员类型
 	 * @param   serverId	服务器Id
+     * @param   checkType   检查类型
+     * @param   chatType     验证类型(c:ENTERCONFERENCETYPE_CAMSHARE, v: ENTERCONFERENCETYPE_VIDEO) （Alex， 2019.07.8）
 	 */
 	bool SendEnterConference2LiveChat(
 			ILiveChatClient* livechat,
@@ -201,7 +203,8 @@ private:
 			const string& toId,
 			MemberType type,
 			const string& serverId,
-			EnterConferenceRequestCheckType checkType = Timer
+			EnterConferenceRequestCheckType checkType = Timer,
+            ENTERCONFERENCETYPE chatType = ENTERCONFERENCETYPE_CAMSHARE
 			);
 
 	/**

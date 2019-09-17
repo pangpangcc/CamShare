@@ -105,7 +105,7 @@ static switch_status_t rtmp_tcp_write(rtmp_session_t *rsession, const unsigned c
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 	switch_size_t orig_len = *len;
 	switch_size_t remaining = *len;
-	int sanity = 100;
+	int sanity = 0;
 
 #ifdef RTMP_DEBUG_IO
 	{
@@ -134,8 +134,10 @@ static switch_status_t rtmp_tcp_write(rtmp_session_t *rsession, const unsigned c
 again:
 		status = switch_socket_send_nonblock(io_pvt->socket, (char*)buf, len);
 
-		if ((status == 32 || SWITCH_STATUS_IS_BREAK(status)) && sanity-- > 0) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "sending too fast, retrying %d\n", sanity);
+//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_tcp_write(), remaining %d, orig_len %d, status %d\n", (int)remaining, (int)*len, status);
+		if ((status == 32 || SWITCH_STATUS_IS_BREAK(status)) && sanity++ < 100) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_tcp_write(), sending too fast, retrying %d\n", sanity);
+			switch_sleep(100000);
 			goto again;
 		}
 
@@ -276,7 +278,7 @@ void *SWITCH_THREAD_FUNC check_timeout_thread(switch_thread_t *thread, void *obj
 //							nowTime
 //							);
 
-					if( io->base.profile->active_timeout > 0 && rsession->check_timeout ) {
+					if( io->base.profile->active_timeout > 0 && rsession->check_timeout && !rsession->client_from_mediaserver ) {
 						if (nowTime >= (rsession->active_time + io->base.profile->active_timeout)) {
 							switch_log_printf(
 									SWITCH_CHANNEL_UUID_LOG(rsession->uuid),

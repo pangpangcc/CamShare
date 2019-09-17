@@ -180,17 +180,17 @@ bool CLiveChatClient::Disconnect()
 }
 
 // 进入聊天室
-bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key) {
+bool CLiveChatClient::SendEnterConference(int seq, const string& serverId, const string& fromId, const string& toId, const string& key, ENTERCONFERENCETYPE type) {
 	bool result = false;
 	FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() begin");
 	if (NULL != m_taskManager
 		&& m_taskManager->IsStart())
 	{
 		SendEnterConferenceTask* task = new SendEnterConferenceTask();
-		FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p, siteId : %s", task, m_siteId.c_str());
+        FileLog("LiveChatClient", "CLiveChatClient::SendEnterConference() task:%p, siteId : %s, type: %d", task, m_siteId.c_str(), type);
 		if (NULL != task) {
 			result = task->Init(this, m_listener);
-			result = result && task->InitParam(m_connectName, fromId, toId, key);
+			result = result && task->InitParam(m_connectName, fromId, toId, key, type);
 
 			if (result) {
 //				int seq = m_seqCounter.GetCount();
