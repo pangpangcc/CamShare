@@ -1109,6 +1109,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 							switch_thread_rwlock_unlock(rsession->rwlock);
 							break;
 						case RTMP_TYPE_VIDEO: /* Video data */
+//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_handle_data(), ts: %u, data:0x%02x, len: %d \n", state->ts, *(state->buf), state->origlen);
 							if (rsession->media_debug & RTMP_MD_VIDEO_READ) {
 								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "R V ts:%u data:0x%02x len:%d \n", state->ts, *(state->buf), state->origlen);
 							}
@@ -1121,6 +1122,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 
 								if (!rsession->tech_pvt->video_readbuf) {
 									switch_thread_rwlock_unlock(rsession->rwlock);
+									switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "rtmp_handle_data(), rsession->tech_pvt->video_readbuf == NULL \n");
 									return SWITCH_STATUS_FALSE;
 								}
 

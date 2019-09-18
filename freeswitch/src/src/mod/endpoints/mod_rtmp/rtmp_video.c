@@ -43,7 +43,6 @@ void rtmp2rtp_helper_init(rtmp2rtp_helper_t *helper)
 	helper->nal_list = amf0_array_new();
 	helper->pps = NULL;
 	helper->sps = NULL;
-
 }
 
 void rtp2rtmp_helper_init(rtp2rtmp_helper_t *helper)
@@ -61,8 +60,11 @@ void rtp2rtmp_helper_init(rtp2rtmp_helper_t *helper)
 void rtmp2rtp_helper_destroy(rtmp2rtp_helper_t *helper)
 {
 	amf0_data_free(helper->nal_list);
+	helper->nal_list = NULL;
 	amf0_data_free(helper->sps);
+	helper->sps = NULL;
 	amf0_data_free(helper->pps);
+	helper->pps = NULL;
 	helper = NULL;
 }
 
@@ -70,8 +72,11 @@ void rtp2rtmp_helper_destroy(rtp2rtmp_helper_t *helper)
 {
 
 	amf0_data_free(helper->avc_conf);
+	helper->avc_conf = NULL;
 	amf0_data_free(helper->sps);
+	helper->sps = NULL;
 	amf0_data_free(helper->pps);
+	helper->pps = NULL;
 	if (helper->rtmp_buf) switch_buffer_destroy(&helper->rtmp_buf);
 	if (helper->fua_buf)  switch_buffer_destroy(&helper->fua_buf);
 	helper = NULL;
@@ -127,6 +132,9 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 	uint8_t *end = data + len;
 
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+//			"rtmp_rtmp2rtpH264(), recv h264 packet, data[0]: %02x, data[1]: %02x, len: %d\n", data[0], data[1], len);
+
 	if (data[0] == 0x17 && data[1] == 0) {
 		switch_byte_t *pdata = data + 2;
 		int cfgVer = pdata[3];
@@ -171,6 +179,9 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 				pdata += lenPPS;
 			}
 
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+					"rtmp_rtmp2rtpH264(), recv sps/pps packet, data[0]: %02x, data[1]: %02x, numSPS: %d, numPPS: %d\n", data[0], data[1], numSPS, numPPS);
+
 			read_helper->lenSize = lenSize;
 
 			// add sps to list
@@ -188,6 +199,11 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 				amf0_string_get_size(read_helper->pps));
 				amf0_array_push(read_helper->nal_list, pps);
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "rtmp_rtmp2rtpH264(), read_helper->pps : %p, data_size : %d\n", (void *)read_helper->pps, amf0_string_get_size(read_helper->pps));
+			}
+
+			if ( !read_helper->sps || !read_helper->pps ) {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+						"rtmp_rtmp2rtpH264(), recv error sps/pps packet, data[0]: %02x, data[1]: %02x, numSPS: %d, numPPS: %d\n", data[0], data[1], numSPS, numPPS);
 			}
 
 		} else {
@@ -528,7 +544,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 		helper->send_avc = SWITCH_TRUE;
 
 		/**
-		 * Mark by Max 2019/09/17
+		 * Add by Max 2019/09/17
 		 */
 		helper->sps_changed = 0;
 	}

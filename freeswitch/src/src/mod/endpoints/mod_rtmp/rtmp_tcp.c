@@ -467,8 +467,10 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 //						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //								, "uuid:%s, remove\n", rsession->uuid);
 
+						switch_mutex_lock(rsession->handle_mutex);
 						switch_socket_close(io_pvt->socket);
 						io_pvt->socket = NULL;
+						switch_mutex_unlock(rsession->handle_mutex);
 
 //						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //								, "uuid:%s, close socket\n", rsession->uuid);

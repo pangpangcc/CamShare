@@ -358,6 +358,12 @@ switch_status_t rtmp_on_hangup(switch_core_session_t *session)
 
 	rtmp_notify_call_state(session);
 	rtmp_send_onhangup(session);
+	/**
+	 * Add by Max 2019/09/18
+	 */
+	switch_mutex_lock(rsession->handle_mutex);
+	rtmp_session_shutdown(&rsession);
+	switch_mutex_unlock(rsession->handle_mutex);
 
 	/*
 	 * If the session_rwlock is already locked, then there is a larger possibility that the rsession
@@ -663,11 +669,15 @@ switch_status_t rtmp_receive_message(switch_core_session_t *session, switch_core
 		switch_buffer_zero(tech_pvt->readbuf);
 		switch_mutex_unlock(tech_pvt->readbuf_mutex);
 
-		if (tech_pvt->has_video) {
-			switch_mutex_lock(tech_pvt->video_readbuf_mutex);
-			switch_buffer_zero(tech_pvt->video_readbuf);
-			switch_mutex_unlock(tech_pvt->video_readbuf_mutex);
-		}
+		/**
+		 * SPS/PPS may be receive before SWITCH_MESSAGE_INDICATE_BRIDGE, if switch_buffer_zero(tech_pvt->video_readbuf) it will be lost
+		 * Mark by Max 2019/09/18
+		 */
+//		if (tech_pvt->has_video) {
+//			switch_mutex_lock(tech_pvt->video_readbuf_mutex);
+//			switch_buffer_zero(tech_pvt->video_readbuf);
+//			switch_mutex_unlock(tech_pvt->video_readbuf_mutex);
+//		}
 		break;
 	case SWITCH_MESSAGE_INDICATE_DISPLAY:
 		{
@@ -1065,8 +1075,10 @@ switch_status_t rtmp_session_shutdown(rtmp_session_t **rsession)
 	switch_status_t status = SWITCH_STATUS_FALSE;
 	if (rsession && *rsession) {
 		rtmp_tcp_io_private_t *io_pvt = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
-		switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
-		status = SWITCH_STATUS_SUCCESS;
+		if ( io_pvt->socket ) {
+			switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
+			status = SWITCH_STATUS_SUCCESS;
+		}
 	}
 	return status;
 }

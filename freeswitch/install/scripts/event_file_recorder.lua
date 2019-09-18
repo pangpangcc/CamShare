@@ -17,12 +17,12 @@ cmd = argv[1];
 local encode_url = "/EXEC?" .. "CMD=" .. cmd
 --encode_url = api:execute("url_encode", encode_url);
 local url = "http://" .. local_domain_name .. ":9201" .. encode_url .. " json connect-timeout 5 timeout 10 get";
-freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->发起http请求:" .. url .. "\n");
+--freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->发起http请求:" .. url .. "\n");
 response = api:execute("curl", url);
 
 --  解析返回
 if response ~= nil then
-  freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->获取http返回:" .. response .. "\n");
+--freeswitch.consoleLog("DEBUG", "# 录制模块事件监听脚本->获取http返回:" .. response .. "\n");
 else
   freeswitch:consoleLog("WARNING", "# 录制模块事件监听脚本->获取http返回失败:" .. url .."\n");
 end

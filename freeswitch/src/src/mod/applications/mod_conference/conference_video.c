@@ -3723,7 +3723,7 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 //		if ((imember = conference_member_get(member->conference, rel->id)) && conference_utils_member_test_flag(imember, MFLAG_RECEIVING_VIDEO)) {
 		if ( (imember = conference_member_get(member->conference, rel->id)) ) {
 			if( conference_utils_member_test_flag(imember, MFLAG_RECEIVING_VIDEO) ) {
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), Write Video To Member, %s %d->%d %d\n", name, member->id, imember->id, frame->datalen);
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_thread_callback(), Write Video To Member, %s %d->%d %d\n", name, member->id, imember->id, frame->datalen);
 				switch_core_session_write_video_frame(imember->session, frame, SWITCH_IO_FLAG_NONE, 0);
 			}
 			switch_thread_rwlock_unlock(imember->rwlock);
