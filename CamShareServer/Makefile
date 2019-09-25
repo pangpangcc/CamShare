@@ -16,7 +16,7 @@ CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
-CXXFLAGS +=	-I. -Iinclude -Ithird_party -Ithird_party/esl/include
+CXXFLAGS +=	-I. -Iinclude -Ithird_party -Ithird_party/esl/include -Ithird_party/json
 
 # 注意连接依赖顺序问题, 被依赖的放后面
 LIBS =		-L. \

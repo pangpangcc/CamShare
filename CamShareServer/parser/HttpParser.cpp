@@ -3,10 +3,14 @@
  *
  *  Created on: 2015-9-28
  *      Author: Max
+ *      Email: Kingsleyyau@gmail.com
  */
 
 #include "HttpParser.h"
 
+#include <common/Math.h>
+#include <common/Arithmetic.h>
+#include <common/StringHandle.h>
 #include <common/LogManager.h>
 
 #define HTTP_URL_MAX_FIRST_LINE 2048
@@ -16,19 +20,30 @@
 #define HTTP_LINE_SEP "\r\n"
 #define HTTP_HEADER_SEP "\r\n\r\n"
 
+#define HTTP_HEADER_CONTENTLENGTH "Content-Length"
+#define HTTP_HEADER_CONTENTTYPE "Content-Type"
+#define HTTP_HEADER_CONTENTTYPE_URLENCODED "application/x-www-form-urlencoded"
+
 HttpParser::HttpParser() {
 	// TODO Auto-generated constructor stub
 	mHttpType = UNKNOW;
 	mPath = "";
 	miContentLength = -1;
+	mContentType = "";
 
 	mState = HttpState_UnKnow;
 	mpCallback = NULL;
+
+	mpBody = NULL;
+	miCurContentIndex = 0;
 }
 
 HttpParser::~HttpParser() {
 	// TODO Auto-generated destructor stub
-
+	if( mpBody != NULL ) {
+		delete[] mpBody;
+		mpBody = NULL;
+	}
 }
 
 void HttpParser::SetCallback(HttpParserCallback* callback) {
@@ -36,91 +51,132 @@ void HttpParser::SetCallback(HttpParserCallback* callback) {
 }
 
 int HttpParser::ParseData(char* buffer, int len) {
-	int ret = -1;
+	int ret = 0;
+	int last = len;
+	bool bContinue = true;
 
 	Lock();
-	switch( mState ) {
-	case HttpState_UnKnow : {
-		int lineNumber = 0;
-		bool bFlag = false;
+	while( bContinue ) {
+		switch( mState ) {
+		case HttpState_UnKnow : {
+			int lineNumber = 0;
+			bool bFlag = false;
 
-		char line[HTTP_URL_MAX_PATH];
-		int lineLen = 0;
+			char line[HTTP_URL_MAX_PATH];
+			int lineLen = 0;
 
-		const char* header = buffer;
-		const char* sepHeader = strstr(buffer, HTTP_HEADER_SEP);
-		const char* sep = NULL;
-		if( sepHeader ) {
-			// 接收头部完成
-			mState = HttpState_Header;
+			const char* header = buffer;
+			const char* sepHeader = strstr(buffer, HTTP_HEADER_SEP);
+			const char* sep = NULL;
+			if( sepHeader ) {
+				// 接收头部完成
+				mState = HttpState_Header;
 
-			// Parse HTTP header separator
-			ret = sepHeader - buffer + strlen(HTTP_HEADER_SEP);
+				// Parse HTTP header separator
+				ret += sepHeader - buffer + strlen(HTTP_HEADER_SEP);
 
-			// Parse HTTP header line separator
-			while( true ) {
-				if( (sep = strstr(header, HTTP_LINE_SEP)) && (sep != sepHeader) ) {
-					lineLen = sep - header;
-					if( lineLen < (int)(sizeof(line) - 1) ) {
-						memcpy(line, header, lineLen);
-						line[lineLen] = '\0';
+				// Parse HTTP header line separator
+				while( true ) {
+					if( (sep = strstr(header, HTTP_LINE_SEP)) && (sep != (sepHeader + 2)) ) {
+						lineLen = sep - header;
+						if( lineLen < (int)(sizeof(line) - 1) ) {
+							memcpy(line, header, lineLen);
+							line[lineLen] = '\0';
 
-						if( lineNumber == 0 ) {
-							// 暂时只获取第一行
-							bFlag = ParseFirstLine(line);
-							break;
-						} else {
-							ParseHeader(line);
+							if( lineNumber == 0 ) {
+								// 暂时只获取第一行
+								bFlag = ParseFirstLine(line);
+							} else {
+								ParseHeader(line);
+							}
 						}
+
+						// 换行
+						header += lineLen + strlen(HTTP_LINE_SEP);
+						lineNumber++;
+
+					} else {
+						break;
 					}
-
-					// 换行
-					header += lineLen + strlen(HTTP_LINE_SEP);
-					lineNumber++;
-
-				} else {
-					break;
 				}
 			}
-		}
 
-		if( mpCallback ) {
 			if( mState == HttpState_Header) {
 				// 解析头部完成
+				last = len - ret;
 				if( bFlag ) {
 					// 解析第一行完成
-					mpCallback->OnHttpParserHeader(this);
+					if( mpCallback ) {
+						mpCallback->OnHttpParserHeader(this);
+					}
 				} else {
 					// 解析第一行错误
-					mpCallback->OnHttpParserError(this);
+					if( mpCallback ) {
+						mpCallback->OnHttpParserError(this);
+					}
 				}
 			} else if( len > HTTP_URL_MAX_PATH ) {
 				// 头部超过限制 HTTP_URL_MAX_PATH
+				if( mpCallback ) {
+					mpCallback->OnHttpParserError(this);
+				}
+			} else {
+				// 数据不够, 继续收数据
+				bContinue = false;
+			}
+		}break;
+		case HttpState_Header:{
+			bContinue = false;
+			// 接收头部完成, 继续接收body
+			if( miContentLength > 0 ) {
+				if( !mpBody ) {
+					mpBody = new char[miContentLength + 1];
+					memset(mpBody, '\0', miContentLength + 1);
+				}
+
+				int readLength = MIN(last, miContentLength - miCurContentIndex);
+				if( readLength > 0 ) {
+					memcpy(mpBody + miCurContentIndex, buffer + ret, readLength);
+					miCurContentIndex += readLength;
+					ret += readLength;
+					last -= readLength;
+
+					if( miCurContentIndex >= miContentLength ) {
+						// 接收Body完成
+						mState = HttpState_Body;
+
+						if( mpCallback ) {
+							mpCallback->OnHttpParserBody(this);
+						}
+					}
+				} else {
+					if( mpCallback ) {
+						mpCallback->OnHttpParserError(this);
+					}
+				}
+
+			} else {
+				// 没有Content-Length的请求不解析
+				if( mpCallback ) {
+					mpCallback->OnHttpParserError(this);
+				}
+
+				ret += last;
+			}
+		}break;
+		case HttpState_Body:{
+			bContinue = false;
+			// 接收body完成还有数据, 出错
+			if( mpCallback ) {
 				mpCallback->OnHttpParserError(this);
 			}
+		}break;
+		default:{
+			bContinue = false;
+			break;
 		}
-	}break;
-	case HttpState_Header:{
-		// 暂时不处理
-		// 接收头部完成, 继续接收body
-//		if( miContentLength > 0 ) {
-//
-//		} else if( miContentLength == 0 ) {
-//			ret = len;
-//		} else {
-//
-//		}
-	}break;
-	case HttpState_Body:{
-		// 暂时不处理
-		// 接收body完成还有数据, 出错
-		if( mpCallback ) {
-			mpCallback->OnHttpParserError(this);
 		}
-	}break;
-	default:break;
 	}
-
 	Unlock();
 
 	return ret;
@@ -141,6 +197,10 @@ string HttpParser::GetPath() {
 
 HttpType HttpParser::GetType() {
 	return mHttpType;
+}
+
+const char* HttpParser::GetBody() {
+	return mpBody;
 }
 
 bool HttpParser::ParseFirstLine(const string& wholeLine) {
@@ -197,7 +257,6 @@ bool HttpParser::ParseFirstLine(const string& wholeLine) {
 			if( (string::npos != posSep) && (posSep + 1 < path.length()) ) {
 				// 解析路径
 				mPath = path.substr(0, posSep);
-
 				// 解析参数
 				string param = path.substr(posSep + 1, path.length() - (posSep + 1));
 				ParseParameters(param);
@@ -261,18 +320,22 @@ void HttpParser::ParseParameters(const string& wholeLine) {
 }
 
 void HttpParser::ParseHeader(const string& line) {
-//	char* paramSep = NULL;
-//	char* key = NULL;
-//	char* value = NULL;
-//
-//	// Parse HTTP header line parameter separator
-//	if( (paramSep = strstr(line, HTTP_PARAM_SEP)) ) {
-//		*paramSep = '\0';
-//		key = line;
-//
-//		value = paramSep + strlen(HTTP_PARAM_SEP);
-//		value = switch_strip_spaces(value, SWITCH_FALSE);
-//	}
+	string key = "";
+	string value = "";
+
+	// Parse HTTP header line parameter separator
+	string::size_type pos = line.find(HTTP_PARAM_SEP, 0);
+	if( string::npos != pos ) {
+		// 找到分隔符
+		key = line.substr(0, pos);
+		value = StringHandle::trim(line.substr(pos + 1, line.size() - 1));
+	}
+
+	if( strcasecmp(key.c_str(), HTTP_HEADER_CONTENTLENGTH) == 0 ) {
+		miContentLength = atoi(value.c_str());
+	} else if( strcasecmp(key.c_str(), HTTP_HEADER_CONTENTTYPE) == 0 ) {
+		mContentType = value;
+	}
 }
 
 void HttpParser::Lock() {

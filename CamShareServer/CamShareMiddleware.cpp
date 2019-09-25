@@ -24,6 +24,8 @@
 #include <respond/BaseResultRespond.h>
 #include <respond/ReSendErrorRecordRespond.h>
 
+#include <json/json.h>
+
 /***************************** 线程处理 **************************************/
 /**
  * 状态监视线程
@@ -972,12 +974,30 @@ void CamShareMiddleware::OnHttpParserHeader(HttpParser* parser) {
 
 	bool bFlag = false;
 
-	// 可以在这里处理超时任务
-//	mAsyncIOServer.GetHandleCount();
+	bFlag = HttpParseRequestHeader(parser);
+	// 已经处理则可以断开连接
+	if( bFlag ) {
+		mAsyncIOServer.Disconnect(client);
+	}
+}
 
-	bFlag = HttpParseRequest(parser);
+void CamShareMiddleware::OnHttpParserBody(HttpParser* parser) {
+	Client* client = (Client *)parser->custom;
 
-	mAsyncIOServer.Disconnect(client);
+	LogManager::GetLogManager()->Log(
+			LOG_MSG,
+			"CamShareMiddleware::OnHttpParserBody( "
+			"parser : %p, "
+			"client : %p "
+			")",
+			parser,
+			client
+			);
+
+	bool bFlag = HttpParseRequestBody(parser);
+	if ( bFlag ) {
+		mAsyncIOServer.Disconnect(client);
+	}
 }
 
 void CamShareMiddleware::OnHttpParserError(HttpParser* parser) {
@@ -998,7 +1018,7 @@ void CamShareMiddleware::OnHttpParserError(HttpParser* parser) {
 /***************************** 内部服务(HTTP)回调 End **************************************/
 
 /***************************** 内部服务(HTTP)接口 **************************************/
-bool CamShareMiddleware::HttpParseRequest(HttpParser* parser) {
+bool CamShareMiddleware::HttpParseRequestHeader(HttpParser* parser) {
 	bool bFlag = true;
 
 	if( parser->GetPath() == "/GETDIALPLAN" ) {
@@ -1023,8 +1043,25 @@ bool CamShareMiddleware::HttpParseRequest(HttpParser* parser) {
 
 	} else {
 		// 未知命令
-		OnRequestUndefinedCommand(parser);
+//		OnRequestUndefinedCommand(parser);
 		bFlag = false;
+	}
+
+	return bFlag;
+}
+
+bool CamShareMiddleware::HttpParseRequestBody(HttpParser* parser) {
+	bool bFlag = true;
+
+	if( parser->GetPath() == "/set_status" ) {
+		// 接收上下线通知
+		OnRequestSetStatus(parser);
+	} else if( parser->GetPath() == "/sync_status" ) {
+		// 同步在线状态
+		OnRequestSyncStatus(parser);
+	} else {
+		// 未知命令
+		OnRequestUndefinedCommand(parser);
 	}
 
 	return bFlag;
@@ -1211,6 +1248,7 @@ void CamShareMiddleware::OnRequestRecordFinish(
 
 	// 马上返回数据
 	BaseResultRespond respond;
+	respond.SetParam(true);
 	HttpSendRespond(parser, &respond);
 }
 
@@ -1228,6 +1266,7 @@ void CamShareMiddleware::OnRequestReloadLogConfig(HttpParser* parser) {
 
 	// 马上返回数据
 	BaseResultRespond respond;
+	respond.SetParam(true);
 	HttpSendRespond(parser, &respond);
 }
 
@@ -1335,6 +1374,118 @@ void CamShareMiddleware::OnRequestRemoveErrorRecord(HttpParser* parser) {
 	HttpSendRespond(parser, &respond);
 }
 
+void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::OnRequestSetStatus( "
+			"event : [内部服务(HTTP)-收到命令:设置在线状态], "
+			"parser : %p, "
+			"body : %s "
+			")",
+			parser,
+			parser->GetBody()
+			);
+
+	bool bFlag = false;
+	Json::Value reqRoot;
+	Json::Reader reader;
+	bool bParse = reader.parse(parser->GetBody(), reqRoot, false);
+	if ( bParse ) {
+		if( reqRoot.isObject() ) {
+			if ( reqRoot["param"].isString() && reqRoot["status"].isInt() ) {
+				string param = reqRoot["param"].asString();
+				bool status = reqRoot["status"].asInt();
+				string userId = "";
+				string siteId = "";
+				GetExtParameters(param, userId, siteId);
+
+				if ( status ) {
+					// 上线
+					bFlag = true;
+				} else {
+					// 下线
+					bFlag = true;
+				}
+
+				ILiveChatClient* livechat = NULL;
+				mLiveChatClientMap.Lock();
+				LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
+				if( itr != mLiveChatClientMap.End() ) {
+					livechat = itr->second;
+				}
+				mLiveChatClientMap.Unlock();
+
+				// 发送用户在线状态改变命令
+				SendOnlineStatus2LiveChat(livechat, userId, status);
+			}
+		}
+	}
+
+	// 马上返回数据
+	BaseResultRespond respond;
+	// 成功失败
+	respond.SetParam(bFlag);
+	HttpSendRespond(parser, &respond);
+}
+
+void CamShareMiddleware::OnRequestSyncStatus(HttpParser* parser) {
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::OnRequestSyncStatus( "
+			"event : [内部服务(HTTP)-收到命令:同步在线列表], "
+			"parser : %p, "
+			"body : %s "
+			")",
+			parser,
+			parser->GetBody()
+			);
+
+	bool bFlag = false;
+	Json::Value reqRoot;
+	Json::Reader reader;
+	bool bParse = reader.parse(parser->GetBody(), reqRoot, false);
+	if ( bParse ) {
+		if( reqRoot.isObject() ) {
+			if ( reqRoot["params"].isArray() ) {
+				for (int i = 0; i < reqRoot["params"].size(); i++) {
+					if ( reqRoot["params"][i].isString() ) {
+						string param = reqRoot["params"][i].asString();
+					}
+//					// 创建用户Id列表
+//					list<string> userIdList;
+//
+//					UserMap *pUserMap = &siteItr->second;
+//					pUserMap->Lock();
+//					for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End(); userItr++) {
+//						userIdList.push_back(userItr->first);
+//					}
+//					pUserMap->Unlock();
+//
+//					ILiveChatClient* livechat = NULL;
+//					string siteId = siteItr->first;
+//					mLiveChatClientMap.Lock();
+//					LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
+//					if( itr != mLiveChatClientMap.End() ) {
+//						livechat = itr->second;
+//					}
+//					mLiveChatClientMap.Unlock();
+//
+//					// 发送用户在线列表命令
+//					SendOnlineList2LiveChat(livechat, userIdList);
+				}
+
+				bFlag = true;
+			}
+		}
+	}
+
+	// 马上返回数据
+	BaseResultRespond respond;
+	// 成功失败
+	respond.SetParam(bFlag);
+	HttpSendRespond(parser, &respond);
+}
+
 void CamShareMiddleware::OnRequestUndefinedCommand(HttpParser* parser) {
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
@@ -1348,6 +1499,7 @@ void CamShareMiddleware::OnRequestUndefinedCommand(HttpParser* parser) {
 
 	// 马上返回数据
 	BaseResultRespond respond;
+	respond.SetParam(false);
 	HttpSendRespond(parser, &respond);
 }
 /***************************** 内部服务(HTTP) 回调处理 end **************************************/
@@ -2547,6 +2699,54 @@ bool CamShareMiddleware::SendRecordFinish(
 
 /***************************** 外部服务接口 end **************************************/
 
+void CamShareMiddleware::GetExtParameters(const string& wholeLine, string& userId, string& siteId) {
+	string key;
+	string value;
+
+	string line;
+	string::size_type posSep;
+	string::size_type index = 0;
+	string::size_type pos;
+
+	while( string::npos != index ) {
+		pos = wholeLine.find("&", index);
+		if( string::npos != pos ) {
+			// 找到分隔符
+			line = wholeLine.substr(index, pos - index);
+			// 移动下标
+			index = pos + 1;
+
+		} else {
+			// 是否最后一次
+			if( index < wholeLine.length() ) {
+				line = wholeLine.substr(index, pos - index);
+				// 移动下标
+				index = string::npos;
+
+			} else {
+				// 找不到
+				index = string::npos;
+				break;
+			}
+		}
+
+		posSep = line.find("=");
+		if( (string::npos != posSep) && (posSep + 1 < line.length()) ) {
+			key = line.substr(0, posSep);
+			value = line.substr(posSep + 1, line.length() - (posSep + 1));
+
+		} else {
+			key = line;
+		}
+
+		if ( key == "userId" ) {
+			userId = value;
+		} else if ( key == "siteId" ) {
+			siteId = value;
+		}
+
+	}
+}
 /***************************** 测试函数 **************************************/
 bool CamShareMiddleware::CheckTestAccount(
 		const string& user

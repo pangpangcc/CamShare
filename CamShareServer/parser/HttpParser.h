@@ -3,10 +3,11 @@
  *
  *  Created on: 2015-9-28
  *      Author: Max
+ *      Email: Kingsleyyau@gmail.com
  */
 
-#ifndef HttpParser_H_
-#define HttpParser_H_
+#ifndef PARSER_HTTPPARSER_H_
+#define PARSER_HTTPPARSER_H_
 
 #include "DataParser.h"
 
@@ -29,7 +30,7 @@ typedef enum HttpState {
 	HttpState_UnKnow = 0,
 	HttpState_Header,
 	HttpState_Body,
-};
+} HttpState;
 
 typedef enum HttpType {
 	GET,
@@ -42,6 +43,7 @@ class HttpParserCallback {
 public:
 	virtual ~HttpParserCallback(){};
 	virtual void OnHttpParserHeader(HttpParser* parser) = 0;
+	virtual void OnHttpParserBody(HttpParser* parser) = 0;
 	virtual void OnHttpParserError(HttpParser* parser) = 0;
 };
 
@@ -58,11 +60,16 @@ public:
 	string GetPath();
 	HttpType GetType();
 
+	const char* GetBody();
+
 private:
 	HttpType mHttpType;
 	string mPath;
 	int miContentLength;
 	Parameters mParameters;
+	char* mpBody;
+	int miCurContentIndex;
+	string mContentType = "";
 
 	KMutex mClientMutex;
 	HttpState mState;
@@ -75,5 +82,4 @@ private:
 	void Lock();
 	void Unlock();
 };
-
-#endif /* HttpParser_H_ */
+#endif /* PARSER_HTTPPARSER_H_ */

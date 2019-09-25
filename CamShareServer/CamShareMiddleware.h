@@ -126,6 +126,7 @@ public:
 
 	// HttpParserCallback
 	void OnHttpParserHeader(HttpParser* parser);
+	void OnHttpParserBody(HttpParser* parser);
 	void OnHttpParserError(HttpParser* parser);
 
 	// HttpHandler
@@ -134,6 +135,8 @@ public:
 	void OnRequestReloadLogConfig(HttpParser* parser);
 	void OnRequestReSendErrorRecord(HttpParser* parser);
 	void OnRequestRemoveErrorRecord(HttpParser* parser);
+	void OnRequestSetStatus(HttpParser* parser);
+	void OnRequestSyncStatus(HttpParser* parser);
 	void OnRequestUndefinedCommand(HttpParser* parser);
 	/***************************** 内部服务(HTTP), 命令回调 end **************************************/
 
@@ -277,10 +280,19 @@ private:
 	/***************************** 外部服务接口 end **************************************/
 
 	/***************************** 内部服务接口 **************************************/
+//	/**
+//	 * 内部服务(HTTP), 解析请求
+//	 */
+//	bool HttpParseRequest(HttpParser* parser);
 	/**
-	 * 内部服务(HTTP), 解析请求
+	 * 内部服务(HTTP), 解析请求, 仅解析头部
 	 */
-	bool HttpParseRequest(HttpParser* parser);
+	bool HttpParseRequestHeader(HttpParser* parser);
+
+	/**
+	 * 内部服务(HTTP), 解析请求, 需要解析参数
+	 */
+	bool HttpParseRequestBody(HttpParser* parser);
 
 	/**
 	 * 内部服务(HTTP), 发送请求响应
@@ -292,6 +304,8 @@ private:
 			HttpParser* parser,
 			IRespond* respond
 			);
+
+	void GetExtParameters(const string& wholeLine, string& userId, string& siteId);
 	/***************************** 内部服务接口 end **************************************/
 
 	/**
