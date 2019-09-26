@@ -1399,24 +1399,53 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 				string siteId = "";
 				GetExtParameters(param, userId, siteId);
 
-				if ( status ) {
-					// 上线
-					bFlag = true;
-				} else {
-					// 下线
-					bFlag = true;
-				}
+				if ( userId.length() > 0 && siteId.length() > 0 ){
+					ILiveChatClient* livechat = NULL;
+					mLiveChatClientMap.Lock();
+					LiveChatClientMap::iterator lcItr = mLiveChatClientMap.Find(siteId);
+					if( lcItr != mLiveChatClientMap.End() ) {
+						livechat = lcItr->second;
+					}
+					mLiveChatClientMap.Unlock();
 
-				ILiveChatClient* livechat = NULL;
-				mLiveChatClientMap.Lock();
-				LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
-				if( itr != mLiveChatClientMap.End() ) {
-					livechat = itr->second;
-				}
-				mLiveChatClientMap.Unlock();
+					// 更新在线状态
+					mSiteUserMap.Lock();
+					SiteUserMap::iterator itr = mSiteUserMap.Find(siteId);
+					if( itr != mSiteUserMap.End() ) {
+						UserMap *pUserMap = &itr->second;
+						pUserMap->Lock();
+						UserMap::iterator userItr = pUserMap->Find(userId);
+						if( status ) {
+							if( userItr == pUserMap->End() ) {
+								// 用户上线
+								SiteConnection *con = new SiteConnection();
+								con->wsCount = 1;
+								pUserMap->Insert(userId, con);
+								bFlag = true;
+							} else {
+								SiteConnection *con = userItr->second;
+								con->wsCount++;
+							}
+						} else if( userItr != pUserMap->End() ) {
+							// 用户下线
+							SiteConnection *con = userItr->second;
+							con->wsCount--;
+							if ( con->IsOffline() ) {
+								delete con;
+								pUserMap->Erase(userItr);
+								bFlag = true;
+							}
+						}
+						pUserMap->Unlock();
+					}
 
-				// 发送用户在线状态改变命令
-				SendOnlineStatus2LiveChat(livechat, userId, status);
+					if ( bFlag ) {
+						// 发送用户在线状态改变命令
+						SendOnlineStatus2LiveChat(livechat, userId, status);
+					}
+
+					mSiteUserMap.Unlock();
+				}
 			}
 		}
 	}
@@ -1447,34 +1476,62 @@ void CamShareMiddleware::OnRequestSyncStatus(HttpParser* parser) {
 	if ( bParse ) {
 		if( reqRoot.isObject() ) {
 			if ( reqRoot["params"].isArray() ) {
-				for (int i = 0; i < reqRoot["params"].size(); i++) {
+				bFlag = true;
+
+				// 清空分站在线用户列表
+				mSiteUserMap.Lock();
+				for(SiteUserMap::iterator siteItr = mSiteUserMap.Begin(); siteItr != mSiteUserMap.End(); siteItr++) {
+					UserMap *pUserMap = &siteItr->second;
+					pUserMap->Lock();
+					for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End();) {
+						SiteConnection *con = userItr->second;
+						con->wsCount = 0;
+
+						if ( con->IsOffline() ) {
+							delete con;
+							pUserMap->Erase(userItr++);
+						}
+					}
+					pUserMap->Unlock();
+				}
+				mSiteUserMap.Unlock();
+
+				// 插入新的在线用户
+				for (unsigned int i = 0; i < reqRoot["params"].size(); i++) {
 					if ( reqRoot["params"][i].isString() ) {
 						string param = reqRoot["params"][i].asString();
+
+						bool status = true;
+						string userId = "";
+						string siteId = "";
+						GetExtParameters(param, userId, siteId);
+
+						if ( userId.length() > 0 && siteId.length() > 0 ) {
+							mSiteUserMap.Lock();
+							SiteUserMap::iterator siteItr = mSiteUserMap.Find(siteId);
+							if( siteItr != mSiteUserMap.End() ) {
+								UserMap *pUserMap = &siteItr->second;
+								pUserMap->Lock();
+								UserMap::iterator userItr = pUserMap->Find(userId);
+								if( userItr == pUserMap->End() ) {
+									// 用户上线
+									SiteConnection *con = new SiteConnection();
+									con->wsCount = 1;
+									pUserMap->Insert(userId, con);
+								} else {
+									// 增加连接数
+									SiteConnection *con = userItr->second;
+									con->wsCount++;
+								}
+								pUserMap->Unlock();
+							}
+							mSiteUserMap.Unlock();
+						}
 					}
-//					// 创建用户Id列表
-//					list<string> userIdList;
-//
-//					UserMap *pUserMap = &siteItr->second;
-//					pUserMap->Lock();
-//					for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End(); userItr++) {
-//						userIdList.push_back(userItr->first);
-//					}
-//					pUserMap->Unlock();
-//
-//					ILiveChatClient* livechat = NULL;
-//					string siteId = siteItr->first;
-//					mLiveChatClientMap.Lock();
-//					LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
-//					if( itr != mLiveChatClientMap.End() ) {
-//						livechat = itr->second;
-//					}
-//					mLiveChatClientMap.Unlock();
-//
-//					// 发送用户在线列表命令
-//					SendOnlineList2LiveChat(livechat, userIdList);
 				}
 
-				bFlag = true;
+				// 通知Livechat重置在线列表
+				SendAllOnlineList();
 			}
 		}
 	}
@@ -1691,7 +1748,15 @@ void CamShareMiddleware::OnFreeswitchEventOnlineList(
 	for(SiteUserMap::iterator siteItr = mSiteUserMap.Begin(); siteItr != mSiteUserMap.End(); siteItr++) {
 		UserMap *pUserMap = &siteItr->second;
 		pUserMap->Lock();
-		pUserMap->Clear();
+		for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End();) {
+			SiteConnection *con = userItr->second;
+			con->rtmpCount = 0;
+
+			if ( con->IsOffline() ) {
+				delete con;
+				pUserMap->Erase(userItr++);
+			}
+		}
 		pUserMap->Unlock();
 	}
 	mSiteUserMap.Unlock();
@@ -1706,10 +1771,13 @@ void CamShareMiddleware::OnFreeswitchEventOnlineList(
 			UserMap::iterator userItr = pUserMap->Find(itr->user);
 			if( userItr == pUserMap->End() ) {
 				// 用户上线
-				pUserMap->Insert(itr->user, 1);
+				SiteConnection *con = new SiteConnection();
+				con->rtmpCount = 1;
+				pUserMap->Insert(itr->user, con);
 			} else {
 				// 增加连接数
-				userItr->second++;
+				SiteConnection *con = userItr->second;
+				con->rtmpCount++;
 			}
 			pUserMap->Unlock();
 		}
@@ -1717,31 +1785,7 @@ void CamShareMiddleware::OnFreeswitchEventOnlineList(
 	}
 
 	// 通知Livechat重置在线列表
-	mSiteUserMap.Lock();
-	for(SiteUserMap::iterator siteItr = mSiteUserMap.Begin(); siteItr != mSiteUserMap.End(); siteItr++) {
-		// 创建用户Id列表
-		list<string> userIdList;
-
-		UserMap *pUserMap = &siteItr->second;
-		pUserMap->Lock();
-		for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End(); userItr++) {
-			userIdList.push_back(userItr->first);
-		}
-		pUserMap->Unlock();
-
-		ILiveChatClient* livechat = NULL;
-		string siteId = siteItr->first;
-		mLiveChatClientMap.Lock();
-		LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
-		if( itr != mLiveChatClientMap.End() ) {
-			livechat = itr->second;
-		}
-		mLiveChatClientMap.Unlock();
-
-		// 发送用户在线列表命令
-		SendOnlineList2LiveChat(livechat, userIdList);
-	}
-	mSiteUserMap.Unlock();
+	SendAllOnlineList();
 }
 
 void CamShareMiddleware::OnFreeswitchEventOnlineStatus(
@@ -1754,6 +1798,14 @@ void CamShareMiddleware::OnFreeswitchEventOnlineStatus(
 	int onlineCount = 0;
 
 	if( rtmpObject.siteId.length() > 0 && rtmpObject.user.length() > 0 ) {
+		ILiveChatClient* livechat = NULL;
+		mLiveChatClientMap.Lock();
+		LiveChatClientMap::iterator lcItr = mLiveChatClientMap.Find(rtmpObject.siteId);
+		if( lcItr != mLiveChatClientMap.End() ) {
+			livechat = lcItr->second;
+		}
+		mLiveChatClientMap.Unlock();
+
 		// 更新在线状态
 		mSiteUserMap.Lock();
 		SiteUserMap::iterator itr = mSiteUserMap.Find(rtmpObject.siteId);
@@ -1764,54 +1816,51 @@ void CamShareMiddleware::OnFreeswitchEventOnlineStatus(
 			if( online ) {
 				if( userItr == pUserMap->End() ) {
 					// 用户上线
-					pUserMap->Insert(rtmpObject.user, 1);
+					SiteConnection *con = new SiteConnection();
+					con->rtmpCount = 1;
+
+					pUserMap->Insert(rtmpObject.user, con);
 					onlineCount = 1;
 					bFlag = true;
 				} else {
 					// 增加连接数
-					onlineCount = ++userItr->second;
+					SiteConnection *con = userItr->second;
+					onlineCount = ++con->rtmpCount;
 				}
 
 			} else if( userItr != pUserMap->End() ) {
 				// 用户下线
-				onlineCount = --userItr->second;
-				if( onlineCount == 0 ) {
+				SiteConnection *con = userItr->second;
+				onlineCount = --con->rtmpCount;
+				if ( con->IsOffline() ) {
+//				if( onlineCount == 0 ) {
+					delete con;
 					pUserMap->Erase(userItr);
 					bFlag = true;
 				}
 			}
 			pUserMap->Unlock();
 		}
-		mSiteUserMap.Unlock();
 
-		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
-				"CamShareMiddleware::OnFreeswitchEventRtmpOnlineStatus( "
-				"event : [内部服务(Freeswitch)-收到命令:用户改变在线状态], "
-				"user : %s, "
-				"online : %s, "
-				"onlineCount : %d, "
-				"siteId : %s "
-				")",
-				rtmpObject.user.c_str(),
-				online?"true":"false",
-				onlineCount,
-				rtmpObject.siteId.c_str()
-				);
-
-		// 需要通知Livechat服务器
-		if( bFlag && rtmpObject.user.length() > 0 ) {
-			ILiveChatClient* livechat = NULL;
-			mLiveChatClientMap.Lock();
-			LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(rtmpObject.siteId);
-			if( itr != mLiveChatClientMap.End() ) {
-				livechat = itr->second;
-			}
-			mLiveChatClientMap.Unlock();
-
+		if( bFlag ) {
+			LogManager::GetLogManager()->Log(
+					LOG_WARNING,
+					"CamShareMiddleware::OnFreeswitchEventRtmpOnlineStatus( "
+					"event : [内部服务(Freeswitch)-收到命令:用户改变在线状态], "
+					"user : %s, "
+					"online : %s, "
+					"onlineCount : %d, "
+					"siteId : %s "
+					")",
+					rtmpObject.user.c_str(),
+					online?"true":"false",
+					onlineCount,
+					rtmpObject.siteId.c_str()
+					);
 			// 发送用户在线状态改变命令
 			SendOnlineStatus2LiveChat(livechat, rtmpObject.user, online);
 		}
+		mSiteUserMap.Unlock();
 	}
 }
 /***************************** 内部服务(Freeswitch) 回调处理 end **************************************/
@@ -2767,3 +2816,38 @@ bool CamShareMiddleware::CheckTestAccount(
 }
 /***************************** 测试函数 end **************************************/
 
+void CamShareMiddleware::SendAllOnlineList() {
+	LogManager::GetLogManager()->Log(
+			LOG_WARNING,
+			"CamShareMiddleware::SendAllOnlineList( "
+			"event : [发送所有站点在线用户列表到Livechat] "
+			")"
+			);
+
+	// 通知Livechat重置在线列表
+	mSiteUserMap.Lock();
+	for(SiteUserMap::iterator siteItr = mSiteUserMap.Begin(); siteItr != mSiteUserMap.End(); siteItr++) {
+		// 创建用户Id列表
+		list<string> userIdList;
+
+		UserMap *pUserMap = &siteItr->second;
+		pUserMap->Lock();
+		for(UserMap::iterator userItr = pUserMap->Begin(); userItr != pUserMap->End(); userItr++) {
+			userIdList.push_back(userItr->first);
+		}
+		pUserMap->Unlock();
+
+		ILiveChatClient* livechat = NULL;
+		string siteId = siteItr->first;
+		mLiveChatClientMap.Lock();
+		LiveChatClientMap::iterator itr = mLiveChatClientMap.Find(siteId);
+		if( itr != mLiveChatClientMap.End() ) {
+			livechat = itr->second;
+		}
+		mLiveChatClientMap.Unlock();
+
+		// 发送用户在线列表命令
+		SendOnlineList2LiveChat(livechat, userIdList);
+	}
+	mSiteUserMap.Unlock();
+}

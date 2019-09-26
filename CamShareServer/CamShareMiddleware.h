@@ -55,12 +55,32 @@ typedef struct SiteConfig {
 	string recordFinishUrl;
 }SiteConfig;
 
+typedef struct SiteConnection {
+	SiteConnection() {
+		wsCount = 0;
+		rtmpCount = 0;
+	}
+
+	SiteConnection& operator=(const SiteConnection& item) {
+		wsCount = item.wsCount;
+		rtmpCount = item.rtmpCount;
+		return *this;
+	}
+
+	bool IsOffline() {
+		return ((wsCount == 0) && (rtmpCount == 0));
+	}
+
+	int wsCount;
+	int rtmpCount;
+} SiteConnection;
+
 // socket -> client
 typedef KSafeMap<int, Client*> ClientMap;
 // siteId -> livechat client
 typedef KSafeMap<string, ILiveChatClient*> LiveChatClientMap;
 // userId -> user
-typedef KSafeMap<string, int> UserMap;
+typedef KSafeMap<string, SiteConnection*> UserMap;
 // siteId -> user map
 typedef KSafeMap<string, UserMap> SiteUserMap;
 // siteId -> site config
@@ -314,6 +334,11 @@ private:
 	bool CheckTestAccount(
 			const string& user
 			);
+
+	/**
+	 * 发送所有分站在线用户列表
+	 */
+	void SendAllOnlineList();
 
 	/***************************** 基本参数 **************************************/
 	/**
