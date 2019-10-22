@@ -1570,6 +1570,7 @@ void *SWITCH_THREAD_FUNC conference_video_muxing_write_thread_run(switch_thread_
 void conference_video_check_recording(conference_obj_t *conference, mcu_canvas_t *canvas, switch_frame_t *frame)
 {
 	conference_member_t *imember;
+	conference_member_t *fmember;
 
 	if (!conference->recording_members) {
 		return;
@@ -1587,6 +1588,18 @@ void conference_video_check_recording(conference_obj_t *conference, mcu_canvas_t
 		}
 
 		if (switch_test_flag((&imember->rec->fh), SWITCH_FILE_OPEN) && switch_core_file_has_video(&imember->rec->fh)) {
+			if ( !imember->already_record_video ) {
+				if ((fmember = conference_member_get(imember->conference, imember->conference->video_floor_holder))) {
+					if ( fmember->sps_frame && fmember->pps_frame ) {
+						imember->already_record_video = SWITCH_TRUE;
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), Record SPS\n");
+						switch_core_file_write_video(&imember->rec->fh, fmember->sps_frame);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), Record PPS\n");
+						switch_core_file_write_video(&imember->rec->fh, fmember->pps_frame);
+					}
+					switch_thread_rwlock_unlock(fmember->rwlock);
+				}
+			}
 			switch_core_file_write_video(&imember->rec->fh, frame);
 		}
 	}

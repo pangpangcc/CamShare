@@ -557,8 +557,8 @@ switch_status_t rtmp_send_notify_free(rtmp_session_t *rsession, uint8_t amfnumbe
 switch_status_t rtmp_send_invoke_v(rtmp_session_t *rsession, uint8_t amfnumber, uint8_t type, uint32_t timestamp, uint32_t stream_id, va_list list, switch_bool_t freethem)
 {
 	amf0_data *data;
-	unsigned char buf[AMF_MAX_SIZE];
-	buffer_helper_t helper = { buf, 0, AMF_MAX_SIZE };
+	unsigned char buf[AMF_INVOKE_SIZE];
+	buffer_helper_t helper = { buf, 0, AMF_INVOKE_SIZE };
 
 	while ((data = va_arg(list, amf0_data*))) {
 		//amf0_data_dump(stdout, data, 0);

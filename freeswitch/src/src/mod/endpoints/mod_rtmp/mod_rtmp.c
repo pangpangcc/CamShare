@@ -209,6 +209,11 @@ switch_status_t rtmp_on_init(switch_core_session_t *session)
 	tech_pvt = switch_core_session_get_private(session);
 	assert(tech_pvt != NULL);
 
+	/**
+	 * Add by Max 2019/09/19
+	 */
+	tech_pvt->video_tmp_buffer = malloc(AMF_MAX_SIZE);
+
 	rsession = tech_pvt->rtmp_session;
 	rsession->wait_destroy = SWITCH_TRUE;
 
@@ -308,6 +313,13 @@ switch_status_t rtmp_on_destroy(switch_core_session_t *session)
 
 		switch_buffer_destroy(&tech_pvt->readbuf);
 		switch_core_timer_destroy(&tech_pvt->timer);
+		/**
+		 * Add by Max 2019/09/19
+		 */
+		if ( tech_pvt->video_tmp_buffer ) {
+			free(tech_pvt->video_tmp_buffer);
+			tech_pvt->video_tmp_buffer = NULL;
+		}
 		on_rtmp_destroy(tech_pvt);
 	}
 
@@ -562,7 +574,11 @@ switch_status_t rtmp_write_frame(switch_core_session_t *session, switch_frame_t 
 	rtmp_private_t *tech_pvt = NULL;
 	rtmp_session_t *rsession = NULL;
 	//switch_frame_t *pframe;
-	unsigned char buf[AMF_MAX_SIZE];
+	/**
+	 * Mark by Max 2019/09/19
+	 */
+//	unsigned char buf[AMF_MAX_SIZE];
+	unsigned char *buf = NULL;
 	switch_time_t ts;
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 
@@ -572,6 +588,11 @@ switch_status_t rtmp_write_frame(switch_core_session_t *session, switch_frame_t 
 	tech_pvt = switch_core_session_get_private(session);
 	assert(tech_pvt != NULL);
 	rsession = tech_pvt->rtmp_session;
+
+	/**
+	 * Add by Max 2019/09/19
+	 */
+	buf = tech_pvt->video_tmp_buffer;
 
 	if ( rsession == NULL ) {
 		// add by samson for test

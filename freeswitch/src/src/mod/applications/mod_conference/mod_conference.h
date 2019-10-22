@@ -775,6 +775,7 @@ struct conference_member {
 	 * Add by Max 2019/09/12
 	 */
 	switch_bool_t already_sent_video;
+	switch_bool_t already_record_video;
 	switch_frame_t *sps_frame;
 	switch_frame_t *pps_frame;
 };

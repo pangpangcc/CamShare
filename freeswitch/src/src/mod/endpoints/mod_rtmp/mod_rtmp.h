@@ -50,7 +50,12 @@
 
 #define RTMP_DEFAULT_PORT 1935
 #define RTMP_TCP_READ_BUF 2048 * 16
-#define AMF_MAX_SIZE      2048 * 16 * 2
+/**
+ * Modify by Max /2019/09/19
+ */
+//#define AMF_MAX_SIZE      2048 * 16 * 2
+#define AMF_MAX_SIZE      2048 * 16 * 2 * 2
+#define AMF_INVOKE_SIZE      2048 * 16 * 2
 
 #define SUPPORT_SND_NONE	0x0000
 #define SUPPORT_SND_ADPCM	0x0002
@@ -434,6 +439,10 @@ typedef struct rtmp2rtp_helper_s
 	amf0_data	*pps;
 	amf0_data	*nal_list;
 	uint32_t	lenSize;
+	switch_buffer_t *nalu_buf;
+	uint32_t	naluReadCount;
+	uint32_t	naluReadIndex;
+	uint32_t	naluReadIPFrameIndex;
 } rtmp2rtp_helper_t;
 
 typedef struct rtp2rtmp_helper_s
@@ -605,6 +614,11 @@ struct rtmp_private {
 
 	switch_core_media_params_t mparams;
 	switch_media_handle_t *media_handle;
+
+	/**
+	 * Add by Max 2019/09/19
+	 */
+	unsigned char *video_tmp_buffer;
 };
 
 /* Locally-extended version of rtmp_io_t */

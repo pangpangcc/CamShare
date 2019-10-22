@@ -109,21 +109,21 @@ bool CLiveChatClient::ConnectServer(string siteId, string name) {
 	if( !m_bConnectForbidden ) {
 		m_pConnectLock->Unlock();
 
+		m_siteId = siteId;
+		m_svrName = name;
+
+		char tmp[64];
+		// 服务器连接名[应用名_站点]
+		sprintf(tmp, "%s_%s", m_svrName.c_str(), m_siteId.c_str());
+		m_connectName = tmp;
+
+		// 服务器组名[应用名]
+		m_groupName = m_svrName;
+
 		FileLog("LiveChatClient", "CLiveChatClient::ConnectServer( siteId : %s, name : %s )", siteId.c_str(), name.c_str());
 		if ( ConnectServer() )
 		{
 			m_bConnectForbidden = true;
-			m_siteId = siteId;
-			m_svrName = name;
-
-			char tmp[64];
-			// 服务器连接名[应用名_站点]
-			sprintf(tmp, "%s_%s", m_svrName.c_str(), m_siteId.c_str());
-			m_connectName = tmp;
-
-			// 服务器组名[应用名]
-			m_groupName = m_svrName;
-
 			result = true;
 		}
 

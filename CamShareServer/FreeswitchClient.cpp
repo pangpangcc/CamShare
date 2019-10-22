@@ -872,7 +872,7 @@ bool FreeswitchClient::AuthorizationAllConference() {
 										"event : [Freeswitch-重新验证当前所有会议室用户], "
 										"user : %s, "
 										"conference : %s, "
-										"memberType : %d, "
+										"memberType : %s, "
 										"memberId : %s, "
 										"channelId : %s, "
 										"serverId : %s, "
@@ -1829,7 +1829,7 @@ void FreeswitchClient::FreeswitchEventHandle(esl_event_t *event) {
 							);
 
 					if( function == RTMP_EVENT_LOGIN_FUNCTION ) {
-						// rtmp登陆成功
+						// rtmp登录成功
 						FreeswitchEventRtmpLogin(root);
 
 					} else if( function == RTMP_EVENT_DISCONNECT_FUNCTION ) {
@@ -1841,7 +1841,7 @@ void FreeswitchClient::FreeswitchEventHandle(esl_event_t *event) {
 						FreeswitchEventWebsocketConnect(root);
 
 					} else if( function == WS_EVENT_LOGIN_FUNCTION ) {
-						// websocket登陆成功
+						// websocket登录成功
 						FreeswitchEventWebsocketLogin(root);
 
 					} else if( function == WS_EVENT_DISCONNECT_FUNCTION ) {
@@ -1900,7 +1900,7 @@ void FreeswitchClient::FreeswitchEventRtmpLogin(const Json::Value& root) {
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"FreeswitchClient::FreeswitchEventRtmpLogin( "
-			"event : [Freeswitch-事件处理-rtmp终端登陆], "
+			"event : [Freeswitch-事件处理-rtmp终端登录], "
 			"user : %s, "
 			"siteId : %s, "
 			"rtmp_session : %s "
@@ -2157,7 +2157,7 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"FreeswitchClient::FreeswitchEventConferenceAddMember( "
-					"event : [Freeswitch-事件处理-增加会议室成员-踢出未登陆用户], "
+					"event : [Freeswitch-事件处理-增加会议室成员-踢出未登录用户], "
 					"conference : %s, "
 					"memberId : %s, "
 					"channelId: %s, "

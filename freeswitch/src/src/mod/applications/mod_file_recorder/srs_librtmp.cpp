@@ -1979,6 +1979,7 @@ private:
 	virtual int write_video_to_cache(int64_t timestamp, int size, char* cache);
     virtual int write_pts_to_cache(int size, char* cache);
     virtual int write_tag(char* header, int header_size, char* tag, int tag_size);
+    int get_h264_slice_data(const char* frame, int frame_size, const char **data, int& data_size, SrsAvcNaluType& sliceType);
 };
 
 /**
@@ -14369,6 +14370,55 @@ int SrsFlvEncoder::write_h264_sps_pps(int64_t timestamp, const char* sps, int sp
     return ret;
 }
 
+int SrsFlvEncoder::get_h264_slice_data(const char* frame, int frame_size, const char **data, int& data_size, SrsAvcNaluType& sliceType)
+{
+	int offset = 0;
+	static const unsigned char h264_raw_head_sub[] = {0x00, 0x00, 0x01};
+	if (NULL != data
+		&& NULL != frame
+		&& frame_size > 0
+//		&& frame_size > sizeof(h264_raw_head_sub)
+		)
+	{
+		// parsing h264 raw head(nalu)
+		int headSize = 0;
+//		if (0 == memcmp(frame, h264_raw_head_sub, sizeof(h264_raw_head_sub))) {
+//			headSize = sizeof(h264_raw_head_sub);
+//		}
+
+//		if (headSize > 0 && frame_size > headSize) {
+			const char* curr = frame;
+
+			// begin
+//			curr += headSize;
+			*data = curr;
+
+			// get nalu type
+			sliceType = (SrsAvcNaluType)((**data)&0x1F);
+
+			// loop to end
+			data_size = 0;
+			for (; curr < frame + frame_size; curr++) {
+				// find next h264 raw
+				if (0 == memcmp(curr, h264_raw_head_sub, sizeof(h264_raw_head_sub)))
+				{
+					headSize = sizeof(h264_raw_head_sub);
+					break;
+				}
+
+				// count frame len
+				data_size++;
+			}
+
+			// success
+			if (data_size > 0) {
+				offset = data_size + headSize;
+			}
+//		}
+	}
+	return offset;
+}
+
 int SrsFlvEncoder::write_h264_video(SrsAvcNaluType naluType, int64_t timestamp, const char* h264_data, int h264_len, SrsStream& h264_sps, SrsStream& h264_pps)
 {
 	int ret = ERROR_SUCCESS;
@@ -14435,13 +14485,40 @@ int SrsFlvEncoder::write_h264_video(SrsAvcNaluType naluType, int64_t timestamp, 
 	if (SrsAvcNaluTypeIDR == naluType) {
 		stream.write_bytes(streamSps.data(), streamSps.pos());
 	}
-	// H264DataLength(4 bytes):
-	u_int32_t dataLength = h264_len;
-	dataLength = htonl(dataLength);
-	stream.write_bytes((char*)&dataLength, sizeof(dataLength));
 
-	// count tag hander and data size
-	int tag_data_size = stream.pos() + h264_len;
+	iovec slice_io[32];
+	int slice_count = 0;
+	int slice_data_total_len = 0;
+	const char* slice_data = NULL;
+	int slice_data_len = 0;
+	SrsAvcNaluType slice_type = SrsAvcNaluTypeReserved;
+	const char* curr = h264_data;
+	int data_len = h264_len;
+	while ( data_len > 0 ) {
+		int offset = get_h264_slice_data(curr, data_len, &slice_data, slice_data_len, slice_type);
+		if (offset <= 0) {
+			return ERROR_AVC_NALU_UEV;
+		}
+
+		slice_io[slice_count].iov_base = (void *)slice_data;
+		slice_io[slice_count].iov_len = slice_data_len;
+		slice_count++;
+
+		slice_data_total_len += sizeof(slice_data_len);
+		slice_data_total_len += slice_data_len;
+
+		curr += offset;
+		data_len -= offset;
+	}
+
+//	// H264DataLength(4 bytes):
+//	u_int32_t dataLength = h264_len;
+//	dataLength = htonl(dataLength);
+//	stream.write_bytes((char*)&dataLength, sizeof(dataLength));
+// count tag hander and data size
+//	int tag_data_size = stream.pos() + h264_len;
+
+	int tag_data_size = stream.pos() + slice_data_total_len;
 	int tag_header_size = sizeof(tag_header);
 
 	// write to tag header cache
@@ -14456,21 +14533,48 @@ int SrsFlvEncoder::write_h264_video(SrsAvcNaluType naluType, int64_t timestamp, 
     }
 
 	// write to file
-    iovec iovs[4];
+    iovec iovs[2];
     iovs[0].iov_base = tag_header;
     iovs[0].iov_len = tag_header_size;
     iovs[1].iov_base = stream.data();
     iovs[1].iov_len = stream.pos();
-	iovs[2].iov_base = (void*)h264_data;
-    iovs[2].iov_len = h264_len;
-    iovs[3].iov_base = pre_size;
-    iovs[3].iov_len = SRS_FLV_PREVIOUS_TAG_SIZE;
 
-    if ((ret = reader->writev(iovs, 4, NULL)) != ERROR_SUCCESS) {
-        if (!srs_is_client_gracefully_close(ret)) {
+	if ((ret = reader->writev(iovs, 2, NULL)) != ERROR_SUCCESS) {
+		if (!srs_is_client_gracefully_close(ret)) {
 //            srs_error("write flv tag failed. ret=%d", ret);
-        }
-    }
+		}
+	}
+
+	//	iovs[2].iov_base = (void*)h264_data;
+	//    iovs[2].iov_len = h264_len;
+	for(int i = 0; i < slice_count; i++) {
+		iovec io;
+		unsigned int dataLength = htonl(slice_io[i].iov_len);
+		io.iov_base = (void *)&dataLength;
+		io.iov_len = sizeof(dataLength);
+
+		if ((ret = reader->writev(&io, 1, NULL)) != ERROR_SUCCESS) {
+			if (!srs_is_client_gracefully_close(ret)) {
+			}
+		}
+
+		iovec *p_slice_io = (slice_io + i);
+		if ((ret = reader->writev(p_slice_io, 1, NULL)) != ERROR_SUCCESS) {
+			if (!srs_is_client_gracefully_close(ret)) {
+			}
+		}
+	}
+
+	if ( ret == ERROR_SUCCESS ) {
+		iovec io;
+		io.iov_base = pre_size;
+		io.iov_len = SRS_FLV_PREVIOUS_TAG_SIZE;
+
+		if ((ret = reader->writev(&io, 1, NULL)) != ERROR_SUCCESS) {
+			if (!srs_is_client_gracefully_close(ret)) {
+			}
+		}
+	}
 
 	return ret;
 }
@@ -35027,19 +35131,19 @@ int get_h264_frame_data(char* frame, int frame_size, char **data, int& data_size
 {
 	int offset = 0;
 	static const unsigned char h264_raw_head[] = {0x00, 0x00, 0x00, 0x01};
-	static const unsigned char h264_raw_head_sub[] = {0x00, 0x00, 0x01};
+//	static const unsigned char h264_raw_head_sub[] = {0x00, 0x00, 0x01};
 	if (NULL != data 
 		&& NULL != frame
-		&& frame_size > sizeof(h264_raw_head_sub))
+		&& frame_size > sizeof(h264_raw_head))
 	{
 		// parsing h264 raw head(nalu)
 		int headSize = 0;
 		if (0 == memcmp(frame, h264_raw_head, sizeof(h264_raw_head))) {
 			headSize = sizeof(h264_raw_head);
 		}
-		else if (0 == memcmp(frame, h264_raw_head_sub, sizeof(h264_raw_head_sub))) {
-			headSize = sizeof(h264_raw_head_sub);
-		}
+//		else if (0 == memcmp(frame, h264_raw_head_sub, sizeof(h264_raw_head_sub))) {
+//			headSize = sizeof(h264_raw_head_sub);
+//		}
 
 		if (headSize > 0 && frame_size > headSize) {
 			char* curr = frame;
@@ -35055,8 +35159,8 @@ int get_h264_frame_data(char* frame, int frame_size, char **data, int& data_size
 			data_size = 0;
 			for (; curr < frame + frame_size; curr++) {
 				// find next h264 raw
-				if (0 == memcmp(curr, h264_raw_head, sizeof(h264_raw_head))
-					|| 0 == memcmp(curr, h264_raw_head_sub, sizeof(h264_raw_head_sub))) 
+				if ( 0 == memcmp(curr, h264_raw_head, sizeof(h264_raw_head)) )
+//					|| 0 == memcmp(curr, h264_raw_head_sub, sizeof(h264_raw_head_sub)))
 				{
 					break;
 				}
@@ -35143,7 +35247,10 @@ int srs_flv_write_h264_raw_frames(srs_flv_t flv, int32_t time, char* frames, int
 			if (context->writer.h264_sps.pos() > 0 && !context->writer.h264_sps_changed
 				&& context->writer.h264_pps.pos() > 0 && !context->writer.h264_pps_changed)
 			{
-				context->enc.write_h264_video(nalu_type, time, h264_data, h264_data_len, context->writer.h264_sps, context->writer.h264_pps);
+				ret = context->enc.write_h264_video(nalu_type, time, h264_data, h264_data_len, context->writer.h264_sps, context->writer.h264_pps);
+				if ( ret != ERROR_SUCCESS ) {
+					break;
+				}
 			}
 		}
 

@@ -706,6 +706,7 @@ switch_status_t conference_member_add(conference_obj_t *conference, conference_m
 	 * Add by Max 2019/09/12
 	 */
 	member->already_sent_video = SWITCH_FALSE;
+	member->already_record_video = SWITCH_FALSE;
 
 	member->join_time = switch_epoch_time_now(NULL);
 	member->conference = conference;

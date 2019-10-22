@@ -408,17 +408,17 @@ bool VideoFlvRecorder::RecordVideoFrame(switch_frame_t *frame)
 			// 增加到缓存队列
 			switch_queue_push(mpVideoQueue, mpNaluBuffer);
 
+//			// log for test
+//			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//					, "mod_file_recorder: VideoFlvRecorder::RecordVideoFrame() push queue, handle:%p, size:%d \n"
+//					, mpHandle, switch_buffer_inuse(mpNaluBuffer->buffer));
+
 			// 创建新Nalu缓冲
 			RenewNaluBuffer();
 
 			// 重置标志位
 			mbNaluStart = SWITCH_FALSE;
 			bFlag = true;
-
-			// log for test
-//			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
-//					, "mod_file_recorder: VideoFlvRecorder::RecordVideoFrame() push queue, handle:%p, mcVideoRecPath:%s\n"
-//					, mpHandle, mcVideoRecPath);
 		}
 	}
 	else {
@@ -549,51 +549,51 @@ void VideoFlvRecorder::PutVideoBuffer2FileProc()
 // 设置视频是否正在处理
 void VideoFlvRecorder::SetVideoHandling(bool isHandling)
 {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() start recorder:%p, isHandling:%d\n"
-			, this, isHandling);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() start recorder:%p, isHandling:%d\n"
+//			, this, isHandling);
 
 	switch_mutex_lock(mpMutex);
 	mIsVideoHandling = isHandling;
 	bool result = !mIsVideoHandling && !mIsPicHandling;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() recorder:%p, isHandling:%d, result:%d, mIsVideoHandling:%d, mIsPicHandling:%d, mpCallback:%p\n"
-			, this, isHandling, result, mIsVideoHandling, mIsPicHandling, mpCallback);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() recorder:%p, isHandling:%d, result:%d, mIsVideoHandling:%d, mIsPicHandling:%d, mpCallback:%p\n"
+//			, this, isHandling, result, mIsVideoHandling, mIsPicHandling, mpCallback);
 
 	if( result && mpCallback ) {
 		mpCallback->OnStop(this);
 	}
 	switch_mutex_unlock(mpMutex);
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() stop recorder:%p, isHandling:%d\n"
-			, this, isHandling);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetVideoHandling() stop recorder:%p, isHandling:%d\n"
+//			, this, isHandling);
 }
 
 // 设置监控截图是否正在处理
 void VideoFlvRecorder::SetPicHandling(bool isHandling)
 {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() start recorder:%p, isHandling:%d\n"
-			, this, isHandling);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() start recorder:%p, isHandling:%d\n"
+//			, this, isHandling);
 
 	switch_mutex_lock(mpMutex);
 	mIsPicHandling = isHandling;
 	bool result = !mIsVideoHandling && !mIsPicHandling;
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() recorder:%p, isHandling:%d, result:%d, mIsVideoHandling:%d, mIsPicHandling:%d, mpCallback:%p\n"
-			, this, isHandling, result, mIsVideoHandling, mIsPicHandling, mpCallback);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() recorder:%p, isHandling:%d, result:%d, mIsVideoHandling:%d, mIsPicHandling:%d, mpCallback:%p\n"
+//			, this, isHandling, result, mIsVideoHandling, mIsPicHandling, mpCallback);
 
 	if( result && mpCallback ) {
 		mpCallback->OnStop(this);
 	}
 	switch_mutex_unlock(mpMutex);
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() stop recorder:%p, isHandling:%d\n"
-			, this, isHandling);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//			, "mod_file_recorder: VideoFlvRecorder::SetPicHandling() stop recorder:%p, isHandling:%d\n"
+//			, this, isHandling);
 }
 
 // 监制截图线程处理
@@ -744,6 +744,7 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 	uint8_t *data = (uint8_t *)frame->data;
 	uint8_t nalu_hdr = *data;
 	uint8_t sync_bytes[] = {0, 0, 0, 1};
+	uint8_t slice_sync_bytes[] = {0, 0, 1};
 	switch_buffer_t *buffer = nalu_buffer;
 
 	nalu_type = nalu_hdr & 0x1f;
@@ -751,11 +752,20 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 	/* hack for phones sending sps/pps with frame->m = 1 such as grandstream */
 	if ((nalu_type == 7 || nalu_type == 8) && frame->m) frame->m = SWITCH_FALSE;
 
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+//			"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+//			"nalu_type: %d, first_nalu: %d, m: %d, size: %d, bufferSize: %d, nalu_28_start : %d \n",
+//			nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer), nalu_28_start);
+
 	if (nalu_type == 28) { // 0x1c FU-A
 		int start = *(data + 1) & 0x80;
 		int end = *(data + 1) & 0x40;
 
 		nalu_type = *(data + 1) & 0x1f;
+
+//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+//				, "mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), nalu_type: %d, size: %d, bufferSize: %d, first: %d, m: %d, start: %d, end: %d, nalu_28_start : %d \n"
+//				, nalu_type, frame->datalen, switch_buffer_inuse(buffer), frame->first_nalu, frame->m, start, end, nalu_28_start);
 
 		if (start && end) return SWITCH_STATUS_RESTART;
 
@@ -771,11 +781,20 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 		}
 
 		if (start) {
+			unsigned int datalen = htonl(frame->datalen);
 			uint8_t nalu_idc = (nalu_hdr & 0x60) >> 5;
 			nalu_type |= (nalu_idc << 5);
 
-			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+			if ( frame->first_nalu ) {
+				// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
+				switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+			} else {
+				// If it is not the first slice of frame, write Slice Start Code(00, 00, 01)
+				switch_buffer_write(buffer, slice_sync_bytes, sizeof(slice_sync_bytes));
+			}
+
 			switch_buffer_write(buffer, &nalu_type, 1);
+
 			nalu_28_start = SWITCH_TRUE;
 		}
 
@@ -810,7 +829,14 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 			goto again;
 		}
 	} else {
-		switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+//		switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+		if ( frame->first_nalu ) {
+			// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
+			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+		} else {
+			// If it is not the first slice of frame, write Slice Start Code(00, 00, 01)
+			switch_buffer_write(buffer, slice_sync_bytes, sizeof(slice_sync_bytes));
+		}
 		switch_buffer_write(buffer, frame->data, frame->datalen);
 		nalu_28_start = SWITCH_FALSE;
 	}
@@ -1445,9 +1471,9 @@ VideoFlvRecorder::video_frame_t* VideoFlvRecorder::GetFreeBuffer()
 					frame->buffer = buffer;
 					// 统计共生成多少个buffer
 					miCreateBufferCount++;
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-							, "mod_file_recorder: VideoFlvRecorder::GetFreeBuffer() recorder:%p, miCreateBufferCount:%d, frame:%p\n"
-							, this, miCreateBufferCount, frame);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//							, "mod_file_recorder: VideoFlvRecorder::GetFreeBuffer() recorder:%p, miCreateBufferCount:%d, frame:%p\n"
+//							, this, miCreateBufferCount, frame);
 				}
 				else {
 					// 创建失败
