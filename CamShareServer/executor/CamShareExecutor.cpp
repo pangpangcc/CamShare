@@ -411,6 +411,10 @@ void CamShareExecutor::OnHttpParserHeader(HttpParser* parser) {
 	mAsyncIOServer.Disconnect(client);
 }
 
+void CamShareExecutor::OnHttpParserBody(HttpParser* parser) {
+
+}
+
 void CamShareExecutor::OnHttpParserError(HttpParser* parser) {
 	Client* client = (Client *)parser->custom;
 

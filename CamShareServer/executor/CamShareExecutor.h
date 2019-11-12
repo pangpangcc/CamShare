@@ -36,6 +36,7 @@ public:
 
 	// HttpParserCallback
 	void OnHttpParserHeader(HttpParser* parser);
+	void OnHttpParserBody(HttpParser* parser);
 	void OnHttpParserError(HttpParser* parser);
 
 private:

@@ -9,7 +9,7 @@
 
 BaseResultRespond::BaseResultRespond() {
 	// TODO Auto-generated constructor stub
-	mRet = true;
+	mRet = false;
 }
 
 BaseResultRespond::~BaseResultRespond() {

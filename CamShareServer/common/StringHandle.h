@@ -100,6 +100,18 @@ public:
 	    return result;
 	}
 
+	static string trim(const string &str) {
+		string s = str;
+	    if (s.empty()) {
+	        return s;
+	    }
+
+	    s.erase(0, s.find_first_not_of(" "));
+	    s.erase(s.find_last_not_of(" ") + 1);
+
+	    return s;
+	}
+
 	static inline char* strIstr(const char *haystack, const char *needle) {
 	    if (!*needle) {
 	    	return (char*)haystack;

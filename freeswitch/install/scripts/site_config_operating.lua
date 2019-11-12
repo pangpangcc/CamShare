@@ -32,4 +32,8 @@ function is_support_test()
     return 0;
 end
 
+-- 是否需要验证
+function is_no_check()
+  return 0;
+end
 --return module;

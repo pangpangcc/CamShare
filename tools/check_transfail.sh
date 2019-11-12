@@ -1,0 +1,85 @@
+#!/bin/sh
+
+LOG_FILE_PATH="./check_recorder.log"
+
+RECORD_FOLDER=/app/freeswitch/recordings
+H264_FOLDER=$RECORD_FOLDER/video_h264
+MP4_FOLDER=$RECORD_FOLDER/video_mp4
+
+START_YEAR=2019
+START_MONTH=01
+START_DAY=01
+
+END_YEAR=2019
+END_MONTH=02
+END_DAY=19
+
+TODAY_YEAR=$START_YEAR
+TODAY_MONTH=$START_MONTH
+TODAY_DAY=$START_DAY
+
+while [ $(($TODAY_YEAR$TODAY_MONTH$TODAY_DAY)) -le $(($END_YEAR$END_MONTH$END_DAY)) ]
+do
+  TODAY_H264_FOLDER="$H264_FOLDER/$TODAY_YEAR/$TODAY_MONTH/$TODAY_DAY"
+  H264_VIDEOS=`ls -lt $TODAY_H264_FOLDER|grep -v "total"|awk '{print $9}'`
+  #echo $TODAY_H264_FOLDER
+
+  TODAY_MP4_FOLDER="$MP4_FOLDER/$TODAY_YEAR/$TODAY_MONTH/$TODAY_DAY"
+  #echo $TODAY_MP4_FOLDER
+
+  FIRST_NOMP4_H264_FILE=""
+  while read -r H264_FILE
+  do
+    FIND_KEY=`echo "$H264_FILE"|awk -F '_' '{print $1"_"$3}'|awk -F '.' '{print $1}'`
+    MP4_FILE=`ls $TODAY_MP4_FOLDER/$FIND_KEY* 2>/dev/null`
+    if [ -z "$MP4_FILE" ]; then
+#      ls -l $TODAY_H264_FOLDER/$H264_FILE
+      USER_ID=`echo $H264_FILE|awk -F '_' '{print $1}'`
+      SITE_ID=`echo $H264_FILE|awk -F '_' '{print $2}'`
+
+      VIDEO_START_TIME_STR=`echo $H264_FILE|awk -F '_' '{print $3}'|awk -F '.' '{print $1}'`
+      VIDEO_START_YEAR=${VIDEO_START_TIME_STR:0:4}
+      VIDEO_START_MONTH=${VIDEO_START_TIME_STR:4:2}
+      VIDEO_START_DAY=${VIDEO_START_TIME_STR:6:2}
+      VIDEO_START_HOUR=${VIDEO_START_TIME_STR:8:2}
+      VIDEO_START_MINUTE=${VIDEO_START_TIME_STR:10:2}
+      VIDEO_START_SECOND=${VIDEO_START_TIME_STR:12:2}
+      VIDEO_START_TIME="$VIDEO_START_YEAR-$VIDEO_START_MONTH-$VIDEO_START_DAY $VIDEO_START_HOUR:$VIDEO_START_MINUTE:$VIDEO_START_SECOND"
+
+      VIDEO_START_TIMESTAMP=`date -d "$VIDEO_START_TIME" +%s`
+      VIDEO_DURATION_STR=`./ffmpeg -i $TODAY_H264_FOLDER/$H264_FILE 2>&1|grep Duration`
+      if [ -n "$VIDEO_DURATION_STR" ]; then
+        VIDEO_DURATION_HOUR=`echo $VIDEO_DURATION_STR|awk -F ':' '{print $2}'`
+        VIDEO_DURATION_MINUTE=`echo $VIDEO_DURATION_STR|awk -F ':' '{print $3}'`
+        VIDEO_DURATION_SECOND=`echo $VIDEO_DURATION_STR|awk -F ':' '{print $4}'|awk -F ',' '{print $1}'|awk -F '.' '{print $1}'`
+        VIDEO_DURATION_TIME_SEC=$(($VIDEO_DURATION_HOUR*60*60 + $VIDEO_DURATION_MINUTE*60 + $VIDEO_DURATION_SECOND))
+        VIDEO_START_TIMESTAMP=`date -d "$VIDEO_START_TIME" +%s`
+        VIDEO_END_TIMESTAMP=$(($VIDEO_START_TIMESTAMP+$VIDEO_DURATION_TIME_SEC))
+        VIDEO_END_TIME=`date -d @"$VIDEO_END_TIMESTAMP" +"%Y-%m-%d %H:%M:%S"`
+
+#        echo "$MP4_FOLDER/" "$TODAY_H264_FOLDER/" "$H264_FILE" "$USER_ID" "$SITE_ID" "$VIDEO_START_TIME" "$VIDEO_END_TIME"
+        ./close_shell.sh "$MP4_FOLDER/" "$TODAY_H264_FOLDER/" "$H264_FILE" "$USER_ID" "$SITE_ID" "$VIDEO_START_TIME" "$VIDEO_END_TIME"
+        exit 0
+      fi
+    fi
+  done <<< "$H264_VIDEOS"
+
+  # next day
+  DATE_STEP="+1 day"
+  TODAY_DATE="$TODAY_YEAR-$TODAY_MONTH-$TODAY_DAY"
+  TODAY_YEAR=`date -d "$TODAY_DATE $DATE_STEP" +%Y`
+  TODAY_MONTH=`date -d "$TODAY_DATE $DATE_STEP" +%m`
+  TODAY_MONTH=`printf "%02d" $(($TODAY_MONTH))`
+  TODAY_DAY=`date -d "$TODAY_DATE $DATE_STEP" +%d`
+  TODAY_DAY=`printf "%02d" $(($TODAY_DAY))`
+done
+
+#H264_MODIFY_TIME=`ls -l --time-style="+%s" $TODAY_H264_FOLDER/$FIRST_NOMP4_H264_FILE|awk '{print $6}'`
+#NOW_TIME=`date +%s`
+#DIFF_TIME=$(($NOW_TIME-$H264_MODIFY_TIME))
+#if [ $DIFF_TIME -gt 600 ]; then
+#  LOG_TIME=`date +"%Y-%m-%d %H:%M:%S"`
+#  echo "[ $LOG_TIME ] error: $TODAY_H264_FOLDER/$FIRST_NOMP4_H264_FILE modify_time:$H264_MODIFY_TIME now:$NOW_TIME diff_time:$DIFF_TIME" > $LOG_FILE_PATH
+#else
+#  echo "$DIFF_TIME"
+#fi

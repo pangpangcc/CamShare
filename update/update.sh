@@ -21,22 +21,22 @@ cd $path
 #cp -f ./file/vars.xml /usr/local/freeswitch/conf/vars.xml
 
 # freeswitch ./lib & ./mod files
-#cp -f ./file/lib/* /usr/local/freeswitch/lib/
+cp -f ./file/lib/* /usr/local/freeswitch/lib/
 #cp -f ./file/mod/* /usr/local/freeswitch/mod/
 
 # freeswitch scripts
-#cp -f ./file/*.lua /usr/local/freeswitch/scripts/
+cp -f ./file/*.lua /usr/local/freeswitch/scripts/
 
 # freeswitch mod_file_recorder shell
 #cp -f ./file/close_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 #cp -f ./file/pic_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 
 # freeswitch mod_conference
-#cp -f ./file/mod_conference* /usr/local/freeswitch/mod/
+cp -f ./file/mod_conference* /usr/local/freeswitch/mod/
 #cp -f ./file/conference.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_file_recorder
-#cp -f ./file/mod_file_recorder* /usr/local/freeswitch/mod/
+cp -f ./file/mod_file_recorder* /usr/local/freeswitch/mod/
 #cp -f ./file/file_recorder.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_rtmp
@@ -44,7 +44,7 @@ cp -f ./file/mod_rtmp* /usr/local/freeswitch/mod/
 #cp -f ./file/rtmp.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_ws
-#cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
+cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
 #cp -f ./file/ws.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_logfile
@@ -59,7 +59,7 @@ cp -f ./file/camshare-middleware /usr/local/CamShareServer/
 #cp -f ./file/camshare-middleware.config /usr/local/CamShareServer/
 
 # ---- camshare executor ----
-#cp -f ./file/camshare-executor /usr/local/CamShareServer/
+cp -f ./file/camshare-executor /usr/local/CamShareServer/
 #cp -f ./file/camshare-executor.config /usr/local/CamShareServer/
 
 # camshare shell
@@ -71,13 +71,16 @@ cp -f ./file/camshare-middleware /usr/local/CamShareServer/
 #if [ -e "/usr/local/CamShareServer/check_session_count.sh" ]; then
 #  rm -f /usr/local/CamShareServer/check_session_count.sh 
 #fi
-cp -f ./file/*.sh /usr/local/CamShareServer/
+#cp -f ./file/*.sh /usr/local/CamShareServer/
 
 # camshare clean shell
 #cp -rf ./file/clean /usr/local/CamShareServer/
 
 # version
 cp -f ./version /usr/local/CamShareServer/
+
+# ---- local bin file ----
+cp -f ./file/usr_local_bin/* /usr/local/bin/
 
 # --- start camshare & freeswitch ---
 # run camshare & freeswitch

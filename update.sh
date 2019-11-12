@@ -65,8 +65,8 @@ cp -f /usr/local/freeswitch/mod/mod_conference.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/conference.conf.xml $updatefiledir/
 
 # copy mod_file_recorder files
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $updatefiledir/
 
 # copy mod_rtmp files
@@ -86,7 +86,7 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 #cp -f ./freeswitch/install/scripts/common.lua $updatefiledir/
 #cp -f ./freeswitch/install/scripts/dialplan_internal_default.lua $updatefiledir/
 #cp -f ./freeswitch/install/scripts/gen_dir_user_xml.lua $updatefiledir/
-#cp -f ./freeswitch/install/scripts/event_file_recorder.lua $updatefiledir/
+cp -f ./freeswitch/install/scripts/event_file_recorder.lua $updatefiledir/
 #cp -f ./freeswitch/install/scripts/event_conference.lua $updatefiledir/
 
 # remove freeswitch scripts config
@@ -101,7 +101,7 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 
 # ---- copy camshare files
 # copy camshare-middleware file 
-#cp -f ./CamShareServer/camshare-middleware $updatefiledir/
+cp -f ./CamShareServer/camshare-middleware $updatefiledir/
 
 # copy configure file
 #if [ "$env" == "develop" ]; then
@@ -113,7 +113,7 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 #fi
 
 # ---- copy camshare executor files
-#cp -f ./CamShareServer/executor/camshare-executor $updatefiledir/
+cp -f ./CamShareServer/executor/camshare-executor $updatefiledir/
 #cp -f ./CamShareServer/executor/camshare-executor.config $updatefiledir/
 
 # copy camshare shell
@@ -132,8 +132,8 @@ cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 #cp -rf ./CamShareServer/bin/clean/clean_log.sh $updatefiledir/clean/
 
 # ---- copy deps build file
-#mkdir -p $updatefiledir/usr_local_bin
-#cp -f ./deps/build/bin/* $updatefiledir/usr_local_bin/
+mkdir -p $updatefiledir/usr_local_bin
+cp -f ./deps/build/bin/* $updatefiledir/usr_local_bin/
 
 # build package
 mkdir -p $updatepackagedir

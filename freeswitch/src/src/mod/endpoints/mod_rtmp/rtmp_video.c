@@ -543,7 +543,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 			uint8_t h264_type      = q[1] & 0x1F;
 			uint8_t h264_nri       = (q[0] & 0x60) >> 5;
 			uint8_t h264_key       = (h264_nri << 5) | h264_type;
-			switch_bool_t h264_idr = SWITCH_FALSE;
+//			switch_bool_t h264_idr = SWITCH_FALSE;
 
 			if (h264_start_bit) {
 				/* write NAL unit code */
@@ -564,7 +564,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 					if (nalType == 5) {
 						switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
 						helper->idr_recv = SWITCH_TRUE;
-						h264_idr = SWITCH_TRUE;
+//						h264_idr = SWITCH_TRUE;
 					}
 					else {
 						switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
@@ -575,7 +575,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 				switch_buffer_write(helper->rtmp_buf, nal_data, used);
 				switch_buffer_zero(helper->fua_buf);
 
-				if ( h264_idr == SWITCH_TRUE ) {
+				if ( nalType == 5 ) {
 					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
 							"rtmp_rtp2rtmpH264(), Send IDR(FU-A) Packet, len: %u, rtp_ts: %u\n", (unsigned int)switch_buffer_inuse(helper->rtmp_buf), rtp_ts);
 				}

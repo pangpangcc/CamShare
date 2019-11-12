@@ -1,5 +1,6 @@
 #!/bin/sh
 # 统计30天内connect&login数据
+
 TIME=$(date +%s)
 DAYS=30
 i=0
@@ -12,7 +13,7 @@ while [[ $i -lt $DAYS ]];do
 	TIME_FORMAT_LOG_FILE=$(date -d @$TIME +%Y%m)
 
 	LOGIN_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "Freeswitch-事件处理-rtmp终端登陆\|Freeswitch-事件处理-websocket终端登录" | wc -l)
-	LOGIN_MAN_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "Freeswitch, 事件处理, rtmp终端登陆], user : CM\|Freeswitch-事件处理-websocket终端登录], user : CM" | wc -l)
+	LOGIN_MAN_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "Freeswitch-事件处理-rtmp终端登陆], user : CM\|Freeswitch-事件处理-websocket终端登录], user : CM" | wc -l)
         MAKECALL_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "Freeswitch-事件处理-增加会议室成员" | wc -l)
         MAKECALL_MAN_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "Freeswitch-事件处理-增加会议室成员], user : CM" | wc -l)
         MAKECALL_TIMEOUT_COUNT=$(grep -e "$TIME_FORMAT_LOG" /app/CamShareServer/log/camshare_server/info/Log$TIME_FORMAT_LOG_FILE* | grep "外部服务(LiveChat)-收到命令:进入会议室认证结果-失败-找不到任务-已经超时" | grep "ACTIVE" | wc -l)

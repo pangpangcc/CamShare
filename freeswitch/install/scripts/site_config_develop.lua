@@ -12,11 +12,11 @@
 
 -- php接口路径
 loginPaths = {
-  ["0"] = "http://192.168.8.12/livechat/setstatus.php?action=getuserloginstatus",
-  ["1"] = "http://192.168.8.12/livechat/setstatus.php?action=getuserloginstatus",
-  ["4"] = "http://192.168.8.12/livechat/setstatus.php?action=getuserloginstatus",
-  ["5"] = "http://192.168.8.12/livechat/setstatus.php?action=getuserloginstatus",
-  ["6"] = "http://192.168.8.12/livechat/setstatus.php?action=getuserloginstatus"
+  ["0"] = "http://192.168.8.136/livechat/setstatus.php?action=getuserloginstatus",
+  ["1"] = "http://192.168.8.136/livechat/setstatus.php?action=getuserloginstatus",
+  ["4"] = "http://192.168.8.136/livechat/setstatus.php?action=getuserloginstatus",
+  ["5"] = "http://192.168.8.136/livechat/setstatus.php?action=getuserloginstatus",
+  ["6"] = "http://192.168.8.136/livechat/setstatus.php?action=getuserloginstatus"
 };
 
 function getLoginPath(siteId)
@@ -32,4 +32,8 @@ function is_support_test()
     return 1;
 end
 
+-- 是否需要验证
+function is_no_check()
+  return 1;
+end
 --return module;

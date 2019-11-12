@@ -469,15 +469,15 @@ void VideoRecordManager::RecordVideoFrame2FileProc()
 				}
 				else {
 					// 已经停止录制，设置不再处理
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling start, recorder:%p\n"
-									, recorder);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling start, recorder:%p\n"
+//									, recorder);
 
 					recorder->SetVideoHandling(false);
 
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling end, recorder:%p\n"
-									, recorder);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetVideoHandling end, recorder:%p\n"
+//									, recorder);
 				}
 			}
 			else {
@@ -539,15 +539,15 @@ void VideoRecordManager::RecordPicture2FileProc()
 					switch_queue_push(m_queuePicture, (void*)recorder);
 				}
 				else {
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling start, recorder:%p\n"
-									, recorder);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling start, recorder:%p\n"
+//									, recorder);
 
 					recorder->SetPicHandling(false);
 
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling end, recorder:%p\n"
-									, recorder);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
+//									, "mod_file_recorder: VideoRecordManager::RecordVideoFrame2FileProc() SetPicHandling end, recorder:%p\n"
+//									, recorder);
 				}
 			}
 			else {
@@ -596,21 +596,21 @@ void VideoRecordManager::RecycleVideoRecorderProc()
 //							, recorder);
 
 			if (NULL != recorder) {
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() recorder->Reset start, recorder:%p\n"
-								, recorder);
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+//								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() recorder->Reset start, recorder:%p\n"
+//								, recorder);
 
 				recorder->Reset();
 
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder start, recorder:%p\n"
-								, recorder);
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+//								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder start, recorder:%p\n"
+//								, recorder);
 
 				RecycleVideoRecorder(recorder);
 
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder end, recorder:%p\n"
-								, recorder);
+//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+//								, "mod_file_recorder: VideoRecordManager::RecycleVideoRecorderProc() RecycleVideoRecorder end, recorder:%p\n"
+//								, recorder);
 			}
 			else {
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR

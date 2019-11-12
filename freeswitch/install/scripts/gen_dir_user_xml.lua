@@ -40,7 +40,7 @@ end
 XML_STRING = "";
 
 local support_test = is_support_test();
-local result = 0
+local result = is_no_check();
 
 -- 判断是否测试帐号
 if support_test == 1 then
