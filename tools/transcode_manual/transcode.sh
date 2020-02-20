@@ -59,7 +59,7 @@ echo "$RES" >> /tmp/transcode.log
 
 # request to CamShareServer
 URL="http://127.0.0.1:9200/RECORDFINISH?userId=$USERID&startTime=$START_TIME&endTime=$END_TIME&siteId=$SITEID&fileName=$MP4_FILENAME"
-echo $URL >> /tmp/transcode.log
+echo $URL >> transcode.log
 RES=`wget --tries=1 --timeout=3 -O /dev/null -S "$URL" 2>&1 | grep "HTTP/" | awk '{print $2}'`
 echo "HTTP:$RES" >> /tmp/transcode.log
 
