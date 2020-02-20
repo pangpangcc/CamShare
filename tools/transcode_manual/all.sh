@@ -1,8 +1,8 @@
 #!/bin/sh
 
-rm -f transcode.log
+rm -f /tmp/transcode.log
 
-./transcode.sh ./30_31/flv_30.txt
-./transcode.sh ./30_31/flv_31.txt
+/home/samson/Max/cmd/transcode.sh /home/samson/Max/cmd/result/result_202001_flv.txt
+/home/samson/Max/cmd/transcode.sh /home/samson/Max/cmd/result/result_202002_flv.txt
 
 echo "done"

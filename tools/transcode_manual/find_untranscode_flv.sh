@@ -29,7 +29,9 @@ MP4_DAY_DIR_ARRAY=($(ls $MP4_MONTH_DIR))
 #echo -e "FLV_DAY_DIR_ARRAY_COUNT:${#FLV_DAY_DIR_ARRAY[@]}"
 #echo -e "MP4_DAY_DIR_ARRAY_COUNT:${#MP4_DAY_DIR_ARRAY[@]}"
 
-rm result_flv.txt -rf
+mkdir -p result
+RESULT_FILE=result/result_${DATE_WITH_MONTH}_flv.txt
+rm $RESULT_FILE -rf
 if [ ${#FLV_DAY_DIR_ARRAY[@]} -ge ${#MP4_DAY_DIR_ARRAY[@]} ];then
   for((day=0;day<${#FLV_DAY_DIR_ARRAY[@]};day++));do
 	  FLV_DAY_DIR=$FLV_MONTH_DIR/${FLV_DAY_DIR_ARRAY[$day]}
@@ -58,7 +60,7 @@ if [ ${#FLV_DAY_DIR_ARRAY[@]} -ge ${#MP4_DAY_DIR_ARRAY[@]} ];then
     
         if [ $FLV_NAME != $MP4_NAME ];then
           echo -e "# [\033[31mFound\033[0m] FLV_ORINAL_NAME:$FLV_ORINAL_NAME"
-          echo $FLV_ORINAL_NAME >> result_flv.txt
+          echo $FLV_ORINAL_NAME >> $RESULT_FILE
     	    ((i++))
         fi
       done
