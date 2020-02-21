@@ -327,7 +327,7 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 		switch_mutex_unlock(io->mutex);
 
 		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_TIMEOUT) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CRIT, "pollset_poll failed\n");
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "pollset_poll failed, status : %d\n", status);
 			continue;
 		} else if (status == SWITCH_STATUS_TIMEOUT) {
 			switch_cond_next();

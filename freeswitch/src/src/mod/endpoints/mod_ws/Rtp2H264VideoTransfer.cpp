@@ -57,6 +57,7 @@ switch_status_t Rtp2H264VideoTransfer::buffer_h264_nalu(switch_frame_t *frame, s
 	uint8_t *data = (uint8_t *)frame->data;
 	uint8_t nalu_hdr = *data;
 	uint8_t sync_bytes[] = {0, 0, 0, 1};
+	uint8_t slice_sync_bytes[] = {0, 0, 1};
 	switch_buffer_t *buffer = nalu_buffer;
 
 	nalu_type = nalu_hdr & 0x1f;
@@ -87,7 +88,15 @@ switch_status_t Rtp2H264VideoTransfer::buffer_h264_nalu(switch_frame_t *frame, s
 			uint8_t nalu_idc = (nalu_hdr & 0x60) >> 5;
 			nalu_type |= (nalu_idc << 5);
 
-			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+//			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+			if ( frame->first_nalu ) {
+				// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
+				switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+			} else {
+				// If it is not the first slice of frame, write Slice Start Code(00, 00, 01)
+				switch_buffer_write(buffer, slice_sync_bytes, sizeof(slice_sync_bytes));
+			}
+
 			switch_buffer_write(buffer, &nalu_type, 1);
 			nalu_28_start = SWITCH_TRUE;
 		}
@@ -121,7 +130,14 @@ switch_status_t Rtp2H264VideoTransfer::buffer_h264_nalu(switch_frame_t *frame, s
 			goto again;
 		}
 	} else {
-		switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+//		switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+		if ( frame->first_nalu ) {
+			// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
+			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+		} else {
+			// If it is not the first slice of frame, write Slice Start Code(00, 00, 01)
+			switch_buffer_write(buffer, slice_sync_bytes, sizeof(slice_sync_bytes));
+		}
 		switch_buffer_write(buffer, frame->data, frame->datalen);
 		nalu_28_start = SWITCH_FALSE;
 	}
