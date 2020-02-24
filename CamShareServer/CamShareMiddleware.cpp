@@ -1422,9 +1422,36 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 								con->wsCount = 1;
 								pUserMap->Insert(userId, con);
 								bFlag = true;
+
+								LogManager::GetLogManager()->Log(
+										LOG_WARNING,
+										"CamShareMiddleware::OnRequestSetStatus( "
+										"event : [内部服务(HTTP)-收到命令:设置在线状态, 上线], "
+										"parser : %p, "
+										"body : %s, "
+										"count : %d "
+										")",
+										parser,
+										parser->GetBody(),
+										con->wsCount
+										);
 							} else {
 								SiteConnection *con = userItr->second;
 								con->wsCount++;
+								bFlag = true;
+
+								LogManager::GetLogManager()->Log(
+										LOG_WARNING,
+										"CamShareMiddleware::OnRequestSetStatus( "
+										"event : [内部服务(HTTP)-收到命令:设置在线状态, 增加数量], "
+										"parser : %p, "
+										"body : %s, "
+										"count : %d "
+										")",
+										parser,
+										parser->GetBody(),
+										con->wsCount
+										);
 							}
 						} else if( userItr != pUserMap->End() ) {
 							// 用户下线
@@ -1434,6 +1461,17 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 								delete con;
 								pUserMap->Erase(userItr);
 								bFlag = true;
+
+								LogManager::GetLogManager()->Log(
+										LOG_WARNING,
+										"CamShareMiddleware::OnRequestSetStatus( "
+										"event : [内部服务(HTTP)-收到命令:设置在线状态, 下线], "
+										"parser : %p, "
+										"body : %s "
+										")",
+										parser,
+										parser->GetBody()
+										);
 							}
 						}
 						pUserMap->Unlock();
