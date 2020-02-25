@@ -207,6 +207,7 @@ switch_status_t rtmp_check_auth(rtmp_session_t *rsession, const char *user, cons
 	const char *passwd = NULL;
 	switch_bool_t disallow_multiple_registration = SWITCH_FALSE;
 	switch_event_t *locate_params;
+	char mediaserver[4] = {0};
 
 	switch_event_create(&locate_params, SWITCH_EVENT_GENERAL);
 	switch_assert(locate_params);
@@ -217,6 +218,8 @@ switch_status_t rtmp_check_auth(rtmp_session_t *rsession, const char *user, cons
 	if( custom ) {
 		switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "custom", custom);
 	}
+	sprintf(mediaserver, "%d", rsession->client_from_mediaserver);
+	switch_event_add_header_string(locate_params, SWITCH_STACK_BOTTOM, "mediaserver", mediaserver);
 
 	/* Locate user */
 	if (switch_xml_locate_user_merged("id", user, domain, NULL, &xml, locate_params) != SWITCH_STATUS_SUCCESS) {

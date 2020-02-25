@@ -1528,6 +1528,8 @@ void CamShareMiddleware::OnRequestSyncStatus(HttpParser* parser) {
 						if ( con->IsOffline() ) {
 							delete con;
 							pUserMap->Erase(userItr++);
+						} else {
+							userItr++;
 						}
 					}
 					pUserMap->Unlock();
@@ -1793,6 +1795,8 @@ void CamShareMiddleware::OnFreeswitchEventOnlineList(
 			if ( con->IsOffline() ) {
 				delete con;
 				pUserMap->Erase(userItr++);
+			} else {
+				userItr++;
 			}
 		}
 		pUserMap->Unlock();

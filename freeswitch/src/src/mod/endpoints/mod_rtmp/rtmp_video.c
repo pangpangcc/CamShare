@@ -209,7 +209,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 					amf0_string_get_uint8_ts(read_helper->sps),
 					amf0_string_get_size(read_helper->sps));
 				amf0_array_push(read_helper->nal_list, sps);
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "rtmp_rtmp2rtpH264(), Add SPS: %p, data_size : %d\n", (void *)amf0_string_get_uint8_ts(read_helper->sps), amf0_string_get_size(read_helper->sps));
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtmp2rtpH264(), Add SPS: %p, data_size : %d\n", (void *)amf0_string_get_uint8_ts(read_helper->sps), amf0_string_get_size(read_helper->sps));
 			}
 			// add pps to list
 			if (read_helper->pps != NULL) {
@@ -217,7 +217,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 				amf0_string_get_uint8_ts(read_helper->pps),
 				amf0_string_get_size(read_helper->pps));
 				amf0_array_push(read_helper->nal_list, pps);
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "rtmp_rtmp2rtpH264(), Add PPS: %p, data_size : %d\n", (void *)amf0_string_get_uint8_ts(read_helper->pps), amf0_string_get_size(read_helper->pps));
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtmp2rtpH264(), Add PPS: %p, data_size : %d\n", (void *)amf0_string_get_uint8_ts(read_helper->pps), amf0_string_get_size(read_helper->pps));
 			}
 
 			if ( !read_helper->sps || !read_helper->pps ) {

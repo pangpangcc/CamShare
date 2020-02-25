@@ -31,7 +31,9 @@ local custom = ""
 if req_custom ~= nil then
   custom = req_custom
 end
- 
+ -- H5媒体网关转发
+local req_mediaserver = params:getHeader("mediaserver")
+
 ---- it's probably wise to sanitize input to avoid SQL injections !
 --local my_query = string.format("select * from users where domain = '%s' and `%s`='%s' limit 1",
 --  req_domain, req_key, req_user)
@@ -42,27 +44,33 @@ XML_STRING = "";
 local support_test = is_support_test();
 local result = is_no_check();
 
--- 判断是否测试帐号
-if support_test == 1 then
-  freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "检查是否测试账号\n");
-  local index = string.find(req_user, "^WW%d+$");
-  if index == nil then
-    index = string.find(req_user, "^MM%d+$");
-  end
-  
-  if index ~= nil then
-    value = string.sub(req_user, index, string.len(req_user));
-    local size = string.len(value);
---    freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
-    
-    if( size < 7 ) then
-      result = 1
-      freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
-    else 
-      freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
+-- 判断是否从H5网关转发
+if req_mediaserver == "1" then
+  result = 1
+  freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "是H5媒体网关账号\n");
+else
+  -- 判断是否测试帐号
+  if support_test == 1 then
+    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "检查是否测试账号\n");
+    local index = string.find(req_user, "^WW%d+$");
+    if index == nil then
+      index = string.find(req_user, "^MM%d+$");
     end
-  else
-    freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
+    
+    if index ~= nil then
+      value = string.sub(req_user, index, string.len(req_user));
+      local size = string.len(value);
+  --    freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度 size : " .. size .. "\n");
+      
+      if( size < 7 ) then
+        result = 1
+        freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度通过\n");
+      else 
+        freeswitch.consoleLog("DEBUG", "# 用户登陆脚本->账号:" .. req_user .. "测试账号, 检测长度失败\n");
+      end
+    else
+      freeswitch.consoleLog("NOTICE", "# 用户登陆脚本->账号:" .. req_user .. "不是测试账号\n");
+    end
   end
 end
 

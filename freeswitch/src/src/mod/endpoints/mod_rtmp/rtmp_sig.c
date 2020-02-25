@@ -50,22 +50,14 @@ void HandleRtmpCall(rtmp_session_t *rsession, const RtmpStreamParamItem* items, 
 		&& NULL != items && itemCount > 0)
 	{
 		const char* uid = NULL;
-		const char* auth = NULL;
 		const char* site = NULL;
-		const char* custom = NULL;
 		const char* room = NULL;
 		for (int i = 0; i < itemCount; i++) {
 			if (strcmp(items[i].key, "uid") == 0) {
 				uid = items[i].value;
 			}
-			if (strcmp(items[i].key, "auth") == 0) {
-				auth = items[i].value;
-			}
 			if (strcmp(items[i].key, "site") == 0) {
 				site = items[i].value;
-			}
-			if (strcmp(items[i].key, "custom") == 0) {
-				custom = items[i].value;
 			}
 			else if (strcmp(items[i].key, "room") == 0) {
 				room = items[i].value;
@@ -83,14 +75,14 @@ void HandleRtmpCall(rtmp_session_t *rsession, const RtmpStreamParamItem* items, 
 
 			// do login
 			int success = 0;
-			if (rtmp_check_auth(rsession, uid, domain, auth, site, custom) == SWITCH_STATUS_SUCCESS) {
+			if (rtmp_check_auth(rsession, uid, domain, NULL, site, NULL) == SWITCH_STATUS_SUCCESS) {
 				rtmp_session_login(rsession, uid, domain, site);
 				success = 1;
 			}
 
 			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO
-					, "do login, uid:%s, auth:%s, site:%s, custom:%s, room:%s, domain:%s, success:%d.\n"
-					, uid, auth, site, custom, room, domain, success);
+					, "HandleRtmpCall login, uid:%s, site:%s, room:%s, domain:%s, success:%d.\n"
+					, uid, site, room, domain, success);
 
 			// do MakeCall
 			if (success) {
@@ -124,8 +116,8 @@ void HandleRtmpCall(rtmp_session_t *rsession, const RtmpStreamParamItem* items, 
 				}
 
 				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO
-						, "do makecall, uid:%s, auth:%s, site:%s, custom:%s, room:%s, domain:%s, success:%d.\n"
-						, uid, auth, site, custom, room, domain, success);
+						, "HandleRtmpCall makecall, uid:%s, site:%s, room:%s, domain:%s, success:%d.\n"
+						, uid, site, room, domain, success);
 			}
 
 			switch_safe_free(domain);

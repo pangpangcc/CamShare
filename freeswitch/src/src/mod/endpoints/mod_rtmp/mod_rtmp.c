@@ -1213,8 +1213,8 @@ switch_call_cause_t rtmp_session_create_call(rtmp_session_t *rsession, switch_co
 	}
 
 	if (!zstr(auth_user) && !zstr(auth_domain)) {
-		const char *s = switch_core_session_sprintf(*newsession, "%s@%s", auth_user, auth_domain);
-		switch_ivr_set_user(*newsession, s);
+//		const char *s = switch_core_session_sprintf(*newsession, "%s@%s", auth_user, auth_domain);
+//		switch_ivr_set_user(*newsession, s);
 		switch_channel_set_variable(channel, "rtmp_authorized", "true");
 	}
 
