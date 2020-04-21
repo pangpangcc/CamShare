@@ -1,6 +1,10 @@
 file /usr/local/freeswitch/bin/freeswitch
 handle SIGPIPE noprint
 set print thread-events off
+set print array-indexes on
+set print pretty on
+set print object on
+set confirm off
+run
 source gdb.break
 source print_event_nodes
-run

@@ -1588,19 +1588,35 @@ void conference_video_check_recording(conference_obj_t *conference, mcu_canvas_t
 		}
 
 		if (switch_test_flag((&imember->rec->fh), SWITCH_FILE_OPEN) && switch_core_file_has_video(&imember->rec->fh)) {
+			/**
+			 * Modify by Max 2020/04/16
+			 */
 			if ( !imember->already_record_video ) {
 				if ((fmember = conference_member_get(imember->conference, imember->conference->video_floor_holder))) {
-					if ( fmember->sps_frame && fmember->pps_frame ) {
+					if ( fmember->sps_frame && fmember->pps_frame && switch_test_flag(frame, SFF_KEY_FRAME) && frame->first_nalu ) {
 						imember->already_record_video = SWITCH_TRUE;
-						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), Record SPS\n");
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), %s Record SPS %d->%d, datalen: %d, sps_frame: %p, sps_datalen: %d, frame: %p\n",
+								conference->name, fmember->id, imember->id, fmember->sps_frame->datalen, (void *)fmember->sps_frame, fmember->sps_frame->datalen, (void *)frame);
 						switch_core_file_write_video(&imember->rec->fh, fmember->sps_frame);
-						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), Record PPS\n");
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), %s Record PPS %d->%d, datalen: %d, pps_frame: %p, pps_datalen: %d, frame: %p\n",
+								conference->name, fmember->id, imember->id, fmember->pps_frame->datalen, (void *)fmember->pps_frame, fmember->pps_frame->datalen, (void *)frame);
 						switch_core_file_write_video(&imember->rec->fh, fmember->pps_frame);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_check_recording(), %s Set KeyFrame Ready For Record %d->%d, frame: %p, datalen: %d, first_nalu: %d\n",
+								conference->name, fmember->id, imember->id, (void *)frame, frame->datalen, frame->first_nalu);
+					} else {
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_check_recording(), %s Drop Record Before Next SPS/PPS/KeyFrame %d->%d, frame: %p, datalen: %d\n",
+								conference->name, fmember->id, imember->id, (void *)frame, frame->datalen);
 					}
 					switch_thread_rwlock_unlock(fmember->rwlock);
 				}
+			} else {
+//				switch_core_file_write_video(&imember->rec->fh, frame);
 			}
-			switch_core_file_write_video(&imember->rec->fh, frame);
+
+			if ( imember->already_record_video ) {
+				switch_core_file_write_video(&imember->rec->fh, frame);
+			}
+//			switch_core_file_write_video(&imember->rec->fh, frame);
 		}
 	}
 
@@ -3600,35 +3616,38 @@ void conference_video_write_frame(conference_obj_t *conference, conference_membe
 				 * Add 4 Send SPS/PPS if imember get into conference later than member
 				 * Add by Max 2019/09/12
 				 */
-//				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_write_frame(), Write Video, %d->%d %d\n", floor_holder->id, imember->id, vid_frame->datalen);
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_write_frame(), %s Write Video %d->%d, datalen: %d, first_nalu: %d, already_sent_video: %d\n", conference->name, floor_holder->id, imember->id, vid_frame->datalen, vid_frame->first_nalu, imember->already_sent_video);
 				if ( !imember->already_sent_video ) {
-					if ( floor_holder->sps_frame && floor_holder->pps_frame ) {
+					if ( floor_holder->sps_frame && floor_holder->pps_frame && switch_test_flag(vid_frame, SFF_KEY_FRAME) && vid_frame->first_nalu ) {
 						imember->already_sent_video = SWITCH_TRUE;
-						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), Send sps %d->%d, sps_size : %d\n", floor_holder->id, imember->id, floor_holder->sps_frame->datalen);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), %s Send SPS %d->%d, sps_datalen: %d\n", conference->name, floor_holder->id, imember->id, floor_holder->sps_frame->datalen);
 						switch_core_session_write_video_frame(imember->session, floor_holder->sps_frame, SWITCH_IO_FLAG_NONE, 0);
-						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), Send pps %d->%d, pps_size : %d\n", floor_holder->id, imember->id, floor_holder->pps_frame->datalen);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), %s Send PPS %d->%d, pps_datalen: %d\n", conference->name, floor_holder->id, imember->id, floor_holder->pps_frame->datalen);
 						switch_core_session_write_video_frame(imember->session, floor_holder->pps_frame, SWITCH_IO_FLAG_NONE, 0);
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "conference_video_write_frame(), %s Set KeyFrame Ready For Send %d->%d, datalen: %d, first_nalu: %d\n", conference->name, floor_holder->id, imember->id, vid_frame->datalen, vid_frame->first_nalu);
 					}
 				}
 
-				if (vid_frame->img) {
-					if (conference->canvases[0]) {
-						tmp_frame.packet = buf;
-						tmp_frame.packetlen = sizeof(buf) - 12;
-						tmp_frame.data = buf + 12;
-						switch_core_session_write_video_frame(imember->session, &tmp_frame, SWITCH_IO_FLAG_NONE, 0);
+				if ( imember->already_sent_video ) {
+					if (vid_frame->img) {
+						if (conference->canvases[0]) {
+							tmp_frame.packet = buf;
+							tmp_frame.packetlen = sizeof(buf) - 12;
+							tmp_frame.data = buf + 12;
+							switch_core_session_write_video_frame(imember->session, &tmp_frame, SWITCH_IO_FLAG_NONE, 0);
+						} else {
+							switch_core_session_write_video_frame(imember->session, vid_frame, SWITCH_IO_FLAG_NONE, 0);
+						}
 					} else {
-						switch_core_session_write_video_frame(imember->session, vid_frame, SWITCH_IO_FLAG_NONE, 0);
+						switch_assert(vid_frame->packetlen <= SWITCH_RTP_MAX_BUF_LEN);
+						tmp_frame = *vid_frame;
+						tmp_frame.packet = buf;
+						tmp_frame.data = buf + 12;
+						memcpy(tmp_frame.packet, vid_frame->packet, vid_frame->packetlen);
+						tmp_frame.packetlen = vid_frame->packetlen;
+						tmp_frame.datalen = vid_frame->datalen;
+						switch_core_session_write_video_frame(imember->session, &tmp_frame, SWITCH_IO_FLAG_NONE, 0);
 					}
-				} else {
-					switch_assert(vid_frame->packetlen <= SWITCH_RTP_MAX_BUF_LEN);
-					tmp_frame = *vid_frame;
-					tmp_frame.packet = buf;
-					tmp_frame.data = buf + 12;
-					memcpy(tmp_frame.packet, vid_frame->packet, vid_frame->packetlen);
-					tmp_frame.packetlen = vid_frame->packetlen;
-					tmp_frame.datalen = vid_frame->datalen;
-					switch_core_session_write_video_frame(imember->session, &tmp_frame, SWITCH_IO_FLAG_NONE, 0);
 				}
 			}
 		}
@@ -3683,14 +3702,14 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 	 * Add 4 Mark SPS/PPS
 	 * Add by Max 2019/09/12
 	 */
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), %s %d, frame : %p\n", name, member->id, (void *)frame);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "conference_video_thread_callback(), %s %d, frame: %p\n", name, member->id, (void *)frame);
 	if ( switch_test_flag(frame, SFF_KEY_FRAME_SPS) ) {
 		if ( member->sps_frame ) {
 			switch_frame_free(&member->sps_frame);
 			member->sps_frame = NULL;
 		}
 		switch_frame_dup(frame, &member->sps_frame);
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark sps %s %d, sps_size : %d\n", name, member->id, member->sps_frame->datalen);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark SPS %s %d, sps_size: %d, sps_frame: %p\n", name, member->id, member->sps_frame->datalen, (void *)member->sps_frame);
 	}
 	if ( switch_test_flag(frame, SFF_KEY_FRAME_PPS) ) {
 		if ( member->pps_frame ) {
@@ -3698,7 +3717,7 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 			member->pps_frame = NULL;
 		}
 		switch_frame_dup(frame, &member->pps_frame);
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark pps %s %d, pps_size : %d\n", name, member->id, member->pps_frame->datalen);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Mark PPS %s %d, pps_size: %d, pps_frame: %p\n", name, member->id, member->pps_frame->datalen, (void *)member->pps_frame);
 	}
 
 	if (conference_utils_test_flag(member->conference, CFLAG_VIDEO_BRIDGE_FIRST_TWO)) {
@@ -3763,15 +3782,15 @@ switch_status_t conference_video_thread_callback(switch_core_session_t *session,
 			conference_video_write_frame(member->conference, member, frame);
 			conference_video_check_recording(member->conference, NULL, frame);
 		} else if (!conference_utils_test_flag(member->conference, CFLAG_VID_FLOOR_LOCK) && member->id == member->conference->last_video_floor_holder) {
-			conference_member_t *fmember;
-
-			if ((fmember = conference_member_get(member->conference, member->conference->video_floor_holder))) {
-				if (!conference_utils_member_test_flag(fmember, MFLAG_RECEIVING_VIDEO)) {
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), Write Video To Holder, %s %d->%d %d\n", name, member->id, fmember->id, frame->datalen);
-					switch_core_session_write_video_frame(fmember->session, frame, SWITCH_IO_FLAG_NONE, 0);
-				}
-				switch_thread_rwlock_unlock(fmember->rwlock);
-			}
+//			conference_member_t *fmember;
+//
+//			if ((fmember = conference_member_get(member->conference, member->conference->video_floor_holder))) {
+//				if (!conference_utils_member_test_flag(fmember, MFLAG_RECEIVING_VIDEO)) {
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "conference_video_thread_callback(), Write Video To Holder, %s %d->%d %d\n", name, member->id, fmember->id, frame->datalen);
+//					switch_core_session_write_video_frame(fmember->session, frame, SWITCH_IO_FLAG_NONE, 0);
+//				}
+//				switch_thread_rwlock_unlock(fmember->rwlock);
+//			}
 		}
 	}
 

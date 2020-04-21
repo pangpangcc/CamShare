@@ -588,6 +588,8 @@ bool CamShareMiddleware::LoadConfig() {
 					sprintf(domain, "SITE_%d", i);
 					pConfig->siteId = conf.GetPrivate(domain, "SITE_ID", "").c_str();
 					pConfig->recordFinishUrl = conf.GetPrivate(domain, "SITE_HTTP_RECORD_URL", "").c_str();
+					pConfig->loginCheckUrl = conf.GetPrivate(domain, "SITE_HTTP_LOGIN_URL", "").c_str();
+					pConfig->loginCheck = atoi(conf.GetPrivate(domain, "SITE_EXTERNL_LOGIN", "0").c_str());
 				}
 			}
 
@@ -732,7 +734,7 @@ void CamShareMiddleware::StateHandle() {
 					"event : [内部服务(Freeswitch)], "
 					"当前通话 : %u, "
 					"在线用户 : %u, "
-					"在线RTMP: %u, "
+					"在线RTMP : %u, "
 					"在线Websocket : %u, "
 					"过去%u秒共收到MakeCall请求 : %u "
 					")",
@@ -1004,7 +1006,7 @@ void CamShareMiddleware::OnHttpParserError(HttpParser* parser) {
 	Client* client = (Client *)parser->custom;
 
 	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
+			LOG_MSG,
 			"CamShareMiddleware::OnHttpParserError( "
 			"parser : %p, "
 			"client : %p "
@@ -1387,6 +1389,7 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 			);
 
 	bool bFlag = false;
+	bool bChange = false;
 	Json::Value reqRoot;
 	Json::Reader reader;
 	bool bParse = reader.parse(parser->GetBody(), reqRoot, false);
@@ -1399,90 +1402,100 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 				string siteId = "";
 				GetExtParameters(param, userId, siteId);
 
-				if ( userId.length() > 0 && siteId.length() > 0 ){
-					ILiveChatClient* livechat = NULL;
-					mLiveChatClientMap.Lock();
-					LiveChatClientMap::iterator lcItr = mLiveChatClientMap.Find(siteId);
-					if( lcItr != mLiveChatClientMap.End() ) {
-						livechat = lcItr->second;
+				if ( userId.length() > 0 && siteId.length() > 0 ) {
+					bool bResult = true;
+					if( status ) {
+						// 外部登录校验
+						bResult = SendExternalLoginCheck(siteId, param);
 					}
-					mLiveChatClientMap.Unlock();
 
-					// 更新在线状态
-					mSiteUserMap.Lock();
-					SiteUserMap::iterator itr = mSiteUserMap.Find(siteId);
-					if( itr != mSiteUserMap.End() ) {
-						UserMap *pUserMap = &itr->second;
-						pUserMap->Lock();
-						UserMap::iterator userItr = pUserMap->Find(userId);
-						if( status ) {
-							if( userItr == pUserMap->End() ) {
-								// 用户上线
-								SiteConnection *con = new SiteConnection();
-								con->wsCount = 1;
-								pUserMap->Insert(userId, con);
-								bFlag = true;
-
-								LogManager::GetLogManager()->Log(
-										LOG_WARNING,
-										"CamShareMiddleware::OnRequestSetStatus( "
-										"event : [内部服务(HTTP)-收到命令:设置在线状态, 上线], "
-										"parser : %p, "
-										"body : %s, "
-										"count : %d "
-										")",
-										parser,
-										parser->GetBody(),
-										con->wsCount
-										);
-							} else {
-								SiteConnection *con = userItr->second;
-								con->wsCount++;
-								bFlag = true;
-
-								LogManager::GetLogManager()->Log(
-										LOG_WARNING,
-										"CamShareMiddleware::OnRequestSetStatus( "
-										"event : [内部服务(HTTP)-收到命令:设置在线状态, 增加数量], "
-										"parser : %p, "
-										"body : %s, "
-										"count : %d "
-										")",
-										parser,
-										parser->GetBody(),
-										con->wsCount
-										);
-							}
-						} else if( userItr != pUserMap->End() ) {
-							// 用户下线
-							SiteConnection *con = userItr->second;
-							con->wsCount--;
-							if ( con->IsOffline() ) {
-								delete con;
-								pUserMap->Erase(userItr);
-								bFlag = true;
-
-								LogManager::GetLogManager()->Log(
-										LOG_WARNING,
-										"CamShareMiddleware::OnRequestSetStatus( "
-										"event : [内部服务(HTTP)-收到命令:设置在线状态, 下线], "
-										"parser : %p, "
-										"body : %s "
-										")",
-										parser,
-										parser->GetBody()
-										);
-							}
+					if ( bResult ) {
+						ILiveChatClient* livechat = NULL;
+						mLiveChatClientMap.Lock();
+						LiveChatClientMap::iterator lcItr = mLiveChatClientMap.Find(siteId);
+						if( lcItr != mLiveChatClientMap.End() ) {
+							livechat = lcItr->second;
 						}
-						pUserMap->Unlock();
-					}
+						mLiveChatClientMap.Unlock();
 
-					if ( bFlag ) {
-						// 发送用户在线状态改变命令
-						SendOnlineStatus2LiveChat(livechat, userId, status);
-					}
+						// 更新在线状态
+						mSiteUserMap.Lock();
+						SiteUserMap::iterator itr = mSiteUserMap.Find(siteId);
+						if( itr != mSiteUserMap.End() ) {
+							UserMap *pUserMap = &itr->second;
+							pUserMap->Lock();
+							UserMap::iterator userItr = pUserMap->Find(userId);
+							if( status ) {
+								if( userItr == pUserMap->End() ) {
+									// 用户上线
+									SiteConnection *con = new SiteConnection();
+									con->wsCount = 1;
+									pUserMap->Insert(userId, con);
+									bFlag = true;
+									bChange = true;
 
-					mSiteUserMap.Unlock();
+									LogManager::GetLogManager()->Log(
+											LOG_WARNING,
+											"CamShareMiddleware::OnRequestSetStatus( "
+											"event : [内部服务(HTTP)-收到命令:设置在线状态, 上线], "
+											"parser : %p, "
+											"body : %s, "
+											"count : %d "
+											")",
+											parser,
+											parser->GetBody(),
+											con->wsCount
+											);
+								} else {
+									SiteConnection *con = userItr->second;
+									con->wsCount++;
+									bFlag = true;
+
+									LogManager::GetLogManager()->Log(
+											LOG_WARNING,
+											"CamShareMiddleware::OnRequestSetStatus( "
+											"event : [内部服务(HTTP)-收到命令:设置在线状态, 增加数量], "
+											"parser : %p, "
+											"body : %s, "
+											"count : %d "
+											")",
+											parser,
+											parser->GetBody(),
+											con->wsCount
+											);
+								}
+							} else if( userItr != pUserMap->End() ) {
+								// 用户下线
+								SiteConnection *con = userItr->second;
+								con->wsCount--;
+								if ( con->IsOffline() ) {
+									delete con;
+									pUserMap->Erase(userItr);
+									bFlag = true;
+									bChange = true;
+
+									LogManager::GetLogManager()->Log(
+											LOG_WARNING,
+											"CamShareMiddleware::OnRequestSetStatus( "
+											"event : [内部服务(HTTP)-收到命令:设置在线状态, 下线], "
+											"parser : %p, "
+											"body : %s "
+											")",
+											parser,
+											parser->GetBody()
+											);
+								}
+							}
+							pUserMap->Unlock();
+						}
+
+						if ( bChange ) {
+							// 发送用户在线状态改变命令
+							SendOnlineStatus2LiveChat(livechat, userId, status);
+						}
+
+						mSiteUserMap.Unlock();
+					}
 				}
 			}
 		}
@@ -1627,7 +1640,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAuthorizationMember(
 
 		if( !CheckTestAccount(channel->user) ) {
 			// 非测试账号
-			// 发送进入聊天室认证命令
+			// 发送进入会议室认证命令
 			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Timer, channel->chatType) ) {
 				// 断开指定用户视频
 				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
@@ -1674,7 +1687,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 	mFreeswitch.KickUserFromConference(channel->user, channel->conference, channel->memberId);
 
 	if( channel->user != channel->conference ) {
-		// 进入别人聊天室
+		// 进入别人会议室
 
 		// 找出需要发送的LiveChat Client
 		string siteId = channel->siteId;
@@ -1690,7 +1703,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 			// 非测试账号
 			string serverId = channel->serverId;
 
-			// 发送进入聊天室认证命令
+			// 发送进入会议室认证命令
 			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active, channel->chatType) ) {
 				// 断开指定用户视频
 				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
@@ -1700,7 +1713,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 			list<string> userList;
 			mFreeswitch.GetConferenceUserList(channel->conference, userList);
 
-			// 发送通知客户端进入聊天室命令
+			// 发送通知客户端进入会议室命令
 			SendMsgEnterConference2LiveChat(livechat, channel->user, channel->conference, userList);
 
 		} else {
@@ -1741,7 +1754,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceDelMember(
 			);
 
 	if( channel->user != channel->conference ) {
-		// 退出别人聊天室
+		// 退出别人会议室
 		if( channel->user.length() > 0
 				&& channel->conference.length() > 0
 				&& channel->siteId.length() > 0
@@ -1762,7 +1775,7 @@ void CamShareMiddleware::OnFreeswitchEventConferenceDelMember(
 				list<string> userList;
 				mFreeswitch.GetConferenceUserList(channel->conference, userList);
 
-				// 发送通知客户端退出聊天室命令
+				// 发送通知客户端退出会议室命令
 				SendMsgExitConference2LiveChat(livechat, channel->user, channel->conference, userList);
 			}
 		}
@@ -2087,7 +2100,6 @@ void CamShareMiddleware::OnRecvEnterConference(
 			transform(strKey.begin(), strKey.end(), strKey.begin(), ::tolower);
 			if( strKey == "active" ) {
 				// 主动请求验证
-				// 开放成员视频
 				mFreeswitch.StartUserRecvVideo(fromId, toId, ((EnterConferenceRequest*)request)->GetMemberType());
 			}
 
@@ -2253,7 +2265,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"CamShareMiddleware::SendEnterConference2LiveChat( "
-			"event : [外部服务(LiveChat)-发送命令:请求进入会议室认证], "
+			"event : [外部服务(LiveChat)-发送命令:进入会议室认证], "
 			"fromId : %s, "
 			"toId : %s, "
 			"type : %u, "
@@ -2284,7 +2296,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
 					"CamShareMiddleware::SendEnterConference2LiveChat( "
-					"event : [外部服务(LiveChat)-发送命令:请求进入会议室认证-生成会话成功], "
+					"event : [外部服务(LiveChat)-发送命令:进入会议室认证-生成会话成功], "
 					"fromId : %s, "
 					"toId : %s, "
 					"type : %u, "
@@ -2312,7 +2324,7 @@ bool CamShareMiddleware::SendEnterConference2LiveChat(
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"CamShareMiddleware::SendEnterConference2LiveChat( "
-				"event : [外部服务(LiveChat)-发送命令:请求进入会议室认证-失败], "
+				"event : [外部服务(LiveChat)-发送命令:进入会议室认证-失败], "
 				"fromId : %s, "
 				"toId : %s, "
 				"type : %u, "
@@ -2354,7 +2366,7 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
-			"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入聊天室], "
+			"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入会议室], "
 			"fromId : %s, "
 			"toId : %s, "
 			"param : %s, "
@@ -2374,7 +2386,7 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
 					"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
-					"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入聊天室-成功], "
+					"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入会议室-成功], "
 					"fromId : %s, "
 					"toId : %s, "
 					"param : %s, "
@@ -2392,7 +2404,7 @@ bool CamShareMiddleware::SendMsgEnterConference2LiveChat(
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"CamShareMiddleware::SendMsgEnterConference2LiveChat( "
-				"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入聊天室-失败], "
+				"event : [外部服务(LiveChat)-发送命令:通知客户端用户进入会议室-失败], "
 				"fromId : %s, "
 				"toId : %s, "
 				"param : %s, "
@@ -2432,7 +2444,7 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
 			"CamShareMiddleware::SendMsgExitConference2LiveChat( "
-			"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出聊天室], "
+			"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出会议室], "
 			"fromId : %s, "
 			"toId : %s, "
 			"param : %s, "
@@ -2452,7 +2464,7 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 			LogManager::GetLogManager()->Log(
 					LOG_MSG,
 					"CamShareMiddleware::SendMsgExitConference2LiveChat( "
-					"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出聊天室-成功], "
+					"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出会议室-成功], "
 					"fromId : %s, "
 					"toId : %s, "
 					"param : %s, "
@@ -2470,7 +2482,7 @@ bool CamShareMiddleware::SendMsgExitConference2LiveChat(
 		LogManager::GetLogManager()->Log(
 				LOG_ERR_USER,
 				"CamShareMiddleware::SendMsgExitConference2LiveChat( "
-				"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出聊天室-失败], "
+				"event : [外部服务(LiveChat)-发送命令:通知客户端用户退出会议室-失败], "
 				"fromId : %s, "
 				"toId : %s, "
 				"param : %s, "
@@ -2892,4 +2904,103 @@ void CamShareMiddleware::SendAllOnlineList() {
 		SendOnlineList2LiveChat(livechat, userIdList);
 	}
 	mSiteUserMap.Unlock();
+}
+
+bool CamShareMiddleware::SendExternalLoginCheck(const string& siteId, const string& param) {
+	bool bFlag = false;
+
+	HttpClient client;
+	HttpEntiy httpEntiy;
+	httpEntiy.SetAuthorization("test", "5179");
+
+	bool loginCheck = true;
+
+	string url = "";
+	mSiteConfigMap.Lock();
+	SiteConfigMap::iterator itr = mSiteConfigMap.Find(siteId);
+	if( itr != mSiteConfigMap.End() ) {
+		SiteConfig* pConfig = itr->second;
+		url = pConfig->loginCheckUrl;
+		loginCheck = pConfig->loginCheck;
+	}
+	mSiteConfigMap.Unlock();
+
+	if ( loginCheck ) {
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"CamShareMiddleware::SendExternalLoginCheck( "
+				"event : [外部登录校验], "
+				"siteId : %s, "
+				"url : %s, "
+				"param : %s "
+				")",
+				siteId.c_str(),
+				url.c_str(),
+				param.c_str()
+				);
+
+		if( url.length() > 0 ) {
+			url += "&";
+			url += param;
+
+			if( client.Request(url.c_str(), &httpEntiy) ) {
+				// 解析返回
+				const char* respond = NULL;
+				int respondSize = 0;
+				int httpCode = client.GetRespondCode();
+				client.GetBody(&respond, respondSize);
+
+				LogManager::GetLogManager()->Log(
+						LOG_WARNING,
+						"CamShareMiddleware::SendExternalLoginCheck( "
+						"event : [外部登录校验, 返回], "
+						"siteId : %s, "
+						"url : %s, "
+						"param : %s, "
+						"httpCode : %ld, "
+						"respondSize : %d, "
+						"respond : %s "
+						")",
+						siteId.c_str(),
+						url.c_str(),
+						param.c_str(),
+						httpCode,
+						respondSize,
+						respond
+						);
+
+				if( httpCode == 200 ) {
+					if( respondSize > 0 ) {
+						// 发送成功
+						Json::Value root;
+						Json::Reader reader;
+						if( reader.parse(respond, root, false) ) {
+							// 解析协议成功, 标记为发送成功
+							if( root["result"].isInt() ) {
+								int result = root["result"].asInt();
+								bFlag = (result == 1);
+							}
+						}
+					}
+				}
+			}
+		} else {
+			LogManager::GetLogManager()->Log(
+					LOG_ERR_USER,
+					"CamShareMiddleware::SendExternalLoginCheck( "
+					"event : [外部登录校验, 参数错误], "
+					"siteId : %s, "
+					"url : %s, "
+					"param : %s "
+					")",
+					siteId.c_str(),
+					url.c_str(),
+					param.c_str()
+					);
+		}
+	} else {
+		bFlag = true;
+	}
+
+	return bFlag;
 }

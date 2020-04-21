@@ -442,7 +442,7 @@ typedef struct rtmp2rtp_helper_s
 	switch_buffer_t *nalu_buf;
 	uint32_t	naluReadCount;
 	uint32_t	naluReadIndex;
-	uint32_t	naluReadIPFrameIndex;
+	uint32_t	naluReadSPS_PPSCount;
 } rtmp2rtp_helper_t;
 
 typedef struct rtp2rtmp_helper_s

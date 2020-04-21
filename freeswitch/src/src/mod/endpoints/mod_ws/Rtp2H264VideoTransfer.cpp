@@ -65,6 +65,11 @@ switch_status_t Rtp2H264VideoTransfer::buffer_h264_nalu(switch_frame_t *frame, s
 	/* hack for phones sending sps/pps with frame->m = 1 such as grandstream */
 	if ((nalu_type == 7 || nalu_type == 8) && frame->m) frame->m = SWITCH_FALSE;
 
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+			"mod_ws: Rtp2H264VideoTransfer::buffer_h264_nalu(), "
+			"nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d, nalu_28_start: %d, frame: %p \n",
+			nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer), nalu_28_start, frame);
+
 	if (nalu_type == 28) { // 0x1c FU-A
 		int start = *(data + 1) & 0x80;
 		int end = *(data + 1) & 0x40;
@@ -79,6 +84,11 @@ switch_status_t Rtp2H264VideoTransfer::buffer_h264_nalu(switch_frame_t *frame, s
 				switch_buffer_zero(buffer);
 			}
 		} else if (end) {
+			// Add by Max
+			if ( !start && !nalu_28_start ) {
+				//  skip error slice frame
+				return SWITCH_STATUS_SUCCESS;
+			}
 			nalu_28_start = SWITCH_FALSE;
 		} else if ( nalu_28_start == SWITCH_FALSE ) {
 			return SWITCH_STATUS_RESTART;

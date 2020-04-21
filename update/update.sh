@@ -16,11 +16,12 @@ cd $path
 
 # ---- freeswitch ----
 # freeswitch common config
-#cp -f ./file/modules.conf.xml /usr/local/freeswitch/conf/autoload_configs/
+cp -f ./file/modules.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 #cp -f ./file/switch.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 #cp -f ./file/vars.xml /usr/local/freeswitch/conf/vars.xml
 
 # freeswitch ./lib & ./mod files
+cp -f ./file/bin/* /usr/local/freeswitch/bin/
 cp -f ./file/lib/* /usr/local/freeswitch/lib/
 #cp -f ./file/mod/* /usr/local/freeswitch/mod/
 
@@ -56,7 +57,7 @@ cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
 # ---- camshare ----
 # camshare-middleware file
 cp -f ./file/camshare-middleware /usr/local/CamShareServer/
-#cp -f ./file/camshare-middleware.config /usr/local/CamShareServer/
+cp -f ./file/camshare-middleware.config /usr/local/CamShareServer/
 
 # ---- camshare executor ----
 cp -f ./file/camshare-executor /usr/local/CamShareServer/
@@ -68,6 +69,7 @@ cp -f ./file/camshare-executor /usr/local/CamShareServer/
 #cp -f ./file/check_run.sh /usr/local/CamShareServer/
 #cp -f ./file/dump_crash_log.sh /usr/local/CamShareServer/
 #cp -f ./file/check_session_count.sh /usr/local/CamShareServer/
+cp -f ./file/check_makecall_fail.sh /usr/local/CamShareServer/
 #if [ -e "/usr/local/CamShareServer/check_session_count.sh" ]; then
 #  rm -f /usr/local/CamShareServer/check_session_count.sh 
 #fi
@@ -80,7 +82,7 @@ cp -f ./file/camshare-executor /usr/local/CamShareServer/
 cp -f ./version /usr/local/CamShareServer/
 
 # ---- local bin file ----
-cp -f ./file/usr_local_bin/* /usr/local/bin/
+#cp -f ./file/usr_local_bin/* /usr/local/bin/
 
 # --- start camshare & freeswitch ---
 # run camshare & freeswitch

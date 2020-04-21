@@ -1196,6 +1196,10 @@ switch_status_t WebSocketServer::WSWriteVideoFrame(switch_core_session_t *sessio
 			// Get H264 frame
 			if( parser->GetFrame(frame, &data, &dataLen) ) {
 				// Get frame success
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+						"mod_ws: WebSocketServer::WSWriteVideoFrame(), "
+						"timestamp: %d, dataLen: %d \n",
+						frame->timestamp, dataLen);
 
 				// Get WebSocket packet
 				char header[WS_HEADER_MAX_LEN] = {0};

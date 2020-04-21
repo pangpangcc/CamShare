@@ -1,3 +1,12 @@
-break switch_event.c:366
+#break switch_event.c:366
 #break switch_event.c:331 if switch_queue_size(EVENT_DISPATCH_QUEUE)==30000
-break switch_event.c:403 if switch_queue_size(EVENT_DISPATCH_QUEUE)==30000
+#break switch_event.c:403 if switch_queue_size(EVENT_DISPATCH_QUEUE)==30000
+
+# open
+break srs_librtmp.cpp:35014
+# close
+break srs_librtmp.cpp:35026
+# write
+break srs_librtmp.cpp:35189
+# write_h264_video
+break srs_librtmp.cpp:35250 

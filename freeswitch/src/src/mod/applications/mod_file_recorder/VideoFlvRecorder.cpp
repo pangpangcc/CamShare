@@ -73,7 +73,7 @@ bool VideoFlvRecorder::StartRecord(switch_file_handle_t *handle
 			  ", videoRecPath:%s, videoDstDir:%s, finishShell:%s"
 			  ", picRecDir:%s, picDstDir:%s, picShell:%s, picInterval:%d\n"
 			, this
-			, (NULL!= handle ? handle->memory_pool : NULL)
+			, (NULL!= handle ? handle->memory_pool: NULL)
 			, videoRecPath, videoDstDir, finishShell
 			, picRecDir, picDstDir, picShell, picInterval);
 
@@ -752,10 +752,10 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 	/* hack for phones sending sps/pps with frame->m = 1 such as grandstream */
 	if ((nalu_type == 7 || nalu_type == 8) && frame->m) frame->m = SWITCH_FALSE;
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-//			"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
-//			"nalu_type: %d, first_nalu: %d, m: %d, size: %d, bufferSize: %d, nalu_28_start : %d \n",
-//			nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer), nalu_28_start);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+			"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+			"nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d, nalu_28_start: %d, frame: %p \n",
+			nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer), nalu_28_start, frame);
 
 	if (nalu_type == 28) { // 0x1c FU-A
 		int start = *(data + 1) & 0x80;
@@ -764,7 +764,7 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 		nalu_type = *(data + 1) & 0x1f;
 
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-//				, "mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), nalu_type: %d, size: %d, bufferSize: %d, first: %d, m: %d, start: %d, end: %d, nalu_28_start : %d \n"
+//				, "mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), nalu_type: %d, size: %d, bufferSize: %d, first: %d, m: %d, start: %d, end: %d, nalu_28_start: %d \n"
 //				, nalu_type, frame->datalen, switch_buffer_inuse(buffer), frame->first_nalu, frame->m, start, end, nalu_28_start);
 
 		if (start && end) return SWITCH_STATUS_RESTART;
@@ -775,13 +775,17 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 				switch_buffer_zero(buffer);
 			}
 		} else if (end) {
+			// Add by Max
+			if ( !start && !nalu_28_start ) {
+				//  skip error slice frame
+				return SWITCH_STATUS_SUCCESS;
+			}
 			nalu_28_start = SWITCH_FALSE;
 		} else if ( nalu_28_start == SWITCH_FALSE ) {
 			return SWITCH_STATUS_RESTART;
 		}
 
 		if (start) {
-			unsigned int datalen = htonl(frame->datalen);
 			uint8_t nalu_idc = (nalu_hdr & 0x60) >> 5;
 			nalu_type |= (nalu_idc << 5);
 
@@ -1141,6 +1145,10 @@ bool VideoFlvRecorder::WriteVideoData2FlvFile(video_frame_t *frame)
 			frame->isIFrame = IsIFrame(mpVideoDataBuffer, miVideoDataBufferLen);
 
 			// 把数据写入flv文件
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+					"mod_file_recorder: VideoFlvRecorder::WriteVideoData2FlvFile(), "
+					"timestamp: %d, miVideoDataBufferLen: %d \n",
+					frame->timestamp, miVideoDataBufferLen);
 			int writeResult = srs_flv_write_h264_raw_frames(mpFlvFile, frame->timestamp, (char*)mpVideoDataBuffer, miVideoDataBufferLen);
 			if (0 == writeResult) {
 				result = true;
@@ -1355,7 +1363,7 @@ bool VideoFlvRecorder::SendCommand(const char* cmd) {
 //	switch_log_printf(
 //			SWITCH_CHANNEL_LOG,
 //			SWITCH_LOG_DEBUG,
-//			"mod_file_recorder: VideoFlvRecorder::SendCommand() cmd : \"%s\"\n",
+//			"mod_file_recorder: VideoFlvRecorder::SendCommand() cmd: \"%s\"\n",
 //			cmd
 //			);
 	return file_record_send_command_lua(cmd);
@@ -1375,8 +1383,8 @@ bool VideoFlvRecorder::file_record_send_command(const char* cmd) {
 				SWITCH_LOG_ERROR,
 				"VideoFlvRecorder::file_record_send_command( "
 				"[Send event Fail], "
-				"this : %p, "
-				"cmd : '%s' "
+				"this: %p, "
+				"cmd: '%s' "
 				") \n",
 				this,
 				cmd
@@ -1414,8 +1422,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 //			SWITCH_LOG_INFO,
 //			"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 //			"[LUA call], "
-//			"this : %p, "
-//			"path : %s "
+//			"this: %p, "
+//			"path: %s "
 //			") \n",
 //			this,
 //			path
@@ -1428,8 +1436,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 //				SWITCH_LOG_INFO,
 //				"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 //				"[LUA call OK], "
-//				"this : %p, "
-//				"stream.data : '%s' "
+//				"this: %p, "
+//				"stream.data: '%s' "
 //				") \n",
 //				this,
 //				stream.data
@@ -1440,8 +1448,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 				SWITCH_LOG_ERROR,
 				"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 				"[LUA call Fail], "
-				"this : %p, "
-				"stream.data : '%s' "
+				"this: %p, "
+				"stream.data: '%s' "
 				") \n",
 				this,
 				stream.data
