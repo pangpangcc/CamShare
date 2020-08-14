@@ -1161,6 +1161,7 @@ void CamShareMiddleware::OnRequestGetDialplan(
 	const string serverId = parser->GetParam("serverId");
 	const string siteId = parser->GetParam("siteId");
 	const string source = parser->GetParam("source");
+	const string chat_type_string = parser->GetParam("chat_type_string");
 
 	LogManager::GetLogManager()->Log(
 			LOG_WARNING,
@@ -1171,6 +1172,7 @@ void CamShareMiddleware::OnRequestGetDialplan(
 			"serverId : %s, "
 			"siteId : %s, "
 			"source : %s, "
+			"chat_type_string : %s, "
 			"channelId : %s, "
 			"parser : %p "
 			")",
@@ -1179,6 +1181,7 @@ void CamShareMiddleware::OnRequestGetDialplan(
 			serverId.c_str(),
 			siteId.c_str(),
 			source.c_str(),
+			chat_type_string.c_str(),
 			channelId.c_str(),
 			parser
 			);
@@ -1189,7 +1192,7 @@ void CamShareMiddleware::OnRequestGetDialplan(
 	mMakeCallCountMutex.unlock();
 
 	// 插入channel
-    bool bFlag = mFreeswitch.UpdateChannelWithDialplan(channelId, caller, conference, serverId, siteId);
+    bool bFlag = mFreeswitch.UpdateChannelWithDialplan(channelId, caller, conference, serverId, siteId, chat_type_string);
     if( !bFlag ) {
     	LogManager::GetLogManager()->Log(
     			LOG_ERR_USER,
@@ -1468,10 +1471,10 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 								// 用户下线
 								SiteConnection *con = userItr->second;
 								con->wsCount--;
+								bFlag = true;
 								if ( con->IsOffline() ) {
 									delete con;
 									pUserMap->Erase(userItr);
-									bFlag = true;
 									bChange = true;
 
 									LogManager::GetLogManager()->Log(

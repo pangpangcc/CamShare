@@ -53,8 +53,7 @@
 /**
  * Modify by Max /2019/09/19
  */
-//#define AMF_MAX_SIZE      2048 * 16 * 2
-#define AMF_MAX_SIZE      2048 * 16 * 2 * 2
+#define AMF_MAX_SIZE      2048 * 16 * 4
 #define AMF_INVOKE_SIZE      2048 * 16 * 2
 
 #define SUPPORT_SND_NONE	0x0000

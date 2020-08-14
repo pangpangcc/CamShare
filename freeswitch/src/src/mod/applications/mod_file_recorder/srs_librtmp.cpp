@@ -850,7 +850,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ERROR_AVC_NALU_UEV                  4027
 #define ERROR_AAC_BYTES_INVALID             4028
 #define ERROR_HTTP_REQUEST_EOF              4029
-
+#define ERROR_AVC_NALU_SPS_UEV              4030
+#define ERROR_AVC_NALU_PPS_UEV              4031
 ///////////////////////////////////////////////////////
 // HTTP API error.
 ///////////////////////////////////////////////////////
@@ -35210,7 +35211,7 @@ int srs_flv_write_h264_raw_frames(srs_flv_t flv, int32_t time, char* frames, int
 					context->writer.h264_sps_changed = true;
 				}
 				else {
-					ret = ERROR_AVC_NALU_UEV;
+					ret = ERROR_AVC_NALU_SPS_UEV;
 					break;
 				}
 			}
@@ -35223,7 +35224,7 @@ int srs_flv_write_h264_raw_frames(srs_flv_t flv, int32_t time, char* frames, int
 					context->writer.h264_pps_changed = true;
 				}
 				else {
-					ret = ERROR_AVC_NALU_UEV;
+					ret = ERROR_AVC_NALU_PPS_UEV;
 					break;
 				}
 			}

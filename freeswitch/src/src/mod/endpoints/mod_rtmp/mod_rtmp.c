@@ -538,7 +538,7 @@ switch_status_t rtmp_read_frame(switch_core_session_t *session, switch_frame_t *
 				tech_pvt->read_frame.datalen = len-1;
 
 				if (codec != tech_pvt->audio_codec) {
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Received codec 0x%x instead of 0x%x\n", codec, tech_pvt->audio_codec);
+//					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Received codec 0x%x instead of 0x%x\n", codec, tech_pvt->audio_codec);
 					switch_mutex_unlock(tech_pvt->readbuf_mutex);
 					goto cng;
 				}
@@ -939,7 +939,11 @@ void rtmp_profile_release(rtmp_profile_t *profile)
 
 rtmp_session_t *rtmp_session_locate(const char *uuid)
 {
-	rtmp_session_t *rsession = switch_core_hash_find_rdlock(rtmp_globals.session_hash, uuid, rtmp_globals.session_rwlock);
+	/**
+	 * Modify by Max 2020/08/10
+	 */
+//	rtmp_session_t *rsession = switch_core_hash_find_rdlock(rtmp_globals.session_hash, uuid, rtmp_globals.session_rwlock);
+	rtmp_session_t *rsession = switch_core_hash_find(rtmp_globals.session_hash, uuid);
 
 	if (!rsession || rsession->state >= RS_DESTROY) {
 		return NULL;
@@ -1138,7 +1142,22 @@ switch_status_t rtmp_real_session_destroy(rtmp_session_t **rsession)
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG1, "RTMP session [%s] %p will be destroyed.\n", (*rsession)->uuid, (void *) *rsession);
 
-
+	/**
+	 * Modify by Max 2020/08/10
+	 * Fix deadlock
+	 *  1.rtmp_garbage_colletor->rtmp_real_session_destroy->switch_event_fire, push event to queue (Thread 1, Producer)
+	 *    1.1 rtmp_globals.session_rwlock->lock()
+	 *    1.2 destroy rsession
+	 *    1.3 rtmp_globals.session_rwlock->unlock()
+	 *
+	 *  2.switch_event_dispatch_thread, pop event from queue, callback rtmp_event_handler, and try to find rsession with uuid  (Thread 2, Consumer)
+	 *    2.1 rtmp_globals.session_rwlock->lock()
+	 *    2.2 get rsession
+	 *    2.3 rtmp_globals.session_rwlock->unlock()
+	 *    2.4 do something with rsession
+	 *
+	 *  if 1.2 destroy rsession between 2.3 and 2.4, it is unpredictable, deadlock or crash.
+	 */
 	if (switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, RTMP_EVENT_DISCONNECT) == SWITCH_STATUS_SUCCESS) {
 		rtmp_event_fill(*rsession, event);
 		switch_event_fire(&event);
@@ -1761,10 +1780,15 @@ static void rtmp_event_handler(switch_event_t *event)
 		return;
 	}
 
+	/**
+	 * Modify by Max 2020/08/10
+	 */
+	switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
 	if ((rsession = rtmp_session_locate(uuid))) {
 		rtmp_send_event(rsession, event);
 		rtmp_session_rwunlock(rsession);
 	}
+	switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
 }
 
 #define RTMP_CONTACT_FUNCTION_SYNTAX "profile/user@domain[/[!]nickname]"
@@ -2001,6 +2025,7 @@ SWITCH_STANDARD_API(rtmp_function)
 			goto usage;
 		}
 
+		switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
 		rsession = rtmp_session_locate(argv[1]);
 		if (!rsession) {
 			stream->write_function(stream, "-ERR No such session\n");
@@ -2086,6 +2111,8 @@ SWITCH_STANDARD_API(rtmp_function)
 		if (rsession) {
 			rtmp_session_rwunlock(rsession);
 		}
+
+		switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
 
 		if( bFlag == SWITCH_FALSE ) {
 			goto usage;

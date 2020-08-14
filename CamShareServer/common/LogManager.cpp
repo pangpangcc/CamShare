@@ -54,7 +54,8 @@ LogManager *LogManager::GetLogManager() {
 	return gLogManager;
 }
 
-LogManager::LogManager() {
+LogManager::LogManager()
+:mMutex(KMutex::MutexType_Recursive) {
 	// TODO Auto-generated constructor stub
 	mIsRunning = false;
 	mpFileCtrl = NULL;
@@ -95,8 +96,12 @@ bool LogManager::Log(LOG_LEVEL nLevel, const char *format, ...) {
 	    time_t stm = time(NULL);
         struct tm tTime;
         localtime_r(&stm,&tTime);
-        snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d tid:%-6d ] ",
-        		tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec,
+
+	    struct timeval tv;
+	    gettimeofday(&tv, NULL);
+
+        snprintf(bitBuffer, 64, "[ %d-%02d-%02d %02d:%02d:%02d.%03d tid:%-6d ] ",
+        		tTime.tm_year+1900, tTime.tm_mon+1, tTime.tm_mday, tTime.tm_hour, tTime.tm_min, tTime.tm_sec, tv.tv_usec / 1000,
 				(int)syscall(SYS_gettid)
 				);
 

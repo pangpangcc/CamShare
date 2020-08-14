@@ -34,7 +34,7 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.2.3"
+#define VERSION_STRING "1.2.5"
 
 typedef struct SiteConfig {
 	SiteConfig() {

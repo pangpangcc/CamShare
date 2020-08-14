@@ -504,7 +504,7 @@ bool VideoFlvRecorder::RecordVideoFrame2FileProc()
 
 			// 读buffer数据失败
 			if (!success) {
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING
 						, "mod_file_recorder: VideoFlvRecorder:RecordVideoFrame2FileProc() read buffer fail, recorder:%p, inuse:%d, dataBufferLen:%d, dataBufferSize:%d, mcVideoRecPath:%s\n"
 						, this, inuseSize, miVideoDataBufferLen, miVideoDataBufferSize, mcVideoRecPath);
 				break;
@@ -1152,6 +1152,17 @@ bool VideoFlvRecorder::WriteVideoData2FlvFile(video_frame_t *frame)
 			int writeResult = srs_flv_write_h264_raw_frames(mpFlvFile, frame->timestamp, (char*)mpVideoDataBuffer, miVideoDataBufferLen);
 			if (0 == writeResult) {
 				result = true;
+			} else {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING,
+						"mod_file_recorder: VideoFlvRecorder::WriteVideoData2FlvFile() fail, "
+						"writeResult: %d, timestamp: %d, miVideoDataBufferLen: %d, "
+						"data: 0x%02x,0x%02x,0x%02x,0x%02x,0x%02x \n",
+						writeResult, frame->timestamp, miVideoDataBufferLen,
+						(unsigned char*)mpVideoDataBuffer[0],
+						(unsigned char*)mpVideoDataBuffer[1],
+						(unsigned char*)mpVideoDataBuffer[2],
+						(unsigned char*)mpVideoDataBuffer[3],
+						(unsigned char*)mpVideoDataBuffer[4]);
 			}
 		}
 
@@ -1328,7 +1339,7 @@ bool VideoFlvRecorder::RunPictureShell()
 	char cmd[MAX_PATH_LENGTH] = {0};
 //	snprintf(cmd, sizeof(cmd), "%s %s %s"
 //			, mcPicShell, mcPicRecPath, mcPicDstPath);
-	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -i %s -y -s 240x180 -vframes 1 %s"
+	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -v error -i %s -y -s 240x180 -vframes 1 %s"
 			, mcPicRecPath, mcPicDstPath);
 
 	// log
