@@ -97,7 +97,7 @@ switch_status_t on_rtmp_tech_init(switch_core_session_t *session, rtmp_private_t
 
 	switch_mutex_init(&tech_pvt->video_readbuf_mutex, SWITCH_MUTEX_NESTED, switch_core_session_get_pool(session));
 
-	switch_buffer_create_dynamic(&tech_pvt->video_readbuf, 1024, 1024, 2048000);
+	switch_buffer_create_dynamic(&tech_pvt->video_readbuf, 1024, 1024, 0);
 
 	rtmp2rtp_helper_init(&tech_pvt->video_read_helper);
 	rtp2rtmp_helper_init(&tech_pvt->video_write_helper);
@@ -132,7 +132,7 @@ switch_status_t on_rtmp_destroy(rtmp_private_t *tech_pvt)
 
 
 /*Rtmp packet to rtp frame*/
-switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data, uint32_t len)
+switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t *read_helper, uint8_t* data, uint32_t len)
 {
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
 	uint8_t *end = data + len;
@@ -268,7 +268,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 	} else if ((data[0] == 0x17 || data[0] == 0x27) && data[1] == 1) {
 		if ( data[0] == 0x17 ) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-					"rtmp_rtmp2rtpH264(), Recv IDR Packet, data[0]: %02x, data[1]: %02x, len: %d\n", data[0], data[1], len);
+					"rtmp_rtmp2rtpH264(), Recv IDR Packet, len: %d\n", len);
 		}
 
 		if (read_helper->sps && read_helper->pps) {
@@ -335,7 +335,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 					if ( nalType == 5 || nalType == 1 || nalType == 7 || nalType == 8 ) {
 						if ( remaining_len < MAX_RTP_PAYLOAD_SIZE ) {
 //							if ( nalType == 5 || nalType == 7 || nalType == 8 ) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_rtmp2rtpH264(), Recv Nalu(Single), nalType: %d, sliceType: %02x, nalSize: %d \n", nalType, sliceType, remaining_len);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_rtmp2rtpH264(), Recv Nalu(Single), nalType: %d, sliceType: %02x, len: %d, nalSize: %d \n", nalType, sliceType, len, remaining_len);
 								if ( nalType == 7 || nalType == 8 ) {
 //									char hex[256];
 //									char *pHex = hex;
@@ -400,7 +400,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 							}
 
 //							if ( nalType == 5 ) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_rtmp2rtpH264(), Recv Nalu(FU-A), nalType: %d, sliceType: %02x, naluSize: %d, fuSize: %d, fuCount: %d \n", nalType, sliceType, nal_len, fuSize, fuCount);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_rtmp2rtpH264(), Recv Nalu(FU-A), nalType: %d, sliceType: %02x, len: %d, naluSize: %d, fuSize: %d, fuCount: %d \n", nalType, sliceType, len, nal_len, fuSize, fuCount);
 //							}
 						}
 					}
@@ -449,7 +449,8 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t  *read_helper, uint8_t* data
 //			}
 		}
 	} else {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Missing rtmp data\n");
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_rtmp2rtpH264(), Missing rtmp data, data[0]: %02x, data[1]: %02x, len: %d\n", data[0], data[1], len);
+		status = SWITCH_STATUS_FALSE;
 	}
 
 	return status;
@@ -504,9 +505,9 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 //		rtp_ts = ntohl(raw_rtp->ts);
 
 		if (helper->last_seq != USHRT_MAX && helper->last_seq + 1 != rtp_seq) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), Possible video rtp packet loss? seq: %u - %u = %d, ts: %u - %u = %d\n",
-				ntohs(raw_rtp->seq), helper->last_seq, (int)(rtp_seq - helper->last_seq),
-				ntohl(raw_rtp->ts), helper->last_recv_ts, (int)(rtp_ts - helper->last_recv_ts));
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), Possible video rtp packet loss? rtp_seq: %u, last_seq: %u, rtp_ts: %u, last_recv_ts: %u \n",
+					rtp_seq, helper->last_seq,
+					rtp_ts, helper->last_recv_ts);
 
 //			if ( switch_test_flag(frame, SFF_KEY_FRAME_SPS) || switch_test_flag(frame, SFF_KEY_FRAME_PPS) ) {
 //				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), Skip duplicate SPS/PPS, ts: %u, seq: %u\n", rtp_ts, rtp_seq);
@@ -530,9 +531,9 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 		switch_buffer_zero(helper->fua_buf);
 	}
 
-	helper->last_recv_ts = rtp_ts;
 	helper->last_mark = frame->m;
 	helper->last_seq = rtp_seq;
+	helper->last_recv_ts = rtp_ts;
 
 	switch (nalType) {
 	case 7: //sps
@@ -908,6 +909,7 @@ switch_status_t rtmp_read_video_frame(switch_core_session_t *session, switch_fra
 	switch_channel_t *channel = NULL;
 	rtmp_private_t *tech_pvt = NULL;
 	uint16_t len;
+	switch_status_t status = SWITCH_STATUS_SUCCESS;
 
 	channel = switch_core_session_get_channel(session);
 	assert(channel != NULL);
@@ -953,7 +955,7 @@ switch_status_t rtmp_read_video_frame(switch_core_session_t *session, switch_fra
 				switch_buffer_read(tech_pvt->video_readbuf, &tech_pvt->video_read_ts, 4);
 				tech_pvt->video_read_ts *= 90;
 				switch_buffer_peek_zerocopy(tech_pvt->video_readbuf, &data);
-				rtmp_rtmp2rtpH264(&tech_pvt->video_read_helper, (uint8_t *)data, len);
+				status = rtmp_rtmp2rtpH264(&tech_pvt->video_read_helper, (uint8_t *)data, len);
 				switch_buffer_toss(tech_pvt->video_readbuf, len);
 
 				if (amf0_array_size(tech_pvt->video_read_helper.nal_list) == 0) {
@@ -1084,6 +1086,12 @@ wr_frame:
 
 	*frame = &tech_pvt->video_read_frame;
 	(*frame)->img = NULL;
+
+	if ( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(tech_pvt->rtmp_session->uuid), SWITCH_LOG_ERROR, "rtmp_read_video_frame(), Read video frame error, seq: %u, ts: %u \n", tech_pvt->seq, tech_pvt->video_read_frame.timestamp);
+		rtmp_session_shutdown(&tech_pvt->rtmp_session);
+	}
+
 	return SWITCH_STATUS_SUCCESS;
 
 cng:
@@ -1092,6 +1100,11 @@ cng:
 	tech_pvt->video_read_frame.codec = &tech_pvt->video_read_codec;
 
 	*frame = &tech_pvt->video_read_frame;
+
+	if ( status != SWITCH_STATUS_SUCCESS ) {
+		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(tech_pvt->rtmp_session->uuid), SWITCH_LOG_ERROR, "rtmp_read_video_frame(), Read video frame error, seq: %u, ts: %u \n", tech_pvt->seq, tech_pvt->video_read_frame.timestamp);
+		rtmp_session_shutdown(&tech_pvt->rtmp_session);
+	}
 
 	return SWITCH_STATUS_SUCCESS;
 }

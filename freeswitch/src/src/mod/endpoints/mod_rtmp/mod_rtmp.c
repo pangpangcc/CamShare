@@ -373,9 +373,7 @@ switch_status_t rtmp_on_hangup(switch_core_session_t *session)
 	/**
 	 * Add by Max 2019/09/18
 	 */
-	switch_mutex_lock(rsession->handle_mutex);
 	rtmp_session_shutdown(&rsession);
-	switch_mutex_unlock(rsession->handle_mutex);
 
 	/*
 	 * If the session_rwlock is already locked, then there is a larger possibility that the rsession
@@ -808,6 +806,7 @@ switch_call_cause_t rtmp_outgoing_channel(switch_core_session_t *session, switch
 	}
 
 	/* Locate the user to be called */
+	switch_thread_rwlock_rdlock(rtmp_globals.session_rwlock);
 	if (!(rsession = rtmp_session_locate(destination))) {
 		cause = SWITCH_CAUSE_NO_ROUTE_DESTINATION;
 		switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "No such session id: %s\n", outbound_profile->destination_number);
@@ -887,6 +886,8 @@ switch_call_cause_t rtmp_outgoing_channel(switch_core_session_t *session, switch
 		rtmp_session_rwunlock(rsession);
 	}
 
+	switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
+
 	return SWITCH_CAUSE_SUCCESS;
 
 fail:
@@ -899,8 +900,10 @@ fail:
 		rtmp_session_rwunlock(rsession);
 	}
 	switch_safe_free(destination);
-	return cause;
 
+//	switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
+
+	return cause;
 }
 
 switch_status_t rtmp_receive_event(switch_core_session_t *session, switch_event_t *event)
@@ -1084,13 +1087,15 @@ switch_status_t rtmp_session_destroy(rtmp_session_t **rsession)
 {
 	switch_status_t status = SWITCH_STATUS_FALSE;
 
-	switch_mutex_lock(rtmp_globals.mutex);
+//	switch_mutex_lock(rtmp_globals.mutex);
+	switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
 	if (rsession && *rsession) {
 		(*rsession)->state = RS_DESTROY;
 		*rsession = NULL;
 		status = SWITCH_STATUS_SUCCESS;
 	}
-	switch_mutex_unlock(rtmp_globals.mutex);
+	switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
+//	switch_mutex_unlock(rtmp_globals.mutex);
 
 	return status;
 }
@@ -1098,13 +1103,22 @@ switch_status_t rtmp_session_destroy(rtmp_session_t **rsession)
 switch_status_t rtmp_session_shutdown(rtmp_session_t **rsession)
 {
 	switch_status_t status = SWITCH_STATUS_FALSE;
-	if (rsession && *rsession) {
-		rtmp_tcp_io_private_t *io_pvt = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
-		if ( io_pvt->socket ) {
-			switch_socket_shutdown(io_pvt->socket, SWITCH_SHUTDOWN_READWRITE);
-			status = SWITCH_STATUS_SUCCESS;
-		}
+//	switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
+//	if (rsession && *rsession && (*rsession)->state != RS_DESTROY) {
+//		rtmp_tcp_io_private_t *io_private = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
+//		if ( io_private && io_private->socket ) {
+//			switch_socket_shutdown(io_private->socket, SWITCH_SHUTDOWN_READWRITE);
+//			status = SWITCH_STATUS_SUCCESS;
+//		}
+//	}
+//	switch_thread_rwlock_unlock(rtmp_globals.session_rwlock);
+	rtmp_tcp_io_private_t *io_private = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
+	switch_mutex_lock(io_private->socket_mutex);
+	if ( io_private->socket ) {
+		switch_socket_shutdown(io_private->socket, SWITCH_SHUTDOWN_READWRITE);
+		status = SWITCH_STATUS_SUCCESS;
 	}
+	switch_mutex_unlock(io_private->socket_mutex);
 	return status;
 }
 
@@ -1783,7 +1797,7 @@ static void rtmp_event_handler(switch_event_t *event)
 	/**
 	 * Modify by Max 2020/08/10
 	 */
-	switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
+	switch_thread_rwlock_rdlock(rtmp_globals.session_rwlock);
 	if ((rsession = rtmp_session_locate(uuid))) {
 		rtmp_send_event(rsession, event);
 		rtmp_session_rwunlock(rsession);
@@ -2025,7 +2039,7 @@ SWITCH_STANDARD_API(rtmp_function)
 			goto usage;
 		}
 
-		switch_thread_rwlock_wrlock(rtmp_globals.session_rwlock);
+		switch_thread_rwlock_rdlock(rtmp_globals.session_rwlock);
 		rsession = rtmp_session_locate(argv[1]);
 		if (!rsession) {
 			stream->write_function(stream, "-ERR No such session\n");

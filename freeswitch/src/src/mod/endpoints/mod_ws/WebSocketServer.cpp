@@ -689,11 +689,10 @@ bool WebSocketServer::CreateCall(WSClientParser* parser) {
 						parser->GetDestNumber()
 						);
 
-				// 会话线程没有启动
-				switch_core_session_destroy(&newsession);
-
 				// 从会话列表删除
 				switch_core_hash_delete_wrlock(mpChannelHash, switch_core_session_get_uuid(newsession), mpHashrwlock);
+				// 会话线程没有启动
+				switch_core_session_destroy(&newsession);
 
 			} else {
 				// 会话线程已经启动, 挂断会话
@@ -1209,10 +1208,13 @@ switch_status_t WebSocketServer::WSWriteVideoFrame(switch_core_session_t *sessio
 				// Send WebSocket header
 				len = packet->GetHeaderLength();
 				if( client ) {
+					// client will be lock in send, if client already lock by recv thread and parser lock in parse function, deadlock!
+					parser->Unlock();
 					if( mAsyncIOServer.Send(client, (const char *)packet, &len) ) {
 						// Send playload
 						mAsyncIOServer.Send(client, data, &dataLen);
 					}
+					parser->Lock();
 				}
 
 				// Release video buffer

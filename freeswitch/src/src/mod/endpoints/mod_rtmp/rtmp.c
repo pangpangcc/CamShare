@@ -583,7 +583,14 @@ switch_status_t rtmp_send_message(rtmp_session_t *rsession, uint8_t amfnumber, u
 	uint8_t microhdr = (3 << 6) | amfnumber;
 	switch_size_t hdrsize = 1;
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
-	rtmp_state_t *state = &rsession->amfstate_out[amfnumber];
+	// Modify By Max 2020/08/12
+	rtmp_state_t *state = NULL;
+	if ( amfnumber < AMF_MAX_STATE_NUMBER ) {
+		state = &rsession->amfstate_out[amfnumber];
+	} else {
+		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_send_message(), Protocol error, amfnumber : %d \n", amfnumber);
+		return SWITCH_STATUS_FALSE;
+	}
 
 	// switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "%d send_ack=%d send=%d window=%d wait_ack=%d\n",
 	// 	type, rsession->send_ack, rsession->send, rsession->send_ack_window, rsession->send + 3073 - rsession->send_ack);
@@ -767,7 +774,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 		// modify by Samson 2016-06-01
 		result = rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s);
 		if (result != SWITCH_STATUS_SUCCESS) {
-			if (result == SWITCH_STATUS_INTR) {
+			if (result == 70014) {
 				return SWITCH_STATUS_SUCCESS;
 			}
 			else {
@@ -822,7 +829,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 		// modify by Samson 2016-06-01
 		result = rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s);
 		if (result != SWITCH_STATUS_SUCCESS) {
-			if (result == SWITCH_STATUS_INTR) {
+			if (result == 70014) {
 				return SWITCH_STATUS_SUCCESS;
 			}
 			else {
@@ -860,10 +867,11 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, (unsigned char*)buf, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-					if (result == SWITCH_STATUS_INTR) {
+					if (result == 70014) {
+//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [0] Read nothing: %d\n", result);
 						return SWITCH_STATUS_SUCCESS;
-					}
-					else {
+					} else {
+						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [0] Read error: %d\n", result);
 						return SWITCH_STATUS_FALSE;
 					}
 				}
@@ -894,8 +902,8 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 						return SWITCH_STATUS_FALSE;
 				}
 				rsession->amfnumber = buf[0] & 0x3F;	/* Get rid of the 2 first bits */
-				if (rsession->amfnumber > 64) {
-					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "Protocol error\n");
+				if (rsession->amfnumber > AMF_MAX_STATE_NUMBER) {
+					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error, rsession->amfnumber : %d \n", rsession->amfnumber);
 					return SWITCH_STATUS_FALSE;
 				}
 				//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Header size: %d AMF Number: %d\n", rsession->hdrsize, rsession->amfnumber);
@@ -922,17 +930,24 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				}
 
 				if ( !(s < 12 && s > 0) ) { /** XXX **/
-					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Protocol error: Invalid header size\n");
+					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error: Invalid header size\n");
 					return SWITCH_STATUS_FALSE;
 				}
 
 				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, readbuf, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-					if (result == SWITCH_STATUS_INTR) {
+//					if (result == SWITCH_STATUS_INTR) {
+//						return SWITCH_STATUS_SUCCESS;
+//					}
+//					else {
+//						return SWITCH_STATUS_FALSE;
+//					}
+					if (result == 70014) {
+//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [1] Read nothing: %d\n", result);
 						return SWITCH_STATUS_SUCCESS;
-					}
-					else {
+					} else {
+						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [1] Read error: %d\n", result);
 						return SWITCH_STATUS_FALSE;
 					}
 				}
@@ -984,8 +999,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				}
 
 				rsession->parse_state++;
-			}
-				break;
+			}break;
 			case 2:
 			{
 				rtmp_state_t *state = &rsession->amfstate[rsession->amfnumber];
@@ -1004,7 +1018,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 
 					rsession->parse_remain = s;
 					if (!s) {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "Protocol error, forcing big read\n");
+						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error, forcing big read\n");
 						s = sizeof(state->buf);
 						rsession->profile->io->read(rsession, state->buf, &s);
 						return SWITCH_STATUS_FALSE;
@@ -1016,22 +1030,29 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "WTF %"SWITCH_SIZE_T_FMT" %"SWITCH_SIZE_T_FMT"\n",
 						state->buf_pos, s);
 
-					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "Protocol error: exceeding max AMF packet size\n");
+					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error: exceeding max AMF packet size\n");
 					return SWITCH_STATUS_FALSE;
 				}
 
 				if (s > rsession->in_chunksize) {
-					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "Protocol error: invalid chunksize\n");
+					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error: invalid chunksize\n");
 					return SWITCH_STATUS_FALSE;
 				}
 
 				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, state->buf + state->buf_pos, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-					if (result == SWITCH_STATUS_INTR) {
+//					if (result == SWITCH_STATUS_INTR) {
+//						return SWITCH_STATUS_SUCCESS;
+//					}
+//					else {
+//						return SWITCH_STATUS_FALSE;
+//					}
+					if (result == 70014) {
+//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [2] Read nothing: %d\n", result);
 						return SWITCH_STATUS_SUCCESS;
-					}
-					else {
+					} else {
+						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [2] Read error: %d\n", result);
 						return SWITCH_STATUS_FALSE;
 					}
 				}
@@ -1073,7 +1094,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 							break;
 						case RTMP_TYPE_AUDIO: /* Audio data */
 							if (rsession->media_debug & RTMP_MD_AUDIO_READ) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "R A ts:%u data:0x%02x len:%d\n", state->ts, *(state->buf), state->origlen);
+								switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), R A ts:%u data:0x%02x len:%d\n", state->ts, *(state->buf), state->origlen);
 							}
 
 							switch_thread_rwlock_wrlock(rsession->rwlock);
@@ -1094,7 +1115,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 								}
 								if (rsession->tech_pvt->over_size > 10) {
 									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING,
-													  "%s buffer > %u for 10 consecutive packets... Flushing buffer\n",
+													  "rtmp_handle_data(), %s buffer > %u for 10 consecutive packets... Flushing buffer\n",
 													  switch_core_session_get_name(rsession->tech_pvt->session), rsession->tech_pvt->maxlen * 40);
 									switch_buffer_zero(rsession->tech_pvt->readbuf);
 									#ifdef RTMP_DEBUG_IO
@@ -1104,7 +1125,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 								switch_buffer_write(rsession->tech_pvt->readbuf, &len, 2);
 								switch_buffer_write(rsession->tech_pvt->readbuf, state->buf, len);
 								if (len > rsession->tech_pvt->maxlen) {
-									switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "changing maxlen from %d to %d\n", rsession->tech_pvt->maxlen, len);
+									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), changing maxlen from %d to %d\n", rsession->tech_pvt->maxlen, len);
 									rsession->tech_pvt->maxlen = len;
 								}
 								switch_mutex_unlock(rsession->tech_pvt->readbuf_mutex);
@@ -1112,9 +1133,9 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 							switch_thread_rwlock_unlock(rsession->rwlock);
 							break;
 						case RTMP_TYPE_VIDEO: /* Video data */
-//							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_handle_data(), ts: %u, data:0x%02x, len: %d \n", state->ts, *(state->buf), state->origlen);
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "rtmp_handle_data(), ts: %u, data:0x%02x, len: %d \n", state->ts, *(state->buf), state->origlen);
 							if (rsession->media_debug & RTMP_MD_VIDEO_READ) {
-								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "R V ts:%u data:0x%02x len:%d \n", state->ts, *(state->buf), state->origlen);
+								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_handle_data(), R V ts:%u data:0x%02x len:%d \n", state->ts, *(state->buf), state->origlen);
 							}
 
 							if ((!rsession->tech_pvt) || (!rsession->tech_pvt->has_video)) break;
@@ -1125,7 +1146,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 
 								if (!rsession->tech_pvt->video_readbuf) {
 									switch_thread_rwlock_unlock(rsession->rwlock);
-									switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "rtmp_handle_data(), rsession->tech_pvt->video_readbuf == NULL \n");
+									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING, "rtmp_handle_data(), rsession->tech_pvt->video_readbuf == NULL \n");
 									return SWITCH_STATUS_FALSE;
 								}
 
@@ -1137,7 +1158,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 								}
 								if (rsession->tech_pvt->video_over_size > 10) {
 									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG,
-													  "%s buffer > %u for 10 consecutive packets... Flushing buffer\n",
+													  "rtmp_handle_data(), %s buffer > %u for 10 consecutive packets... Flushing buffer\n",
 													  switch_core_session_get_name(rsession->tech_pvt->session), rsession->tech_pvt->video_maxlen * 100);
 									switch_buffer_zero(rsession->tech_pvt->video_readbuf);
 									#ifdef RTMP_DEBUG_IO
@@ -1148,7 +1169,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 								switch_buffer_write(rsession->tech_pvt->video_readbuf, &state->ts, 4);
 								switch_buffer_write(rsession->tech_pvt->video_readbuf, state->buf, len);
 								if (len > rsession->tech_pvt->video_maxlen) {
-									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "changing video max len from %d to %d\n", rsession->tech_pvt->video_maxlen, len);
+									switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), changing video max len from %d to %d\n", rsession->tech_pvt->video_maxlen, len);
 									rsession->tech_pvt->video_maxlen = len;
 								}
 								switch_mutex_unlock(rsession->tech_pvt->video_readbuf_mutex);
@@ -1160,7 +1181,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 						case RTMP_TYPE_WINDOW_ACK_SIZE:
 							{
 								uint32_t new_window = (state->buf[0] << 24) | (state->buf[1] << 16) | (state->buf[2] << 8) | (state->buf[3]);
-								switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Set window size: from %u to %u bytes\n", rsession->send_ack_window, new_window);
+								switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "rtmp_handle_data(), Set window size: from %u to %u bytes\n", rsession->send_ack_window, new_window);
 								rsession->send_ack_window = new_window;
 							}
 							break;
@@ -1176,7 +1197,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 								rsession->send_bw  = (ack - rsession->send_ack) / delta;
 							}
 
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "got ack %d send:%d wait-ack:%d\n",
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), got ack %d send:%d wait-ack:%d\n",
 								ack, rsession->send + 3073, rsession->send + 3073 - ack);
 
 							rsession->send_ack = ack;
@@ -1184,7 +1205,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 							break;
 						}
 						default:
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING, "Cannot handle message type 0x%x\n", state->type);
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING, "rtmp_handle_data(), Cannot handle message type 0x%x\n", state->type);
 							break;
 					}
 					state->buf_pos = 0;

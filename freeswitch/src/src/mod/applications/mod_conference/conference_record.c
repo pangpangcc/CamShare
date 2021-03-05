@@ -424,11 +424,15 @@ void *SWITCH_THREAD_FUNC conference_record_thread_run(switch_thread_t *thread, v
 		switch_core_destroy_memory_pool(&pool);
 	}
 
+	switch_thread_rwlock_unlock(conference->rwlock);
+
+	/**
+	 * Modify by Max 2020/08/18 for fix deadlock
+	 */
 	switch_mutex_lock(conference_globals.hash_mutex);
 	conference_globals.threads--;
 	switch_mutex_unlock(conference_globals.hash_mutex);
 
-	switch_thread_rwlock_unlock(conference->rwlock);
 	return NULL;
 }
 

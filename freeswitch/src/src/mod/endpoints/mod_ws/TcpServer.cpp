@@ -333,7 +333,7 @@ void TcpServer::IOHandleThread() {
 	}
 
 	mRunning = false;
-	switch_socket_close(mpSocket->socket);
+//	switch_socket_close(mpSocket->socket);
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "TcpServer::IOHandleThread( [Exit], this : %p ) \n", this);
 

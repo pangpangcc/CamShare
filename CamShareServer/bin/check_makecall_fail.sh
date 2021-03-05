@@ -9,14 +9,15 @@ function print_log()
   if [ -n "$reboot_log_file_path" ]; then
     log_time=$(date "+[%Y-%m-%d %H:%M:%S]")
     echo "$log_time check_makecall_fail: $print_body" >> $reboot_log_file_path
-    #echo "$log_time check_makecall_fail.sh: $print_body"
   fi
+  #echo "$log_time check_makecall_fail.sh: $print_body"
 }
 
 # define check log path
 log_folder="/usr/local/freeswitch/log"
 log_file_name="freeswitch.log"
 log_file_path="$log_folder/$log_file_name"
+
 #log_file_path=$1
 # check log file is exist
 if [ ! -e "$log_file_path" ]; then
@@ -24,9 +25,16 @@ if [ ! -e "$log_file_path" ]; then
   exit 0
 fi
 
+log_file_path_last=$(ls -alht /app/freeswitch/log/freeswitch.log.* | head -n 1 | awk '{print $9}')
+log_file_path_last_modify_time=0
+if [ "$log_file_path_last" != "" ];then
+  log_file_path_last_modify_time=$(stat -c %Y $log_file_path_last)
+fi
+
 # 获取单行日志时间
 function get_log_datetime() {
   line=$1
+  
   line_date_time=0;
   # check the first and the second field whether 'date time'
   line_date_str=$(echo "$line"|awk '{print $1}'|grep "-")
@@ -91,7 +99,7 @@ if [ -n "$deadlock_start_key_line" ]; then
 fi  
 
 # 获取登录特征时间
-login_key="用户登陆脚本->结束"
+login_key="用户登录脚本->结束"
 login_key_line=$(grep "$login_key" $log_file_path | tail -n 1)
 print_log "# Check.Login() login_key_line:$login_key_line"
 
@@ -101,32 +109,70 @@ last_line_time=$(get_log_datetime "$last_line")
 print_log "# Check() last_line:$last_line"
 print_log "# Check() last_line_time:$last_line_time"
 
-print_log "# Check.Deadlock() deadlock_start_time:$deadlock_start_time deadloack_end_time:$deadloack_end_time deadlock_delta_1:$((${deadloack_end_time}-${deadlock_start_time})) deadlock_delta_2:$((${last_line_time}-${deadlock_start_time})))"
-
 # 判断是否特征死锁
 is_reboot=0
 if [ is_check_deadlock == 1 ]; then
+  print_log "# Check.Deadlock() deadlock_start_time:$deadlock_start_time deadloack_end_time:$deadloack_end_time deadlock_delta_1:$((${deadloack_end_time}-${deadlock_start_time})) deadlock_delta_2:$((${last_line_time}-${deadlock_start_time})))"
+  
   # 是否超过死锁检查间隔
   if [ $(($deadlock_start_time)) -gt $(($deadloack_end_time)) ]; then
     if [ $(($last_line_time)) -gt $(($deadlock_start_time+$DEADLOCK_TIMEOUT_S)) ]; then
-      print_log "# Reboot cause deadlock keys check timeout."
+      print_log "# Reboot because deadlock keys check timeout."
       is_reboot=1
     fi
   fi
 fi
 
-# Check Login Interval
+# 检查命令是否超时
 if [ $(($is_reboot)) == 0 ]; then
-  # 上次登录时间
-  login_last_time=$(get_log_datetime "$login_key_line")
+  i=0;
+  timeout=10000;
+  for ((i=0; i<3; i++))
+  do
+    fs_conference_cmd=`/usr/local/freeswitch/bin/fs_cli -t $timeout -T $timeout -x "conference list" 2>&1` 
+    fs_conference_result=`echo $fs_conference_cmd | grep "Request timed out.\|Error Connecting"` 
+    print_log "# Check.Cmd() fs_conference_result:$fs_conference_result"
+
+    if [ ! "$fs_conference_result" == "" ]; then
+      print_log "# Check.Cmd() Request timed out.$i"
+      timeout=$((timeout+10000))
+    else
+      print_log "# Check.Cmd() fs_conference_cmd:$fs_conference_cmd"
+      break;
+    fi
+  done
+
+  if [ $(($i)) == 3 ];then
+    is_reboot=1
+    print_log "# Check.Cmd() Reboot because command timeout."
+  fi
+fi
+
+# Check Login Interval
+#if [ 0 == 1 ]; then
+if [ $(($is_reboot)) == 0 ]; then
   # 获取当前时间
   now=$(date +%s)
+    
+  # 上次登录时间
+  login_last_time=$(get_log_datetime "$login_key_line")
+  
+  print_log "# Check.Login() login_last_time:$login_last_time now:$now log_file_path_last_modify_time:$log_file_path_last_modify_time log_file_path_last:$log_file_path_last"
+  # 最新备份的日志最后修改时间为最近900秒, 获取该文件的最后登录时间
+  if [ $((login_last_time)) == 0 ] && [ $(($now)) -lt $(($log_file_path_last_modify_time+900)) ];then
+    # 上次登录时间
+    login_key_line_last_file=$(grep "$login_key" $log_file_path_last | tail -n 1)
+    login_last_time=$(get_log_datetime "$login_key_line_last_file")
+    
+    print_log "# Check.Login().LastFile() login_last_time:$login_last_time login_key_line_last_file:$login_key_line_last_file"
+  fi 
+
   print_log "# Check.Login() login_last_time:$login_last_time now:$now delta_second:$((${now}-${login_last_time}))"
   
-  # 是否超过5分钟没有登录
-  LOGIN_CHECK_S=300
+  # 是否超过15分钟没有登录
+  LOGIN_CHECK_S=900
   if [ $(($now)) -gt $(($login_last_time+$LOGIN_CHECK_S)) ]; then
-    print_log "# Reboot cause there are no login within 5 minutes."
+    print_log "# Reboot because there are no login within 15 minutes."
     is_reboot=1 
   fi
 fi
@@ -137,6 +183,14 @@ if [ $(($is_reboot)) -gt 0 ]; then
   reboot_time=$(date +%Y-%m-%d-%H-%M-%S)
   # print log
   print_log "# Reboot now... "
+  
+  # Dump thread
+  fs_pid=`ps -ef | grep "freeswitch -nc" | grep -v grep | awk '{print $2}'`
+  if [ ! $"fs_pid" == "" ];then
+    print_log "# Dump thread bt $fs_pid "
+    gdb -p $fs_pid -x /usr/local/CamShareServer/dump_thread_bt.init
+    mv /tmp/freeswitch.log.dump ${log_folder}/${log_file_name}.$reboot_time.1.dump
+  fi
   
   # Stop server
   /usr/local/CamShareServer/stop.sh

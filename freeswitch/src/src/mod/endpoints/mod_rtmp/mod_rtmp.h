@@ -54,7 +54,8 @@
  * Modify by Max /2019/09/19
  */
 #define AMF_MAX_SIZE      2048 * 16 * 4
-#define AMF_INVOKE_SIZE      2048 * 16 * 2
+#define AMF_INVOKE_SIZE      1024 * 16 * 2
+#define AMF_MAX_STATE_NUMBER 16
 
 #define SUPPORT_SND_NONE	0x0000
 #define SUPPORT_SND_ADPCM	0x0002
@@ -474,8 +475,8 @@ struct rtmp_session {
 	int hdrsize;	/* < The current header size */
 	int amfnumber;	/* < The current AMF number */
 
-	rtmp_state_t amfstate[64];
-	rtmp_state_t amfstate_out[64];
+	rtmp_state_t amfstate[AMF_MAX_STATE_NUMBER];
+	rtmp_state_t amfstate_out[AMF_MAX_STATE_NUMBER];
 
 	switch_mutex_t *socket_mutex;
 	switch_mutex_t *count_mutex;
@@ -554,6 +555,7 @@ struct rtmp_session {
 	 * Add by Max 2019-09-11
 	 */
 	int8_t client_from_mediaserver;
+
 	// ------------------------
 };
 
@@ -650,6 +652,11 @@ typedef struct rtmp_io_tcp rtmp_io_tcp_t;
 struct rtmp_tcp_io_private {
 	switch_pollfd_t *pollfd;
 	switch_socket_t *socket;
+	/**
+	 * Add by Max 2020-11-23
+	 *
+	 */
+	switch_mutex_t *socket_mutex;
 };
 
 typedef struct rtmp_tcp_io_private rtmp_tcp_io_private_t;

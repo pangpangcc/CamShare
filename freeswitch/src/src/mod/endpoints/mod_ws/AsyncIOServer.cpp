@@ -208,6 +208,7 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 		switch_status_t status = SWITCH_STATUS_SUCCESS;
 		bool disconnect = false;
 
+		switch_mutex_lock(client->clientMutex);
 		// 有足够的缓存空间
 		if( client->CheckBufferEnough() ) {
 			while (true) {
@@ -288,7 +289,6 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 		}
 
 		bool bFlag = false;
-		switch_mutex_lock(client->clientMutex);
 		bFlag = ClientCloseIfNeed(client);
 		switch_mutex_unlock(client->clientMutex);
 

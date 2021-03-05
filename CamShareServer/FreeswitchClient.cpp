@@ -280,10 +280,12 @@ bool FreeswitchClient::KickUserFromConference(
 						"event : [Freeswitch-检查会议室用户-从会议室踢出用户], "
 						"user : %s, "
 						"conference : %s, "
+						"memberId : %s, "
 						"exceptMemberId : %s "
 						")",
 						user.c_str(),
 						conference.c_str(),
+						memberId.c_str(),
 						exceptMemberId.c_str()
 						);
 
@@ -361,7 +363,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 				switch(type) {
 				case Member:{
 					LogManager::GetLogManager()->Log(
-							LOG_WARNING,
+							LOG_MSG,
 							"FreeswitchClient::StartUserRecvVideo( "
 							"event : [Freeswitch-用户开始观看会议室视频-普通成员], "
 							"user : %s, "
@@ -378,7 +380,7 @@ bool FreeswitchClient::StartUserRecvVideo(
 					snprintf(temp, sizeof(temp), "api conference %s unvmute %s ", conference.c_str(), memberId.c_str());
 					if( SendCommandGetResult(temp, result) ) {
 						LogManager::GetLogManager()->Log(
-								LOG_WARNING,
+								LOG_MSG,
 								"FreeswitchClient::StartUserRecvVideo( "
 								"event : [Freeswitch-用户开始观看会议室视频-主持人], "
 								"user : %s, "
@@ -885,7 +887,7 @@ bool FreeswitchClient::AuthorizationAllConference(bool bCreateChannel) {
 								}
 
 								LogManager::GetLogManager()->Log(
-										LOG_WARNING,
+										LOG_STAT,
 										"FreeswitchClient::AuthorizationAllConference( "
 										"event : [Freeswitch-重新验证当前所有会议室用户-验证用户], "
 										"bCreateChannel : %d, "
@@ -1126,7 +1128,7 @@ unsigned int FreeswitchClient::GetOnlineUserCount() {
 	LogManager::GetLogManager()->Log(
 			LOG_STAT,
 			"FreeswitchClient::GetOnlineUserCount( "
-			"event : [Freeswitch-获取在线用户数目] "
+			"event : [Freeswitch-获取在线RTMP用户数目] "
 			")"
 			);
 	unsigned int count = 0;
@@ -1952,7 +1954,7 @@ void FreeswitchClient::FreeswitchEventRtmpLogin(const Json::Value& root) {
     }
 
 	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
+			LOG_MSG,
 			"FreeswitchClient::FreeswitchEventRtmpLogin( "
 			"event : [Freeswitch-事件处理-rtmp终端登录], "
 			"user : %s, "
@@ -2027,7 +2029,7 @@ void FreeswitchClient::FreeswitchEventRtmpDestory(const Json::Value& root) {
     	RtmpUserMap::iterator itr = mRtmpUserMap.Find(rtmp_session);
     	if( itr != mRtmpUserMap.End() ) {
     		LogManager::GetLogManager()->Log(
-    				LOG_WARNING,
+    				LOG_MSG,
     				"FreeswitchClient::FreeswitchEventRtmpDestory( "
     				"event : [Freeswitch-事件处理-rtmp终端断开-有身份], "
 					"user : %s, "
@@ -2069,7 +2071,7 @@ void FreeswitchClient::FreeswitchEventRtmpDestory(const Json::Value& root) {
 
     	} else {
     		LogManager::GetLogManager()->Log(
-    				LOG_WARNING,
+    				LOG_MSG,
     				"FreeswitchClient::FreeswitchEventRtmpDestory( "
     				"event : [Freeswitch-事件处理-rtmp终端断开-无身份], "
     				"rtmp_session : %s "
@@ -2090,7 +2092,7 @@ void FreeswitchClient::FreeswitchEventWebsocketConnect(const Json::Value& root) 
 	mWebSocketUserCount++;
 
 	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
+			LOG_MSG,
 			"FreeswitchClient::FreeswitchEventWebsocketConnect( "
 			"event : [Freeswitch-事件处理-websocket终端连接] "
 			")"
@@ -2173,7 +2175,7 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 	// 已经登录
 	if( channel && channel->user.length() > 0 ) {
 		LogManager::GetLogManager()->Log(
-				LOG_WARNING,
+				LOG_MSG,
 				"FreeswitchClient::FreeswitchEventConferenceAddMember( "
 				"event : [Freeswitch-事件处理-增加会议室成员], "
 				"user : %s, "
@@ -2209,7 +2211,7 @@ void FreeswitchClient::FreeswitchEventConferenceAddMember(const Json::Value& roo
 		snprintf(temp, sizeof(temp), "api conference %s kick %s", conference.c_str(), memberId.c_str());
 		if( SendCommandGetResult(temp, result) ) {
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"FreeswitchClient::FreeswitchEventConferenceAddMember( "
 					"event : [Freeswitch-事件处理-增加会议室成员-踢出未登录用户], "
 					"conference : %s, "
@@ -2261,7 +2263,7 @@ void FreeswitchClient::FreeswitchEventConferenceDelMember(const Json::Value& roo
 			}
 
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"FreeswitchClient::FreeswitchEventConferenceDelMember( "
 					"event : [Freeswitch-事件处理-删除会议室成员], "
 					"user : %s, "
@@ -2322,7 +2324,7 @@ void FreeswitchClient::FreeswitchEventChannelCreate(const Json::Value& root) {
     }
 
 	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
+			LOG_MSG,
 			"FreeswitchClient::FreeswitchEventChannelCreate( "
 			"event : [Freeswitch-事件处理-创建频道], "
 			"channelId : %s, "

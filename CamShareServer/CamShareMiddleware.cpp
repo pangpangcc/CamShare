@@ -733,13 +733,11 @@ void CamShareMiddleware::StateHandle() {
 					"CamShareMiddleware::StateHandle( "
 					"event : [内部服务(Freeswitch)], "
 					"当前通话 : %u, "
-					"在线用户 : %u, "
 					"在线RTMP : %u, "
 					"在线Websocket : %u, "
 					"过去%u秒共收到MakeCall请求 : %u "
 					")",
 					mFreeswitch.GetChannelCount(),
-					mFreeswitch.GetOnlineUserCount(),
 					mFreeswitch.GetRTMPSessionCount(),
 					mFreeswitch.GetWebSocketUserCount(),
 					iStateTime,
@@ -1109,7 +1107,7 @@ bool CamShareMiddleware::HttpSendRespond(
 		while( true ) {
 			len = respond->GetData(buffer, MAX_BUFFER_LEN, more);
 			LogManager::GetLogManager()->Log(
-					LOG_WARNING,
+					LOG_MSG,
 					"CamShareMiddleware::HttpSendRespond( "
 					"event : [内部服务(HTTP)-返回请求内容到客户端], "
 					"parser : %p, "
@@ -1163,28 +1161,32 @@ void CamShareMiddleware::OnRequestGetDialplan(
 	const string source = parser->GetParam("source");
 	const string chat_type_string = parser->GetParam("chat_type_string");
 
-	LogManager::GetLogManager()->Log(
-			LOG_WARNING,
-			"CamShareMiddleware::OnRequestGetDialplan( "
-			"event : [内部服务(HTTP)-收到命令:获取拨号计划], "
-			"caller : %s, "
-			"conference : %s, "
-			"serverId : %s, "
-			"siteId : %s, "
-			"source : %s, "
-			"chat_type_string : %s, "
-			"channelId : %s, "
-			"parser : %p "
-			")",
-			caller.c_str(),
-			conference.c_str(),
-			serverId.c_str(),
-			siteId.c_str(),
-			source.c_str(),
-			chat_type_string.c_str(),
-			channelId.c_str(),
-			parser
-			);
+	if( !CheckTestAccount(caller) ) {
+		LogManager::GetLogManager()->Log(
+				LOG_WARNING,
+				"CamShareMiddleware::OnRequestGetDialplan( "
+				"event : [内部服务(HTTP)-收到命令:获取拨号计划], "
+				"parser : %p, "
+				"caller : %s, "
+				"conference : %s, "
+				"serverId : %s, "
+				"siteId : %s, "
+				"source : %s, "
+				"chat_type_string : %s, "
+				"channelId : %s, "
+				"parser : %p "
+				")",
+				parser,
+				caller.c_str(),
+				conference.c_str(),
+				serverId.c_str(),
+				siteId.c_str(),
+				source.c_str(),
+				chat_type_string.c_str(),
+				channelId.c_str(),
+				parser
+				);
+	}
 
 	// 统计MakeCall请求
 	mMakeCallCountMutex.lock();
@@ -1493,8 +1495,10 @@ void CamShareMiddleware::OnRequestSetStatus(HttpParser* parser) {
 						}
 
 						if ( bChange ) {
-							// 发送用户在线状态改变命令
-							SendOnlineStatus2LiveChat(livechat, userId, status);
+							if( !CheckTestAccount(userId) ) {
+								// 发送用户在线状态改变命令
+								SendOnlineStatus2LiveChat(livechat, userId, status);
+							}
 						}
 
 						mSiteUserMap.Unlock();
@@ -1665,8 +1669,17 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 		FreeswitchClient* freeswitch,
 		const Channel* channel
 		) {
+
+	// 踢出相同账户已经进入的其他连接
+	mFreeswitch.KickUserFromConference(channel->user, channel->conference, channel->memberId);
+	if( CheckTestAccount(channel->user) ) {
+		// 测试账号, 开放成员视频
+		mFreeswitch.StartUserRecvVideo(channel->user, channel->conference, channel->type);
+		return;
+	}
+
 	LogManager::GetLogManager()->Log(
-			LOG_MSG,
+			LOG_WARNING,
 			"CamShareMiddleware::OnFreeswitchEventConferenceAddMember( "
 			"event : [内部服务(Freeswitch)-收到命令:增加会议成员], "
 			"user : %s, "
@@ -1686,9 +1699,6 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
             channel->chatType
 			);
 
-	// 踢出相同账户已经进入的其他连接
-	mFreeswitch.KickUserFromConference(channel->user, channel->conference, channel->memberId);
-
 	if( channel->user != channel->conference ) {
 		// 进入别人会议室
 
@@ -1702,28 +1712,20 @@ void CamShareMiddleware::OnFreeswitchEventConferenceAddMember(
 		}
 		mLiveChatClientMap.Unlock();
 
-		if( !CheckTestAccount(channel->user) ) {
-			// 非测试账号
-			string serverId = channel->serverId;
+		string serverId = channel->serverId;
 
-			// 发送进入会议室认证命令
-			if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active, channel->chatType) ) {
-				// 断开指定用户视频
-				freeswitch->KickUserFromConference(channel->user, channel->conference, "");
-			}
-
-			// 获取用户列表
-			list<string> userList;
-			mFreeswitch.GetConferenceUserList(channel->conference, userList);
-
-			// 发送通知客户端进入会议室命令
-			SendMsgEnterConference2LiveChat(livechat, channel->user, channel->conference, userList);
-
-		} else {
-			// 测试账号
-			// 开放成员视频
-			mFreeswitch.StartUserRecvVideo(channel->user, channel->conference, channel->type);
+		// 发送进入会议室认证命令
+		if( !SendEnterConference2LiveChat(livechat, channel->user, channel->conference, channel->type, channel->serverId, Active, channel->chatType) ) {
+			// 断开指定用户视频
+			freeswitch->KickUserFromConference(channel->user, channel->conference, "");
 		}
+
+		// 获取用户列表
+		list<string> userList;
+		mFreeswitch.GetConferenceUserList(channel->conference, userList);
+
+		// 发送通知客户端进入会议室命令
+		SendMsgEnterConference2LiveChat(livechat, channel->user, channel->conference, userList);
 
 	} else {
 		// 进入自己会议室, 直接通过
@@ -1737,8 +1739,12 @@ void CamShareMiddleware::OnFreeswitchEventConferenceDelMember(
 		FreeswitchClient* freeswitch,
 		const Channel* channel
 		) {
+	if( CheckTestAccount(channel->user) ) {
+		return;
+	}
+
 	LogManager::GetLogManager()->Log(
-			LOG_MSG,
+			LOG_WARNING,
 			"CamShareMiddleware::OnFreeswitchEventConferenceDelMember( "
 			"event : [内部服务(Freeswitch)-收到命令:退出会议成员], "
 			"user : %s, "
@@ -1771,18 +1777,13 @@ void CamShareMiddleware::OnFreeswitchEventConferenceDelMember(
 			}
 			mLiveChatClientMap.Unlock();
 
-			if( !CheckTestAccount(channel->user) ) {
-				// 非测试账号
+			// 获取用户列表
+			list<string> userList;
+			mFreeswitch.GetConferenceUserList(channel->conference, userList);
 
-				// 获取用户列表
-				list<string> userList;
-				mFreeswitch.GetConferenceUserList(channel->conference, userList);
-
-				// 发送通知客户端退出会议室命令
-				SendMsgExitConference2LiveChat(livechat, channel->user, channel->conference, userList);
-			}
+			// 发送通知客户端退出会议室命令
+			SendMsgExitConference2LiveChat(livechat, channel->user, channel->conference, userList);
 		}
-
 	}
 }
 void CamShareMiddleware::OnFreeswitchEventOnlineList(
@@ -1855,6 +1856,10 @@ void CamShareMiddleware::OnFreeswitchEventOnlineStatus(
 	bool bFlag = false;
 	int onlineCount = 0;
 
+	if( CheckTestAccount(rtmpObject.user) ) {
+		return;
+	}
+
 	if( rtmpObject.siteId.length() > 0 && rtmpObject.user.length() > 0 ) {
 		ILiveChatClient* livechat = NULL;
 		mLiveChatClientMap.Lock();
@@ -1903,7 +1908,7 @@ void CamShareMiddleware::OnFreeswitchEventOnlineStatus(
 		if( bFlag ) {
 			LogManager::GetLogManager()->Log(
 					LOG_WARNING,
-					"CamShareMiddleware::OnFreeswitchEventRtmpOnlineStatus( "
+					"CamShareMiddleware::OnFreeswitchEventOnlineStatus( "
 					"event : [内部服务(Freeswitch)-收到命令:用户改变在线状态], "
 					"user : %s, "
 					"online : %s, "

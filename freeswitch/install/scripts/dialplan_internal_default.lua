@@ -15,7 +15,7 @@ api = freeswitch.API();
 -- 输出变量
 function logChannelVar(k, v)
   if not v then v = "nil" end
-  session:consoleLog("NOTICE", "# [" .. k .. " : " .. v .. "]\n")
+  session:consoleLog("NOTICE", "# 内网拨号计划->[" .. k .. " : " .. v .. "]\n")
 end
 
 -- 获取会话变量
@@ -41,6 +41,8 @@ local conference = "";
 local serverId = "";
 -- 站点Id
 local siteId = "";
+-- 会话类型
+local chat_type_string = ""
 
 -- 分隔[用户Id]/[Livechat服务器Id]/[站点Id]
 tables = string_split(destination_number, "|||");
@@ -48,6 +50,13 @@ if( #tables >= 3 ) then
   conference = tables[1];
   serverId = tables[2];
   siteId = tables[3];
+  
+--  Add by Max 2020/07/15
+  if( #tables >= 4 ) then
+    chat_type_string = tables[4];
+    session:setVariable("chat_type_string", chat_type_string);
+    logChannelVar("chat_type_string", chat_type_string)
+  end
   
 --  设置channel变量
   session:setVariable("serverId", serverId);
@@ -62,6 +71,7 @@ if( #tables >= 3 ) then
                       "&serverId=" .. serverId .. 
                       "&siteId=" .. siteId .. 
                       "&source=" .. source .. 
+                      "&chat_type_string=" .. chat_type_string .. 
                       " json connect-timeout 5 timeout 10 get";
 --  freeswitch.consoleLog("NOTICE", "# 内网拨号计划->发起http请求 " .. url .. "\n");
   response = api:execute("curl", url);
