@@ -66,6 +66,7 @@ public:
 
 protected:
     FILE* CreateLog();
+    int Mkdirs(const char *path, mode_t mode);
 
 private:
     pthread_mutex_t m_hMutex;

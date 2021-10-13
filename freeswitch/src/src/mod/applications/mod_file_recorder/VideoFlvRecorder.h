@@ -88,7 +88,7 @@ private:
 
 	// ----- 视频录制处理函数 -----
 	// 解析h264，并组为h264带分隔符帧数据包
-	switch_status_t buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* buffer, switch_bool_t& start);
+	switch_status_t buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* buffer, switch_bool_t& start, uint8_t &nalu_type);
 	// 重建Nalu缓冲
 	bool RenewNaluBuffer();
 	// 执行关闭shell
@@ -175,6 +175,11 @@ private:
 	// 处理回调
 	IVideoRecorderCallback* mpCallback;
 	switch_mutex_t*		mpMutex;		// 状态锁
+
+	// Add by Max
+	switch_buffer_t *mpSpsBuffer;
+	switch_buffer_t *mpPpsBuffer;
+
 };
 
 #endif /* SRC_MOD_APPLICATIONS_MOD_FILE_RECORDER_VIDEOFLVRECORDER_H_ */

@@ -1,5 +1,7 @@
 
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
@@ -82,8 +84,17 @@ int CFileCtrl::Initialize(
     }
 
     m_dwMaxFileLength = m_dwMaxFileLength * BUFFER_SIZE_1K * BUFFER_SIZE_1K;
-    pthread_mutex_init(&m_hMutex, NULL);
+
+	pthread_mutexattr_t mattr;
+    pthread_mutexattr_init(&mattr);
+    pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&m_hMutex, &mattr);
     pthread_mutex_init(&m_hMutexBuffer, NULL);
+    pthread_mutexattr_destroy(&mattr);
+
+    mode_t mod = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
+    Mkdirs(szlogPath, mod);
+
 	return 0;
 }
 
@@ -103,8 +114,11 @@ FILE* CFileCtrl::CreateLog()
 	
 	DIR *dp=opendir(m_szLogPath);
 	if (dp==NULL) {
-		int mod=S_IREAD | S_IWRITE| S_IEXEC | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH ;
-		mkdir(m_szLogPath, mod);
+		mode_t mod = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ;
+		int ret = Mkdirs(m_szLogPath, mod);
+		if( ret != 0 ) {
+			fprintf(stderr, "mkdir \"%s\" fail(%d) \n", m_szLogPath, errno);
+		}
 	} else {
 		closedir(dp);
 	}
@@ -272,4 +286,33 @@ void CFileCtrl::FlushMem2File()
     if (!m_bSingle) {
         pthread_mutex_unlock(&m_hMutex);
     }
+}
+
+int CFileCtrl::Mkdirs(const char *path, mode_t mode) {
+	int ret = 0;
+	char curPath[MAX_PATH] = {'\0'};
+
+	int len = strlen(path);
+    strncpy(curPath, path, strlen(path));
+
+    for(int i = 0; i < len; i++) {
+    	if ( curPath[i] == '/' ) {
+    		curPath[i] = '\0';
+            if( access(curPath, 0) != 0 ) {
+            	ret = mkdir( curPath, mode );
+            	if( ret != 0 ) {
+            		break;
+            	}
+            }
+            curPath[i]='/';
+        }
+    }
+
+    if( ret == 0 ) {
+		if( len > 0 && access(curPath, 0) != 0 ) {
+			ret = mkdir( curPath, mode );
+		}
+    }
+
+    return ret;
 }

@@ -53,17 +53,17 @@ H264="/app/freeswitch/recordings/pic_h264/$USERID.jpg"
 
 # transcode
 CMD="/usr/local/bin/ffmpeg -i $LINE -loglevel error -y -vcodec copy -map 0 -movflags faststart $MP4"
-echo "$CMD" >> transcode.log
+echo "$CMD" >> /tmp/transcode.log
 RES=$($CMD </dev/null 2>&1)
-echo "$RES" >> transcode.log
+echo "$RES" >> /tmp/transcode.log
 
 # request to CamShareServer
 URL="http://127.0.0.1:9200/RECORDFINISH?userId=$USERID&startTime=$START_TIME&endTime=$END_TIME&siteId=$SITEID&fileName=$MP4_FILENAME"
 echo $URL >> transcode.log
 RES=`wget --tries=1 --timeout=3 -O /dev/null -S "$URL" 2>&1 | grep "HTTP/" | awk '{print $2}'`
-echo "HTTP:$RES" >> transcode.log
+echo "HTTP:$RES" >> /tmp/transcode.log
 
-echo "sleep 2" >>transcode.log
+echo "sleep 2" >> /tmp/transcode.log
 sleep 2
 
 done <"$FILE"

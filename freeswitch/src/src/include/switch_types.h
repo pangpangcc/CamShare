@@ -1573,6 +1573,7 @@ typedef enum {
 	 */
 	SFF_KEY_FRAME_SPS = (1 << 18),
 	SFF_KEY_FRAME_PPS = (1 << 19),
+	SFF_KEY_FRAME = (1 << 20),
 } switch_frame_flag_enum_t;
 typedef uint32_t switch_frame_flag_t;
 

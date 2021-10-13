@@ -70,6 +70,8 @@ int main(int argc, char *argv[]) {
 	while( bFlag && server.IsRunning() ) {
 		/* do nothing here */
 		sleep(5);
+		LogManager::GetLogManager()->LogFlushMem2File();
+		fflush(stdout);
 	}
 
 	return EXIT_SUCCESS;

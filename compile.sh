@@ -1,20 +1,20 @@
 #!/bin/sh
 
 # compile freeswtich
-cd freeswitch &&
-chmod +x ./compile.sh &&
-./compile.sh $1 &&
+cd freeswitch
+chmod +x ./compile.sh || exit 1
+./compile.sh $1 || exit 1
 cd .. &&
 
 # compile dependent tools
-cd deps &&
-chmod +x ./compile.sh &&
-./compile.sh $1 &&
+cd deps 
+chmod +x ./compile.sh || exit 1
+./compile.sh $1 || exit 1
 cd .. &&
 
 # compile CamShareServer
-cd CamShareServer &&
-chmod +x ./compile.sh &&
-./compile.sh $1 &&
+cd CamShareServer
+chmod +x ./compile.sh || exit 1
+./compile.sh $1 || exit 1
 cd ..
 

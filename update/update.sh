@@ -17,18 +17,19 @@ cd $path
 # ---- freeswitch ----
 # freeswitch common config
 #cp -f ./file/modules.conf.xml /usr/local/freeswitch/conf/autoload_configs/
-#cp -f ./file/switch.conf.xml /usr/local/freeswitch/conf/autoload_configs/
+cp -f ./file/switch.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 #cp -f ./file/vars.xml /usr/local/freeswitch/conf/vars.xml
 
 # freeswitch ./lib & ./mod files
+#cp -f ./file/bin/* /usr/local/freeswitch/bin/
 cp -f ./file/lib/* /usr/local/freeswitch/lib/
 #cp -f ./file/mod/* /usr/local/freeswitch/mod/
 
 # freeswitch scripts
-cp -f ./file/*.lua /usr/local/freeswitch/scripts/
+#cp -f ./file/*.lua /usr/local/freeswitch/scripts/
 
 # freeswitch mod_file_recorder shell
-#cp -f ./file/close_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
+cp -f ./file/close_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 #cp -f ./file/pic_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 
 # freeswitch mod_conference
@@ -59,7 +60,7 @@ cp -f ./file/camshare-middleware /usr/local/CamShareServer/
 #cp -f ./file/camshare-middleware.config /usr/local/CamShareServer/
 
 # ---- camshare executor ----
-cp -f ./file/camshare-executor /usr/local/CamShareServer/
+#cp -f ./file/camshare-executor /usr/local/CamShareServer/
 #cp -f ./file/camshare-executor.config /usr/local/CamShareServer/
 
 # camshare shell
@@ -68,6 +69,8 @@ cp -f ./file/camshare-executor /usr/local/CamShareServer/
 #cp -f ./file/check_run.sh /usr/local/CamShareServer/
 #cp -f ./file/dump_crash_log.sh /usr/local/CamShareServer/
 #cp -f ./file/check_session_count.sh /usr/local/CamShareServer/
+cp -f ./file/check_makecall_fail.sh /usr/local/CamShareServer/
+#cp -f ./file/dump_thread_bt.init /usr/local/CamShareServer/
 #if [ -e "/usr/local/CamShareServer/check_session_count.sh" ]; then
 #  rm -f /usr/local/CamShareServer/check_session_count.sh 
 #fi
@@ -80,7 +83,7 @@ cp -f ./file/camshare-executor /usr/local/CamShareServer/
 cp -f ./version /usr/local/CamShareServer/
 
 # ---- local bin file ----
-cp -f ./file/usr_local_bin/* /usr/local/bin/
+#cp -f ./file/usr_local_bin/* /usr/local/bin/
 
 # --- start camshare & freeswitch ---
 # run camshare & freeswitch

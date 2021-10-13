@@ -33,7 +33,7 @@ fi
 
 # 检测 freeswitch 是否运行中
 FREESWITCH="freeswitch"
-FREESWITCH_PID=$(ps -ef | grep $FREESWITCH | grep -v "grep" | awk '{ print $2 }')
+FREESWITCH_PID=$(ps -ef | grep "$FREESWITCH -nc" | grep -v "grep" | awk '{ print $2 }')
 if [ -n "$FREESWITCH_PID" ]; then
   echo "$FREESWITCH is running, please stop first."
   exit 1
@@ -49,6 +49,8 @@ cd -
 cd $FREESWITCH_FOLDER
 $FREESWITCH_FOLDER/freeswitch -nc
 cd -
+
+sleep 3
 
 # 打印 log
 echo "# $CAMSHARE_MIDDLEWARE pid : `ps -ef | grep $CAMSHARE_MIDDLEWARE | grep -v "grep" | awk '{ print $2 }'`"

@@ -761,15 +761,8 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 
 	switch_core_timer_destroy(&timer);
 	switch_mutex_lock(conference_globals.hash_mutex);
-	if (conference_utils_test_flag(conference, CFLAG_INHASH)) {
-		// Add by Max 2017/06/29 for crash
-		conference_utils_clear_flag(conference, CFLAG_INHASH);
-		switch_core_hash_delete(conference_globals.conference_hash, conference->name);
-	}
+	switch_core_hash_delete(conference_globals.conference_hash, conference->name);
 	switch_mutex_unlock(conference_globals.hash_mutex);
-
-
-	conference_utils_clear_flag(conference, CFLAG_VIDEO_MUXING);
 
 	for (x = 0; x <= conference->canvas_count; x++) {
 		if (conference->canvases[x] && conference->canvases[x]->video_muxing_thread) {
@@ -780,12 +773,22 @@ void *SWITCH_THREAD_FUNC conference_thread_run(switch_thread_t *thread, void *ob
 	}
 
 	/* Wait till everybody is out */
-	conference_utils_clear_flag_locked(conference, CFLAG_RUNNING);
-	// Modify by Max 2017/01/19
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock ON\n");
-	switch_thread_rwlock_wrlock(conference->rwlock);
+	conference_utils_clear_flag(conference, CFLAG_RUNNING);
+	conference_utils_clear_flag(conference, CFLAG_INHASH);
+	conference_utils_clear_flag(conference, CFLAG_VIDEO_MUXING);
+
+//	// Modify by Max 2017/01/19
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock ON\n");
+//	switch_thread_rwlock_wrlock(conference->rwlock);
+//	switch_thread_rwlock_unlock(conference->rwlock);
+//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock OFF\n");
+
+	// Add by Max 2020/08/17 for fix crash
+	while (switch_thread_rwlock_trywrlock_timeout(conference->rwlock, 5) != SWITCH_STATUS_SUCCESS) {
+		// Wait other thread to exit
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "conference_thread_run() %s Waitting other thread to exit......\n", conference->name);
+	}
 	switch_thread_rwlock_unlock(conference->rwlock);
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Write Lock OFF\n");
 
 	if (conference->la) {
 		switch_live_array_destroy(&conference->la);
@@ -1802,6 +1805,14 @@ SWITCH_STANDARD_APP(conference_function)
 		/* Indicate the conference has a bridgeto party */
 		conference_utils_set_flag_locked(conference, CFLAG_BRIDGE_TO);
 
+		/* acquire a read lock on the thread so it can't leave without us */
+		if (switch_thread_rwlock_tryrdlock(conference->rwlock) != SWITCH_STATUS_SUCCESS) {
+			switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_CRIT, "Read Lock Fail\n");
+			goto done;
+		}
+
+		rl++;
+
 		/* Start the conference thread for this conference */
 		conference_launch_thread(conference);
 
@@ -2228,10 +2239,6 @@ SWITCH_STANDARD_APP(conference_function)
 
  done:
 
-	if (locked) {
-		switch_mutex_unlock(conference_globals.setup_mutex);
-	}
-
 	if (member.read_resampler) {
 		switch_resample_destroy(&member.read_resampler);
 	}
@@ -2296,6 +2303,10 @@ SWITCH_STANDARD_APP(conference_function)
 		switch_thread_rwlock_unlock(conference->rwlock);
 	}
 
+	if (locked) {
+		switch_mutex_unlock(conference_globals.setup_mutex);
+	}
+
 	switch_channel_set_variable(channel, "last_transfered_conference", NULL);
 
  end:
@@ -2318,8 +2329,8 @@ void conference_launch_thread(conference_obj_t *conference)
 	switch_threadattr_detach_set(thd_attr, 1);
 	switch_threadattr_priority_set(thd_attr, SWITCH_PRI_REALTIME);
 	switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
-	switch_mutex_lock(conference_globals.hash_mutex);
-	switch_mutex_unlock(conference_globals.hash_mutex);
+//	switch_mutex_lock(conference_globals.hash_mutex);
+//	switch_mutex_unlock(conference_globals.hash_mutex);
 	switch_thread_create(&thread, thd_attr, conference_thread_run, conference, conference->pool);
 }
 
@@ -3142,11 +3153,11 @@ conference_obj_t *conference_new(char *name, conference_xml_cfg_t cfg, switch_co
 	switch_mutex_init(&conference->member_mutex, SWITCH_MUTEX_NESTED, conference->pool);
 	switch_mutex_init(&conference->canvas_mutex, SWITCH_MUTEX_NESTED, conference->pool);
 
-	switch_mutex_lock(conference_globals.hash_mutex);
+//	switch_mutex_lock(conference_globals.hash_mutex);
 	// Modify by Max 2017/02/04
 	conference_utils_set_flag(conference, CFLAG_INHASH);
 	switch_core_hash_insert(conference_globals.conference_hash, conference->name, conference);
-	switch_mutex_unlock(conference_globals.hash_mutex);
+//	switch_mutex_unlock(conference_globals.hash_mutex);
 
 	conference->super_canvas_label_layers = video_super_canvas_label_layers;
 	conference->super_canvas_show_all_layers = video_super_canvas_show_all_layers;
@@ -3435,9 +3446,9 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_conference_shutdown)
 			switch_yield(100000);
 		}
 
-		switch_event_unbind_callback(conference_event_pres_handler);
-		switch_event_unbind_callback(conference_data_event_handler);
-		switch_event_unbind_callback(conference_event_call_setup_handler);
+//		switch_event_unbind_callback(conference_event_pres_handler);
+//		switch_event_unbind_callback(conference_data_event_handler);
+//		switch_event_unbind_callback(conference_event_call_setup_handler);
 		switch_event_free_subclass(CONF_EVENT_MAINT);
 
 		/* free api interface help ".syntax" field string */

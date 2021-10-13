@@ -27,7 +27,7 @@ chmod +x ./compile.sh
 
 # build install package
 chmod +x ./packageall.sh
-./packageall.sh $ver &&
+./packageall.sh $ver
 
 # build update package
 chmod +x ./updateall.sh

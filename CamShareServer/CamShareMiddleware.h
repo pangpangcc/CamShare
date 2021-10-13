@@ -34,25 +34,34 @@
 #include <list>
 using namespace std;
 
-#define VERSION_STRING "1.1.7"
+#define VERSION_STRING "1.2.6"
 
 typedef struct SiteConfig {
 	SiteConfig() {
 		siteId = "";
 		recordFinishUrl ="";
+		loginCheckUrl = "";
+		loginCheck = false;
 	}
 	SiteConfig(
 			const string& siteId,
-			const string& recordFinishUrl
+			const string& recordFinishUrl,
+			const string& loginCheckUrl,
+			bool loginCheck
 			) {
 		this->siteId = siteId;
 		this->recordFinishUrl = recordFinishUrl;
+		this->loginCheckUrl = loginCheckUrl;
+		this->loginCheck = loginCheck;
 	}
 	~SiteConfig() {
 
 	}
 	string siteId;
 	string recordFinishUrl;
+	string loginCheckUrl;
+	bool loginCheck;
+
 }SiteConfig;
 
 typedef struct SiteConnection {
@@ -339,6 +348,11 @@ private:
 	 * 发送所有分站在线用户列表
 	 */
 	void SendAllOnlineList();
+
+	/**
+	 * 外部登录校验
+	 */
+	bool SendExternalLoginCheck(const string& siteId, const string& param);
 
 	/***************************** 基本参数 **************************************/
 	/**

@@ -9,6 +9,8 @@
 #include "VideoFlvRecorder.h"
 #include "CommonFunc.h"
 
+#include <errno.h>
+
 #define H264_BUFFER_SIZE (128 * 1024)
 
 VideoFlvRecorder::VideoFlvRecorder()
@@ -73,7 +75,7 @@ bool VideoFlvRecorder::StartRecord(switch_file_handle_t *handle
 			  ", videoRecPath:%s, videoDstDir:%s, finishShell:%s"
 			  ", picRecDir:%s, picDstDir:%s, picShell:%s, picInterval:%d\n"
 			, this
-			, (NULL!= handle ? handle->memory_pool : NULL)
+			, (NULL!= handle ? handle->memory_pool: NULL)
 			, videoRecPath, videoDstDir, finishShell
 			, picRecDir, picDstDir, picShell, picInterval);
 
@@ -121,8 +123,8 @@ bool VideoFlvRecorder::StartRecord(switch_file_handle_t *handle
 			if (!success) {
 				// error
 				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
-					, "mod_file_recorder: VideoFlvRecorder::StartRecord() open file fail, recorder:%p, videoRecPath:%s\n"
-					, this, videoRecPath);
+					, "mod_file_recorder: VideoFlvRecorder::StartRecord() open file fail(%d), recorder:%p, videoRecPath:%s\n"
+					, errno, this, videoRecPath);
 			}
 
 //			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
@@ -202,6 +204,8 @@ bool VideoFlvRecorder::StartRecord(switch_file_handle_t *handle
 					success = success
 							&& (NULL != (mpPicDataBuffer = (uint8_t*)switch_core_alloc(mpMemoryPool, miPicDataBufferSize)));
 
+					success = success & (SWITCH_STATUS_SUCCESS == switch_buffer_create(mpMemoryPool, &mpSpsBuffer, 256));
+					success = success & (SWITCH_STATUS_SUCCESS == switch_buffer_create(mpMemoryPool, &mpPpsBuffer, 256));
 //					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //									, "mod_file_recorder: VideoFlvRecorder::StartRecord() load cut picture thread, success:%d\n"
 //									, success);
@@ -362,7 +366,7 @@ void VideoFlvRecorder::SetCallback(IVideoRecorderCallback* callback) {
 bool VideoFlvRecorder::RecordVideoFrame(switch_frame_t *frame)
 {
 	bool bFlag = true;
-
+	uint8_t nalu_type = 0;
 //	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //					, "mod_file_recorder: VideoFlvRecorder::RecordVideoFrame() start handle:%p\n"
 //					, mpHandle);
@@ -374,7 +378,7 @@ bool VideoFlvRecorder::RecordVideoFrame(switch_frame_t *frame)
 //				, mpHandle,	frame->datalen);
 
 		// 解析h264包
-		switch_status_t status = buffer_h264_nalu(frame, mpNaluBuffer->buffer, mbNaluStart);
+		switch_status_t status = buffer_h264_nalu(frame, mpNaluBuffer->buffer, mbNaluStart, nalu_type);
 
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 //				, "mod_file_recorder: VideoFlvRecorder::RecordVideoFrame() buffer_h264_nalu, handle:%p, mbNaluStart:%d\n"
@@ -404,6 +408,9 @@ bool VideoFlvRecorder::RecordVideoFrame(switch_frame_t *frame)
 			// 更新timestamp
 			int64_t now = srs_utils_time_ms();
 			mpNaluBuffer->timestamp = now - mLocalTimestamp;
+
+			// 由于这里读出数据，因此在这里判断是否为I帧
+			mpNaluBuffer->isIFrame = ((nalu_type & 0x1f) == 5);
 
 			// 增加到缓存队列
 			switch_queue_push(mpVideoQueue, mpNaluBuffer);
@@ -504,7 +511,7 @@ bool VideoFlvRecorder::RecordVideoFrame2FileProc()
 
 			// 读buffer数据失败
 			if (!success) {
-				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING
 						, "mod_file_recorder: VideoFlvRecorder:RecordVideoFrame2FileProc() read buffer fail, recorder:%p, inuse:%d, dataBufferLen:%d, dataBufferSize:%d, mcVideoRecPath:%s\n"
 						, this, inuseSize, miVideoDataBufferLen, miVideoDataBufferSize, mcVideoRecPath);
 				break;
@@ -738,9 +745,9 @@ bool VideoFlvRecorder::IsIFrame(const uint8_t* data, switch_size_t inuse)
 	return isIFrame;
 }
 
-switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* nalu_buffer, switch_bool_t& nalu_28_start)
+switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch_buffer_t* nalu_buffer, switch_bool_t& nalu_28_start, uint8_t &nalu_type)
 {
-	uint8_t nalu_type = 0;
+//	uint8_t nalu_type = 0;
 	uint8_t *data = (uint8_t *)frame->data;
 	uint8_t nalu_hdr = *data;
 	uint8_t sync_bytes[] = {0, 0, 0, 1};
@@ -750,12 +757,24 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 	nalu_type = nalu_hdr & 0x1f;
 
 	/* hack for phones sending sps/pps with frame->m = 1 such as grandstream */
-	if ((nalu_type == 7 || nalu_type == 8) && frame->m) frame->m = SWITCH_FALSE;
+	switch_mutex_lock(mpPicMutex);
+	if (nalu_type == 7) {
+		switch_buffer_zwrite(mpSpsBuffer, (const void *)frame->data, frame->datalen);
+	} else if (nalu_type == 8) {
+		switch_buffer_zwrite(mpPpsBuffer, (const void *)frame->data, frame->datalen);
+	}
+	switch_mutex_unlock(mpPicMutex);
 
-//	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-//			"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
-//			"nalu_type: %d, first_nalu: %d, m: %d, size: %d, bufferSize: %d, nalu_28_start : %d \n",
-//			nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer), nalu_28_start);
+	if ((nalu_type == 7 || nalu_type == 8) && frame->m) {
+		frame->m = SWITCH_FALSE;
+		nalu_28_start = SWITCH_FALSE;
+
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+				"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+				"frame: %p, nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d \n",
+				frame, nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer));
+		return SWITCH_STATUS_SUCCESS;
+	}
 
 	if (nalu_type == 28) { // 0x1c FU-A
 		int start = *(data + 1) & 0x80;
@@ -763,9 +782,10 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 
 		nalu_type = *(data + 1) & 0x1f;
 
-//		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
-//				, "mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), nalu_type: %d, size: %d, bufferSize: %d, first: %d, m: %d, start: %d, end: %d, nalu_28_start : %d \n"
-//				, nalu_type, frame->datalen, switch_buffer_inuse(buffer), frame->first_nalu, frame->m, start, end, nalu_28_start);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+				"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+				"frame: %p, nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d \n",
+				frame, nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer));
 
 		if (start && end) return SWITCH_STATUS_RESTART;
 
@@ -775,15 +795,34 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 				switch_buffer_zero(buffer);
 			}
 		} else if (end) {
+			// Add by Max
+			if ( !start && !nalu_28_start ) {
+				//  skip error slice frame
+				return SWITCH_STATUS_SUCCESS;
+			}
 			nalu_28_start = SWITCH_FALSE;
 		} else if ( nalu_28_start == SWITCH_FALSE ) {
 			return SWITCH_STATUS_RESTART;
 		}
 
 		if (start) {
-			unsigned int datalen = htonl(frame->datalen);
 			uint8_t nalu_idc = (nalu_hdr & 0x60) >> 5;
 			nalu_type |= (nalu_idc << 5);
+
+			if ( (nalu_type & 0x1f) == 5 ) {
+				uint8_t *tmp = NULL;
+				switch_size_t size = 0;
+				size = switch_buffer_peek_zerocopy(mpSpsBuffer, (const void **)&tmp);
+				if ( size > 0 ) {
+					switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+					switch_buffer_write(buffer, tmp, size);
+				}
+				size = switch_buffer_peek_zerocopy(mpPpsBuffer, (const void **)&tmp);
+				if ( size > 0 ) {
+					switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+					switch_buffer_write(buffer, tmp, size);
+				}
+			}
 
 			if ( frame->first_nalu ) {
 				// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
@@ -822,6 +861,26 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 			nalu_hdr = *data;
 			nalu_type = nalu_hdr & 0x1f;
 
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+					"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+					"frame: %p, nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d \n",
+					frame, nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer));
+
+			if ( nalu_type == 5 ) {
+				uint8_t *tmp = NULL;
+				switch_size_t size = 0;
+				size = switch_buffer_peek_zerocopy(mpSpsBuffer, (const void **)&tmp);
+				if ( size > 0 ) {
+					switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+					switch_buffer_write(buffer, tmp, size);
+				}
+				size = switch_buffer_peek_zerocopy(mpPpsBuffer, (const void **)&tmp);
+				if ( size > 0 ) {
+					switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+					switch_buffer_write(buffer, tmp, size);
+				}
+			}
+
 			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
 			switch_buffer_write(buffer, (void *)data, nalu_size);
 			data += nalu_size;
@@ -830,6 +889,26 @@ switch_status_t VideoFlvRecorder::buffer_h264_nalu(switch_frame_t *frame, switch
 		}
 	} else {
 //		switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+				"mod_file_recorder: VideoFlvRecorder::buffer_h264_nalu(), "
+				"frame: %p, nalu_type: %d, first_nalu: %d, m: %d, datalen: %d, bufferSize: %d \n",
+				frame, nalu_type, frame->first_nalu, frame->m, frame->datalen, switch_buffer_inuse(buffer));
+
+		if ( (nalu_type & 0x1f) == 5 ) {
+			uint8_t *tmp = NULL;
+			switch_size_t size = 0;
+			size = switch_buffer_peek_zerocopy(mpSpsBuffer, (const void **)&tmp);
+			if ( size > 0 ) {
+				switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+				switch_buffer_write(buffer, tmp, size);
+			}
+			size = switch_buffer_peek_zerocopy(mpPpsBuffer, (const void **)&tmp);
+			if ( size > 0 ) {
+				switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
+				switch_buffer_write(buffer, tmp, size);
+			}
+		}
+
 		if ( frame->first_nalu ) {
 			// If it is first slice of frame, write Nalu Start Code(00, 00, 00, 01)
 			switch_buffer_write(buffer, sync_bytes, sizeof(sync_bytes));
@@ -1137,13 +1216,28 @@ bool VideoFlvRecorder::WriteVideoData2FlvFile(video_frame_t *frame)
 		// 从buffer中读取数据
 		miVideoDataBufferLen = switch_buffer_peek(frame->buffer, mpVideoDataBuffer, miVideoDataBufferSize);
 		if (miVideoDataBufferLen > 0) {
-			// 由于这里读出数据，因此在这里判断是否为I帧
-			frame->isIFrame = IsIFrame(mpVideoDataBuffer, miVideoDataBufferLen);
+//			// 由于这里读出数据，因此在这里判断是否为I帧
+//			frame->isIFrame = IsIFrame(mpVideoDataBuffer, miVideoDataBufferLen);
 
 			// 把数据写入flv文件
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+					"mod_file_recorder: VideoFlvRecorder::WriteVideoData2FlvFile(), "
+					"timestamp: %d, miVideoDataBufferLen: %d \n",
+					frame->timestamp, miVideoDataBufferLen);
 			int writeResult = srs_flv_write_h264_raw_frames(mpFlvFile, frame->timestamp, (char*)mpVideoDataBuffer, miVideoDataBufferLen);
 			if (0 == writeResult) {
 				result = true;
+			} else {
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING,
+						"mod_file_recorder: VideoFlvRecorder::WriteVideoData2FlvFile() fail, "
+						"writeResult: %d, timestamp: %d, miVideoDataBufferLen: %d, "
+						"data: 0x%02x,0x%02x,0x%02x,0x%02x,0x%02x \n",
+						writeResult, frame->timestamp, miVideoDataBufferLen,
+						(unsigned char*)mpVideoDataBuffer[0],
+						(unsigned char*)mpVideoDataBuffer[1],
+						(unsigned char*)mpVideoDataBuffer[2],
+						(unsigned char*)mpVideoDataBuffer[3],
+						(unsigned char*)mpVideoDataBuffer[4]);
 			}
 		}
 
@@ -1320,7 +1414,7 @@ bool VideoFlvRecorder::RunPictureShell()
 	char cmd[MAX_PATH_LENGTH] = {0};
 //	snprintf(cmd, sizeof(cmd), "%s %s %s"
 //			, mcPicShell, mcPicRecPath, mcPicDstPath);
-	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -i %s -y -s 240x180 -vframes 1 %s"
+	snprintf(cmd, sizeof(cmd), "/usr/local/bin/ffmpeg -v error -i %s -y -s 240x180 -vframes 1 %s"
 			, mcPicRecPath, mcPicDstPath);
 
 	// log
@@ -1355,7 +1449,7 @@ bool VideoFlvRecorder::SendCommand(const char* cmd) {
 //	switch_log_printf(
 //			SWITCH_CHANNEL_LOG,
 //			SWITCH_LOG_DEBUG,
-//			"mod_file_recorder: VideoFlvRecorder::SendCommand() cmd : \"%s\"\n",
+//			"mod_file_recorder: VideoFlvRecorder::SendCommand() cmd: \"%s\"\n",
 //			cmd
 //			);
 	return file_record_send_command_lua(cmd);
@@ -1375,8 +1469,8 @@ bool VideoFlvRecorder::file_record_send_command(const char* cmd) {
 				SWITCH_LOG_ERROR,
 				"VideoFlvRecorder::file_record_send_command( "
 				"[Send event Fail], "
-				"this : %p, "
-				"cmd : '%s' "
+				"this: %p, "
+				"cmd: '%s' "
 				") \n",
 				this,
 				cmd
@@ -1414,8 +1508,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 //			SWITCH_LOG_INFO,
 //			"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 //			"[LUA call], "
-//			"this : %p, "
-//			"path : %s "
+//			"this: %p, "
+//			"path: %s "
 //			") \n",
 //			this,
 //			path
@@ -1428,8 +1522,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 //				SWITCH_LOG_INFO,
 //				"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 //				"[LUA call OK], "
-//				"this : %p, "
-//				"stream.data : '%s' "
+//				"this: %p, "
+//				"stream.data: '%s' "
 //				") \n",
 //				this,
 //				stream.data
@@ -1440,8 +1534,8 @@ bool VideoFlvRecorder::file_record_send_command_lua(const char* cmd) {
 				SWITCH_LOG_ERROR,
 				"mod_file_recorder::VideoFlvRecorder::file_record_send_command_lua( "
 				"[LUA call Fail], "
-				"this : %p, "
-				"stream.data : '%s' "
+				"this: %p, "
+				"stream.data: '%s' "
 				") \n",
 				this,
 				stream.data

@@ -143,7 +143,7 @@ public:
 	 * 重新验证当前所有会议室用户
 	 * @return true:成功/false:失败
 	 */
-	bool AuthorizationAllConference();
+	bool AuthorizationAllConference(bool bCreateChannel = false);
 
 	/**
 	 * 根据会议室信息更新频道信息
@@ -170,7 +170,8 @@ public:
 			const string& user,
 			const string& conference,
 			const string& serverId,
-			const string& siteId
+			const string& siteId,
+			const string& chat_type_string
 			);
 
 	/**

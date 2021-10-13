@@ -19,7 +19,7 @@
 /**
  * 总读包缓存Buffer Size
  */
-#define CLIENT_BUFFER_SIZE 128 * 1024
+#define CLIENT_BUFFER_SIZE 8 * 1024
 
 typedef struct Client {
 	static Client* Create(Socket *socket) {
