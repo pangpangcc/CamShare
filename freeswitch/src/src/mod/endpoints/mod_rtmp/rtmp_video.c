@@ -271,6 +271,11 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t *read_helper, uint8_t* data,
 					"rtmp_rtmp2rtpH264(), Recv IDR Packet, len: %d\n", len);
 		}
 
+		if ( len < 5 ) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_rtmp2rtpH264(), Invalid data size: %d \n" , len);
+			return SWITCH_STATUS_FALSE;
+		}
+
 		if (read_helper->sps && read_helper->pps) {
 			switch_byte_t * pdata = data + 5;
 			uint32_t  pdata_len = len - 5;
@@ -449,7 +454,7 @@ switch_status_t rtmp_rtmp2rtpH264(rtmp2rtp_helper_t *read_helper, uint8_t* data,
 //			}
 		}
 	} else {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_rtmp2rtpH264(), Missing rtmp data, data[0]: %02x, data[1]: %02x, len: %d\n", data[0], data[1], len);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_rtmp2rtpH264(), Missing rtmp data, data[0]: 0x%02x, data[1]: 0x%02x, len: %d\n", data[0], data[1], len);
 		status = SWITCH_STATUS_FALSE;
 	}
 
@@ -474,7 +479,7 @@ switch_bool_t sps_changed(amf0_data *data, uint8_t *new, int datalen)
 	return SWITCH_FALSE;
 }
 
-switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *frame)
+switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *frame, rtmp_session_t *rsession)
 {
 	uint8_t* packet = frame->packet;
 	// uint32_t len = frame->packetlen;
@@ -487,7 +492,7 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 	uint32_t rtp_ts = 0;
 	static const uint8_t rtmp_header17[] = {0x17, 1, 0, 0, 0};
 	static const uint8_t rtmp_header27[] = {0x27, 1, 0, 0, 0};
-
+	switch_bool_t send_frame = switch_test_flag(rsession, SFLAG_VIDEO);
 	/**
 	 * Add by Max 2019/09/17
 	 */
@@ -505,8 +510,8 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 //		rtp_ts = ntohl(raw_rtp->ts);
 
 		if (helper->last_seq != USHRT_MAX && helper->last_seq + 1 != rtp_seq) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), Possible video rtp packet loss? rtp_seq: %u, last_seq: %u, rtp_ts: %u, last_recv_ts: %u \n",
-					rtp_seq, helper->last_seq,
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), %s Possible video rtp packet loss? rtp_seq: %u, last_seq: %u, rtp_ts: %u, last_recv_ts: %u \n",
+					rsession->account->user, rtp_seq, helper->last_seq,
 					rtp_ts, helper->last_recv_ts);
 
 //			if ( switch_test_flag(frame, SFF_KEY_FRAME_SPS) || switch_test_flag(frame, SFF_KEY_FRAME_PPS) ) {
@@ -538,11 +543,11 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 	switch (nalType) {
 	case 7: //sps
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-				"rtmp_rtp2rtmpH264(), Send New SPS, datalen: %d \n", datalen);
+				"rtmp_rtp2rtmpH264(), %s Send New SPS, datalen: %d \n", rsession->account->user, datalen);
 
 		if (sps_changed(helper->sps, payload, datalen)) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-					"rtmp_rtp2rtmpH264(), Send New SPS Change, datalen: %d \n", datalen);
+					"rtmp_rtp2rtmpH264(), %s Send New SPS Change, datalen: %d \n", rsession->account->user, datalen);
 
 			amf0_data_free(helper->sps);
 			helper->sps = amf0_string_new(payload, datalen);
@@ -557,32 +562,36 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 			 */
 //			helper->sps_changed = 0;
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-					"rtmp_rtp2rtmpH264(), Send New SPS Dup, datalen: %d \n", datalen);
+					"rtmp_rtp2rtmpH264(), %s Send New SPS Dup, datalen: %d \n", rsession->account->user, datalen);
 		}
 		break;
 	case 8: //pps
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-				"rtmp_rtp2rtmpH264(), Send New PPS, datalen: %d \n", datalen);
+				"rtmp_rtp2rtmpH264(), %s Send New PPS, datalen: %d \n", rsession->account->user, datalen);
 
 		amf0_data_free(helper->pps);
 		helper->pps = amf0_string_new(payload, datalen);
 		break;
 	case 1: //Non IDR
-		size = htonl(datalen);
-		if (switch_buffer_inuse(helper->rtmp_buf) == 0)
-			switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
-		switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
-		switch_buffer_write(helper->rtmp_buf, payload, datalen);
+		if (send_frame) {
+			size = htonl(datalen);
+			if (switch_buffer_inuse(helper->rtmp_buf) == 0)
+				switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
+			switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
+			switch_buffer_write(helper->rtmp_buf, payload, datalen);
+		}
 		break;
 	case 5: //IDR
-		size = htonl(datalen);
-		if (switch_buffer_inuse(helper->rtmp_buf) == 0)
-			switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
-		switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
-		switch_buffer_write(helper->rtmp_buf, payload, datalen);
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-				"rtmp_rtp2rtmpH264(), Send IDR Packet, len: %u, ts: %u\n", (unsigned int)switch_buffer_inuse(helper->rtmp_buf), rtp_ts);
-		helper->idr_recv = SWITCH_TRUE;
+		if (send_frame) {
+			size = htonl(datalen);
+			if (switch_buffer_inuse(helper->rtmp_buf) == 0)
+				switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
+			switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
+			switch_buffer_write(helper->rtmp_buf, payload, datalen);
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+					"rtmp_rtp2rtmpH264(), %s, Send IDR Packet, len: %u, ts: %u\n", rsession->account->user, (unsigned int)switch_buffer_inuse(helper->rtmp_buf), rtp_ts);
+			helper->idr_recv = SWITCH_TRUE;
+		}
 		break;
 	case 28: //FU-A
 		{
@@ -594,42 +603,43 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 			uint8_t h264_key       = (h264_nri << 5) | h264_type;
 //			switch_bool_t h264_idr = SWITCH_FALSE;
 
-			if (h264_start_bit) {
-				/* write NAL unit code */
-				switch_buffer_write(helper->fua_buf, &h264_key, sizeof(h264_key));
-			}
-
-			switch_buffer_write(helper->fua_buf, q + 2, datalen - 2);
-
-			if (h264_end_bit) {
-				const void * nal_data;
-
-				uint32_t used = switch_buffer_inuse(helper->fua_buf);
-				uint32_t used_big = htonl(used);
-				switch_buffer_peek_zerocopy(helper->fua_buf, &nal_data);
-
-				nalType = ((uint8_t*)nal_data)[0] & 0x1f;
-				if (switch_buffer_inuse(helper->rtmp_buf) == 0) {
-					if (nalType == 5) {
-						switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
-						helper->idr_recv = SWITCH_TRUE;
-//						h264_idr = SWITCH_TRUE;
-					}
-					else {
-						switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
-					}
+			if (send_frame) {
+				if (h264_start_bit) {
+					/* write NAL unit code */
+					switch_buffer_write(helper->fua_buf, &h264_key, sizeof(h264_key));
 				}
 
-				switch_buffer_write(helper->rtmp_buf, &used_big, sizeof(uint32_t));
-				switch_buffer_write(helper->rtmp_buf, nal_data, used);
-				switch_buffer_zero(helper->fua_buf);
+				switch_buffer_write(helper->fua_buf, q + 2, datalen - 2);
 
-				if ( nalType == 5 ) {
-					switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-							"rtmp_rtp2rtmpH264(), Send IDR(FU-A) Packet, len: %u, rtp_ts: %u\n", (unsigned int)switch_buffer_inuse(helper->rtmp_buf), rtp_ts);
+				if (h264_end_bit) {
+					const void * nal_data;
+
+					uint32_t used = switch_buffer_inuse(helper->fua_buf);
+					uint32_t used_big = htonl(used);
+					switch_buffer_peek_zerocopy(helper->fua_buf, &nal_data);
+
+					nalType = ((uint8_t*)nal_data)[0] & 0x1f;
+					if (switch_buffer_inuse(helper->rtmp_buf) == 0) {
+						if (nalType == 5) {
+							switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
+							helper->idr_recv = SWITCH_TRUE;
+	//						h264_idr = SWITCH_TRUE;
+						}
+						else {
+							switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
+						}
+					}
+
+					switch_buffer_write(helper->rtmp_buf, &used_big, sizeof(uint32_t));
+					switch_buffer_write(helper->rtmp_buf, nal_data, used);
+					switch_buffer_zero(helper->fua_buf);
+
+					if ( nalType == 5 ) {
+						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+								"rtmp_rtp2rtmpH264(), %sSend IDR(FU-A) Packet, len: %u, rtp_ts: %u\n", rsession->account->user, (unsigned int)switch_buffer_inuse(helper->rtmp_buf), rtp_ts);
+					}
 				}
 			}
-
 		}
 		break;
 	case 24:
@@ -653,19 +663,23 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 				nt = q[nidx] & 0x1f;
 				switch (nt) {
 				case 1: //Non IDR
-					size = htonl(nalu_size);
-					if (switch_buffer_inuse(helper->rtmp_buf) == 0)
-							switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
-					switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
-					switch_buffer_write(helper->rtmp_buf, q + nidx, nalu_size);
+					if (send_frame) {
+						size = htonl(nalu_size);
+						if (switch_buffer_inuse(helper->rtmp_buf) == 0)
+								switch_buffer_write(helper->rtmp_buf, rtmp_header27,  sizeof(rtmp_header27));
+						switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
+						switch_buffer_write(helper->rtmp_buf, q + nidx, nalu_size);
+					}
 					break;
 				case 5:	// IDR
-					size = htonl(nalu_size);
-					if (switch_buffer_inuse(helper->rtmp_buf) == 0)
-						switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
+					if (send_frame) {
+						size = htonl(nalu_size);
+						if (switch_buffer_inuse(helper->rtmp_buf) == 0)
+							switch_buffer_write(helper->rtmp_buf, rtmp_header17, sizeof(rtmp_header17));
 
-					switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
-					switch_buffer_write(helper->rtmp_buf, q + nidx, nalu_size);
+						switch_buffer_write(helper->rtmp_buf, &size, sizeof(uint32_t));
+						switch_buffer_write(helper->rtmp_buf, q + nidx, nalu_size);
+					}
 					break;
 				case 7: //sps
 					amf0_data_free(helper->sps);
@@ -693,14 +707,14 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 	}
 
 	// build the avc seq
-	if (helper->sps_changed && helper->sps != NULL && helper->pps != NULL) {
+	if (helper->sps_changed && helper->sps != NULL && helper->pps != NULL && send_frame) {
 		int i = 0;
 		uint16_t size;
 		uint8_t *sps = amf0_string_get_uint8_ts(helper->sps);
 		unsigned char *buf = malloc(AMF_MAX_SIZE); /* make sure the buffer is big enough */
 
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
-				"rtmp_rtp2rtmpH264(), Change SPS/PPS , profile: %02x, compatiable: %02x, level: %02x\n", sps[1], sps[2], sps[3]);
+				"rtmp_rtp2rtmpH264(), %s Change SPS/PPS , profile: %02x, compatiable: %02x, level: %02x\n", rsession->account->user, sps[1], sps[2], sps[3]);
 
 		buf[i++] = 0x17;   // i = 0
 		buf[i++] = 0;      // 0 for sps/pps packet
@@ -749,13 +763,14 @@ switch_status_t rtmp_rtp2rtmpH264(rtp2rtmp_helper_t *helper, switch_frame_t *fra
 		if (helper->avc_conf) {
 			helper->send = SWITCH_TRUE;
 		} else {
-
+			if (send_frame) {
 //wait_sps:
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), waiting for sps and pps\n");
+				switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "rtmp_rtp2rtmpH264(), %s waiting for sps and pps\n", rsession->account->user);
 //			switch_buffer_zero(helper->rtmp_buf);
 //			switch_buffer_zero(helper->fua_buf);
 //skip:
-		    helper->send = SWITCH_FALSE;
+			}
+			helper->send = SWITCH_FALSE;
 		}
 	} else {
 		helper->send = SWITCH_FALSE;
@@ -799,7 +814,8 @@ switch_status_t rtmp_write_video_frame(switch_core_session_t *session, switch_fr
 		switch_goto_status(SWITCH_STATUS_FALSE, end);
 	}
 
-	if (switch_test_flag(tech_pvt, TFLAG_DETACHED) || !switch_test_flag(tech_pvt->rtmp_session, SFLAG_VIDEO)) {
+	if (switch_test_flag(tech_pvt, TFLAG_DETACHED)) {
+//	if (switch_test_flag(tech_pvt, TFLAG_DETACHED) || !switch_test_flag(tech_pvt->rtmp_session, SFLAG_VIDEO)) {
 		switch_goto_status(SWITCH_STATUS_SUCCESS, end);
 	}
 
@@ -816,9 +832,9 @@ switch_status_t rtmp_write_video_frame(switch_core_session_t *session, switch_fr
 		switch_goto_status(SWITCH_STATUS_SUCCESS, end);
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "rtmp_write_video_frame(), seq: %u, ts: %u \n", frame->seq, frame->timestamp);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s rtmp_write_video_frame(), seq: %u, ts: %u \n", rsession->account->user, frame->seq, frame->timestamp);
 
-	rtmp_rtp2rtmpH264(helper, frame);
+	rtmp_rtp2rtmpH264(helper, frame, rsession);
 
 	if (helper->send) {
 		uint16_t used = switch_buffer_inuse(helper->rtmp_buf);
@@ -869,7 +885,7 @@ switch_status_t rtmp_write_video_frame(switch_core_session_t *session, switch_fr
 			uint8_t *avc_conf = amf0_string_get_uint8_ts(helper->avc_conf);
 
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
-					"rtmp_rtp2rtmpH264(), Send AVC, size: %d, ts: %u\n", amf0_string_get_size(helper->avc_conf), (unsigned int)ts);
+					"%s, rtmp_rtp2rtmpH264(), Send AVC, size: %d, ts: %u\n", rsession->account->user, amf0_string_get_size(helper->avc_conf), (unsigned int)ts);
 
 			rtmp_send_message(tech_pvt->rtmp_session, RTMP_DEFAULT_STREAM_VIDEO, ts,
 				RTMP_TYPE_VIDEO, tech_pvt->rtmp_session->media_streamid, avc_conf, amf0_string_get_size(helper->avc_conf), 0);

@@ -16,7 +16,8 @@ loginPaths = {
   ["1"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus",
   ["4"] = "http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=getuserloginstatus",
   ["5"] = "http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus",
-  ["6"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus"
+  ["6"] = "http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus",
+  ["7"] = "https://link:connect@demo.connectlink.com/chat/setStatus?action=getuserloginstatus"
 };
 
 function getLoginPath(siteId)

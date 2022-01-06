@@ -74,7 +74,7 @@ typedef struct Client {
 
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
-				SWITCH_LOG_DEBUG,
+				SWITCH_LOG_INFO,
 				"Client::Create( "
 				"client : %p, "
 				"socket : %p "
@@ -87,7 +87,7 @@ typedef struct Client {
 	void Destroy() {
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
-				SWITCH_LOG_DEBUG,
+				SWITCH_LOG_INFO,
 				"Client::Destroy( "
 				"client : %p, "
 				"socket : %p "

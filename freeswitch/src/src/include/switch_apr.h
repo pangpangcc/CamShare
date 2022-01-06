@@ -1283,8 +1283,8 @@ SWITCH_DECLARE(switch_status_t) switch_mcast_interface(switch_socket_t *sock, sw
 		 switch_memory_pool_t *p;		  /**< associated pool */
 		 switch_pollset_type_t desc_type;
 									   /**< descriptor type */
-		 int16_t reqevents;	/**< requested events */
-		 int16_t rtnevents;	/**< returned events */
+		 int32_t reqevents;	/**< requested events */
+		 int32_t rtnevents;	/**< returned events */
 		 switch_descriptor_t desc;	 /**< @see apr_descriptor */
 		 void *client_data;		/**< allows app to associate context */
 	 };
@@ -1311,7 +1311,7 @@ SWITCH_DECLARE(switch_status_t) switch_mcast_interface(switch_socket_t *sock, sw
 #define SWITCH_POLLERR 0x010			/**< Pending error */
 #define SWITCH_POLLHUP 0x020			/**< Hangup occurred */
 #define SWITCH_POLLNVAL 0x040		/**< Descriptior invalid */
-
+#define SWITCH_POLLLET   1u << 31  /**< Edge */
 /**
  * Setup a pollset object
  * @param pollset  The pointer in which to return the newly created object 
@@ -1395,7 +1395,7 @@ SWITCH_DECLARE(switch_status_t) switch_pollset_poll(switch_pollset_t *pollset, s
   \param pool the memory pool to use
   \return SWITCH_STATUS_SUCCESS when successful
 */
-SWITCH_DECLARE(switch_status_t) switch_socket_create_pollset(switch_pollfd_t ** poll, switch_socket_t *sock, int16_t flags, switch_memory_pool_t *pool);
+SWITCH_DECLARE(switch_status_t) switch_socket_create_pollset(switch_pollfd_t ** poll, switch_socket_t *sock, int32_t flags, switch_memory_pool_t *pool);
 
 SWITCH_DECLARE(switch_interval_time_t) switch_interval_time_from_timeval(struct timeval *tvp);
 																
@@ -1409,7 +1409,7 @@ SWITCH_DECLARE(switch_interval_time_t) switch_interval_time_from_timeval(struct 
   \param pool the memory pool to use
   \return SWITCH_STATUS_SUCCESS when successful
 */
-SWITCH_DECLARE(switch_status_t) switch_socket_create_pollfd(switch_pollfd_t **pollfd, switch_socket_t *sock, int16_t flags, void *client_data, switch_memory_pool_t *pool);
+SWITCH_DECLARE(switch_status_t) switch_socket_create_pollfd(switch_pollfd_t **pollfd, switch_socket_t *sock, int32_t flags, void *client_data, switch_memory_pool_t *pool);
 SWITCH_DECLARE(switch_status_t) switch_match_glob(const char *pattern, switch_array_header_t ** result, switch_memory_pool_t *pool);
 SWITCH_DECLARE(switch_status_t) switch_os_sock_get(switch_os_socket_t *thesock, switch_socket_t *sock);
 SWITCH_DECLARE(switch_status_t) switch_os_sock_put(switch_socket_t **sock, switch_os_socket_t *thesock, switch_memory_pool_t *pool);

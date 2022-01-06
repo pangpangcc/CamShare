@@ -301,7 +301,6 @@ switch_status_t rtmp_on_destroy(switch_core_session_t *session)
 
 	if (tech_pvt) {
 		rsession = tech_pvt->rtmp_session;
-		rsession->wait_destroy = SWITCH_FALSE;
 
 		if (switch_core_codec_ready(&tech_pvt->read_codec)) {
 			switch_core_codec_destroy(&tech_pvt->read_codec);
@@ -321,6 +320,8 @@ switch_status_t rtmp_on_destroy(switch_core_session_t *session)
 			tech_pvt->video_tmp_buffer = NULL;
 		}
 		on_rtmp_destroy(tech_pvt);
+
+		rsession->wait_destroy = SWITCH_FALSE;
 	}
 
 	return SWITCH_STATUS_SUCCESS;
@@ -1115,6 +1116,8 @@ switch_status_t rtmp_session_shutdown(rtmp_session_t **rsession)
 	rtmp_tcp_io_private_t *io_private = (rtmp_tcp_io_private_t*)(*rsession)->io_private;
 	switch_mutex_lock(io_private->socket_mutex);
 	if ( io_private->socket ) {
+		switch_log_printf(SWITCH_CHANNEL_UUID_LOG((*rsession)->uuid), SWITCH_LOG_INFO
+				, "rtmp_session_shutdown()\n");
 		switch_socket_shutdown(io_private->socket, SWITCH_SHUTDOWN_READWRITE);
 		status = SWITCH_STATUS_SUCCESS;
 	}

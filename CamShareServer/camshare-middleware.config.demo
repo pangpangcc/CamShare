@@ -3,7 +3,7 @@
 # 端口
 PORT=9200
 # 最大连接数
-MAXCLIENT=2000
+MAXCLIENT=1000
 # 处理线程数目, 一般为cpu内核数目
 MAXHANDLETHREAD=4
 # 单核每秒处理请求数目
@@ -54,7 +54,7 @@ AUTHORIZATION_TIME=60
 # 站点配置
 [SITE]
 # 站点数量
-SITE_COUNT=5
+SITE_COUNT=6
 # 上传视频录制记录时间间隔(秒)
 UPLOADTIME=60
 
@@ -63,34 +63,65 @@ UPLOADTIME=60
 # 站点Id
 SITE_ID=0
 # 上传录制文件完成记录接口路径
-#SITE_HTTP_RECORD_URL=http://demo.chnlove.com/livechat/setstatus.php?action=savecamsharevideo
-SITE_HTTP_RECORD_URL=http://demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+#SITE_HTTP_RECORD_URL=http://test:5179@demo.chnlove.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1
 
 # 站点配置(IDA)
 [SITE_1]
 # 站点Id
 SITE_ID=1
 # 上传录制文件完成记录接口路径
-#SITE_HTTP_RECORD_URL=http://demo.idateasia.com/livechat/setstatus.php?action=savecamsharevideo
-SITE_HTTP_RECORD_URL=http://demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+#SITE_HTTP_RECORD_URL=http://test:5179@demo.idateasia.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1
 
 # 站点配置(CD)
 [SITE_2]
 # 站点Id
 SITE_ID=4
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://demo.charmdate.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://test:5179@demo.charmdate.com/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1
 
 # 站点配置(LD)
 [SITE_3]
 # 站点Id
 SITE_ID=5
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://demo.latamdate.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://test:5179@demo.latamdate.com/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1
 
 # 站点配置(AM)
 [SITE_4]
 # 站点Id
 SITE_ID=6
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://test:5179@demo.asiame.com/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1
+
+# 站点配置(CTL)
+[SITE_5]
+# 站点Id
+SITE_ID=7
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=https://link:connect@demo.connectlink.com/chat/setStatus?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=https://link:connect@demo.connectlink.com/chat/setStatus?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=1

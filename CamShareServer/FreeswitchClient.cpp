@@ -822,6 +822,12 @@ bool FreeswitchClient::AuthorizationAllConference(bool bCreateChannel) {
 							break;
 						}
 
+						sessionId = "";
+						uuId = "";
+						user = "";
+						memberId = "";
+						memberType = Member;
+
 						const char* type = memberHandle.ToElement()->Attribute("type");
 						LogManager::GetLogManager()->Log(
 								LOG_STAT,

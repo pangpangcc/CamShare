@@ -2658,7 +2658,6 @@ bool CamShareMiddleware::SendRecordFinish(
 	int respondSize = 0;
 	HttpEntiy httpEntiy;
 
-	httpEntiy.SetAuthorization("test", "5179");
 	httpEntiy.AddContent("userId", record.conference);
 	httpEntiy.AddContent("startTime", record.startTime);
 	httpEntiy.AddContent("endTime", record.endTime);
@@ -2919,7 +2918,6 @@ bool CamShareMiddleware::SendExternalLoginCheck(const string& siteId, const stri
 
 	HttpClient client;
 	HttpEntiy httpEntiy;
-	httpEntiy.SetAuthorization("test", "5179");
 
 	bool loginCheck = true;
 
@@ -2955,7 +2953,7 @@ bool CamShareMiddleware::SendExternalLoginCheck(const string& siteId, const stri
 				// 解析返回
 				const char* respond = NULL;
 				int respondSize = 0;
-				int httpCode = client.GetRespondCode();
+				long httpCode = client.GetRespondCode();
 				client.GetBody(&respond, respondSize);
 
 				LogManager::GetLogManager()->Log(

@@ -35,28 +35,28 @@
 #include "rtmp_common.h"
 
 #define RETRY_READ_MAXTIMES		2
-#define TCP_SND_BUFFER_SIZE 1 * 1024 * 1024
+#define TCP_SND_BUFFER_SIZE 1 * 128 * 1024
 // ------------------------
 
 static switch_status_t rtmp_tcp_read(rtmp_session_t *rsession, unsigned char *buf, switch_size_t *len)
 {
 	//rtmp_io_tcp_t *io = (rtmp_io_tcp_t*)rsession->profile->io;
 	rtmp_tcp_io_private_t *io_private = rsession->io_private;
-	switch_status_t status = SWITCH_STATUS_SUCCESS;
+	switch_status_t status = SWITCH_STATUS_FALSE;
 #ifdef RTMP_DEBUG_IO
 	switch_size_t olen = *len;
 #endif
 	switch_assert(*len > 0 && *len < 1024000);
 
-	do {
+//	do {
 		switch_mutex_lock(io_private->socket_mutex);
 		if (io_private->socket) {
 			status = switch_socket_recv(io_private->socket, (char*)buf, len);
-		} else {
-			status = SWITCH_STATUS_FALSE;
 		}
 		switch_mutex_unlock(io_private->socket_mutex);
-	} while(status != SWITCH_STATUS_SUCCESS && SWITCH_STATUS_IS_BREAK(status));
+		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+				, "rtmp_tcp_read(), uuid:%s, status:%d, len:%d\n", rsession->uuid, status, (int)*len);
+//	} while(status != SWITCH_STATUS_SUCCESS && SWITCH_STATUS_IS_BREAK(status));
 
 #ifdef RTMP_DEBUG_IO
 	{
@@ -211,14 +211,18 @@ static switch_status_t rtmp_tcp_close(rtmp_session_t *rsession)
 	// add by Samson for test
 //	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //			, "uuid:%s, rtmp tcp close\n", rsession->uuid);
+	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession)->uuid, SWITCH_LOG_INFO
+			, "rtmp_tcp_close() \n");
 
-	switch_mutex_lock(io->mutex);
+//	switch_mutex_lock(io->mutex);
 	switch_pollset_remove(io->pollset, io_private->pollfd);
-	switch_mutex_unlock(io->mutex);
+//	switch_mutex_unlock(io->mutex);
 
 	switch_mutex_lock(io_private->socket_mutex);
-	switch_socket_close(io_private->socket);
-	io_private->socket = NULL;
+	if (io_private->socket) {
+		switch_socket_close(io_private->socket);
+		io_private->socket = NULL;
+	}
 	switch_mutex_unlock(io_private->socket_mutex);
 
 	return SWITCH_STATUS_SUCCESS;
@@ -347,23 +351,28 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s: I/O Thread starting\n", io->base.profile->name);
 
-
 	while(io->base.running) {
 		const switch_pollfd_t *fds;
 		int32_t numfds;
 		int32_t i;
 		switch_status_t status;
 
-		switch_mutex_lock(io->mutex);
 		status = switch_pollset_poll(io->pollset, 500000, &numfds, &fds);
-		switch_mutex_unlock(io->mutex);
-
-		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_TIMEOUT) {
-			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "pollset_poll failed, status : %d\n", status);
+		if (status == SWITCH_STATUS_INTR) {
 			continue;
 		} else if (status == SWITCH_STATUS_TIMEOUT) {
+			// sleep
 			switch_cond_next();
+		} else if (status != SWITCH_STATUS_SUCCESS) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "pollset_poll failed, status : %d) \n", status);
 		}
+//
+//		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_TIMEOUT) {
+//			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "pollset_poll failed, status : %d\n", status);
+//			continue;
+//		} else if (status == SWITCH_STATUS_TIMEOUT) {
+//			switch_cond_next();
+//		}
 
 		// modify by Samson 2016-05-28
 		for (i = 0; i < numfds; i++) {
@@ -382,6 +391,10 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 
 						if (switch_socket_opt_set(newsocket, SWITCH_SO_NONBLOCK, TRUE)) {
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket as non-blocking\n");
+						}
+
+						if (switch_socket_opt_set(newsocket, SWITCH_SO_SNDBUF, TCP_SND_BUFFER_SIZE)) {
+							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket send buffer size:%d\n", TCP_SND_BUFFER_SIZE);
 						}
 
 						if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_NODELAY, 1)) {
@@ -434,12 +447,14 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 							rsession->active_time = GetTickCount();
 							rsession->check_timeout = 1;
 							add_to_timeout_list(io, rsession);
+							rsession->handle_disconnect = SWITCH_FALSE;
 
 							/* Create out private data and attach it to the rtmp session structure */
 							io_private = switch_core_alloc(rsession->pool, sizeof(*io_private));
 							io_private->socket = newsocket;
 							switch_mutex_init(&(io_private->socket_mutex), SWITCH_MUTEX_NESTED, rsession->pool);
-							switch_socket_create_pollfd(&io_private->pollfd, newsocket, SWITCH_POLLIN | SWITCH_POLLERR, rsession, rsession->pool);
+//							switch_socket_create_pollfd(&io_private->pollfd, newsocket, SWITCH_POLLIN | SWITCH_POLLHUP | SWITCH_POLLERR, rsession, rsession->pool);
+							switch_socket_create_pollfd(&io_private->pollfd, newsocket, SWITCH_POLLIN | SWITCH_POLLLET, rsession, rsession->pool);
 							switch_pollset_add(io->pollset, io_private->pollfd);
 							rsession->io_private = io_private;
 
@@ -460,163 +475,74 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 						/* Don't spam the logs if we are shutting down */
 						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Socket Listen Error [%s]\n", strerror(errno));
 					} else {
-						return NULL;
+						break;
 					}
 				}
 			} else {
 				rtmp_session_t *rsession = (rtmp_session_t*)fds[i].client_data;
+				switch_bool_t destroy = SWITCH_FALSE;
 //				rtmp_tcp_io_private_t *io_private = (rtmp_tcp_io_private_t*)rsession->io_private;
 
-				if (fds[i].rtnevents & (SWITCH_POLLERR|SWITCH_POLLHUP|SWITCH_POLLNVAL)) {
-					uint32_t handle_count = 0;
-					switch_bool_t is_destroy = SWITCH_FALSE;
-
-					switch_mutex_lock(rsession->handle_count_mutex);
-					is_destroy = rsession->handle_count <= 0;
-					handle_count = rsession->handle_count;
-					switch_mutex_unlock(rsession->handle_count_mutex);
-
-					if (is_destroy) {
-						if (NULL == rsession->account || NULL == rsession->account->user) {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Closing socket, uuid:%s, handle_count:%d\n"
-									, rsession->uuid, handle_count);
-						}
-						else {
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-									, "Closing socket, uuid:%s, user:%s, handle_count:%d\n"
-									, rsession->uuid, rsession->account->user, handle_count);
-						}
-
-						remove_from_timeout_list(io, rsession);
-
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//								, "uuid:%s, remove from timeout list\n", rsession->uuid);
-
-//						switch_mutex_lock(io->mutex);
-//						switch_pollset_remove(io->pollset, io_private->pollfd);
-//						switch_mutex_unlock(io->mutex);
-
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//								, "uuid:%s, remove\n", rsession->uuid);
-
-//						switch_mutex_lock(rsession->handle_mutex);
-//						switch_socket_close(io_private->socket);
-//						io_private->socket = NULL;
-//						switch_mutex_unlock(rsession->handle_mutex);
-
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//								, "uuid:%s, close socket\n", rsession->uuid);
-
-						io->base.close(rsession);
-
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//								, "uuid:%s, close\n", rsession->uuid);
-
-						rtmp_session_destroy(&rsession);
-					}
-					else {
-						// print log
+//				if (fds[i].rtnevents & (SWITCH_POLLERR|SWITCH_POLLHUP|SWITCH_POLLNVAL)) {
+//					uint32_t handle_count = 0;
+//					switch_bool_t is_destroy = SWITCH_FALSE;
+//
+//					switch_mutex_lock(rsession->handle_count_mutex);
+//					is_destroy = rsession->handle_count <= 0;
+//					handle_count = rsession->handle_count;
+//					switch_mutex_unlock(rsession->handle_count_mutex);
+//
+//					if (is_destroy) {
 //						if (NULL == rsession->account || NULL == rsession->account->user) {
 //							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//									, "Wait to close socket, uuid:%s, handle_count:%d\n"
+//									, "Closing socket, uuid:%s, handle_count:%d\n"
 //									, rsession->uuid, handle_count);
 //						}
 //						else {
 //							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//									, "Wait to close socket, uuid:%s, user:%s, handle_count:%d\n"
+//									, "Closing socket, uuid:%s, user:%s, handle_count:%d\n"
 //									, rsession->uuid, rsession->account->user, handle_count);
 //						}
-					}
-				}
-				else if (fds[i].rtnevents & SWITCH_POLLIN) {
-//					remove_from_timeout_list(io, rsession);
-
-					switch_mutex_lock(rsession->handle_count_mutex);
-					if (rsession->handle_count == 0) {
-						rsession->handle_count++;
+//
+//						remove_from_timeout_list(io, rsession);
+//						io->base.close(rsession);
+//						rtmp_session_destroy(&rsession);
+//					}
+//				} else
+				if (fds[i].rtnevents & SWITCH_POLLIN) {
+					if ( !(fds[i].rtnevents & (SWITCH_POLLERR|SWITCH_POLLHUP|SWITCH_POLLNVAL)) ) {
+						switch_mutex_lock(rsession->handle_mutex);
+	//					if (rsession->handle_count == 0) {
+							rsession->handle_count++;
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+								, "Push Read Event, handle_count:%d, rtnevents:0x%x\n"
+								, rsession->handle_count, fds[i].rtnevents);
+	//					}
+						switch_mutex_unlock(rsession->handle_mutex);
 						switch_queue_push(io->handle_queue, (void*)rsession);
-						// print log
-//						if (NULL == rsession->account || NULL == rsession->account->user) {
-//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//									, "Push to handle queue, uuid:%s, handle_count:%d\n"
-//									, rsession->uuid, rsession->handle_count);
-//						}
-//						else {
-//							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//									, "Push to handle queue, uuid:%s, user:%s, handle_count:%d\n"
-//									, rsession->uuid, rsession->account->user, rsession->handle_count);
-//						}
+					} else {
+						switch_pollset_remove(io->pollset, ((rtmp_tcp_io_private_t *)rsession->io_private)->pollfd);
+
+						switch_mutex_lock(rsession->handle_mutex);
+						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+							, "Error Event %p, rtnevents:0x%x, handle_count:%d \n"
+							, (void *)rsession, fds[i].rtnevents, rsession->handle_count);
+
+						rsession->handle_disconnect = SWITCH_TRUE;
+						if (rsession->handle_count == 0) {
+							destroy = SWITCH_TRUE;
+						}
+						switch_mutex_unlock(rsession->handle_mutex);
+
+						if (destroy) {
+							remove_from_timeout_list(io, rsession);
+							io->base.close(rsession);
+							rtmp_session_destroy(&rsession);
+						}
 					}
-					switch_mutex_unlock(rsession->handle_count_mutex);
 				}
 			}
 		}
-//		for (i = 0; i < numfds; i++) {
-//			if (!fds[i].client_data) {
-//				switch_socket_t *newsocket;
-//				if (switch_socket_accept(&newsocket, io->listen_socket, io->base.pool) != SWITCH_STATUS_SUCCESS) {
-//					if (io->base.running) {
-//						/* Don't spam the logs if we are shutting down */
-//						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Socket Error [%s]\n", strerror(errno));
-//					} else {
-//						return NULL;
-//					}
-//				} else {
-//					rtmp_session_t *rsession;
-//
-//					if (switch_socket_opt_set(newsocket, SWITCH_SO_NONBLOCK, TRUE)) {
-//						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't set socket as non-blocking\n");
-//					}
-//
-//					if (switch_socket_opt_set(newsocket, SWITCH_SO_TCP_NODELAY, 1)) {
-//						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Couldn't disable Nagle.\n");
-//					}
-//
-//					if (rtmp_session_request(io->base.profile, &rsession) != SWITCH_STATUS_SUCCESS) {
-//						switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "RTMP session request failed\n");
-//						switch_socket_close(newsocket);
-//					} else {
-//						switch_sockaddr_t *addr = NULL;
-//						char ipbuf[200];
-//
-//						/* Create out private data and attach it to the rtmp session structure */
-//						rtmp_tcp_io_private_t *pvt = switch_core_alloc(rsession->pool, sizeof(*pvt));
-//						rsession->io_private = pvt;
-//						pvt->socket = newsocket;
-//						switch_socket_create_pollfd(&pvt->pollfd, newsocket, SWITCH_POLLIN | SWITCH_POLLERR, rsession, rsession->pool);
-//						switch_pollset_add(io->pollset, pvt->pollfd);
-//
-//						/* Get the remote address/port info */
-//						switch_socket_addr_get(&addr, SWITCH_TRUE, newsocket);
-//						if (addr) {
-//							switch_get_addr(ipbuf, sizeof(ipbuf), addr);
-//							rsession->remote_address = switch_core_strdup(rsession->pool, ipbuf);
-//							rsession->remote_port = switch_sockaddr_get_port(addr);
-//						}
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "uuid:%s, Rtmp connection from %s:%i\n",
-//								rsession->uuid, rsession->remote_address, rsession->remote_port);
-//					}
-//				}
-//			} else {
-//				rtmp_session_t *rsession = (rtmp_session_t*)fds[i].client_data;
-//				rtmp_tcp_io_private_t *io_private = (rtmp_tcp_io_private_t*)rsession->io_private;
-//
-//				if (rtmp_handle_data(rsession) != SWITCH_STATUS_SUCCESS) {
-//					switch_mutex_lock(io->mutex);
-//					switch_pollset_remove(io->pollset, io_private->pollfd);
-//					switch_mutex_unlock(io->mutex);
-//
-//					switch_socket_close(io_private->socket);
-//					io_private->socket = NULL;
-//
-//					io->base.close(rsession);
-//
-//					rtmp_session_destroy(&rsession);
-//				}
-//			}
-//		}
-		// ---------------------------
 	}
 
 //	// Modify by Max 2017/01/22 for crash when shutdown
@@ -626,29 +552,49 @@ void *SWITCH_THREAD_FUNC rtmp_io_tcp_thread(switch_thread_t *thread, void *obj)
 	return NULL;
 }
 
-void rtmp_handle_proc(rtmp_session_t *rsession)
+switch_status_t rtmp_handle_proc(rtmp_session_t *rsession)
 {
-	switch_status_t result;
+	switch_status_t result = SWITCH_STATUS_SUCCESS;
+	rtmp_io_tcp_t *io = (rtmp_io_tcp_t *)rsession->profile->io;
+	switch_bool_t destroy = SWITCH_FALSE;
+
 	switch_mutex_lock(rsession->handle_mutex);
 //	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
 //			, "uuid:%s, handle_count:%d, handle data\n", rsession->uuid, rsession->handle_count);
-	result = rtmp_handle_data(rsession);
-	if (result != SWITCH_STATUS_SUCCESS)
-	{
-		rtmp_session_shutdown(&rsession);
+	rsession->handle_count--;
+	switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+			, "Pop Read Event, handle_count:%d, handle_disconnect:%d\n"
+			, rsession->handle_count, rsession->handle_disconnect);
+	do {
+		result = rtmp_handle_data(rsession);
+	} while(result == SWITCH_STATUS_SUCCESS);
 
+	if ( (result != SWITCH_STATUS_BREAK) || (rsession->handle_disconnect == SWITCH_TRUE) ) {
 		if (NULL == rsession->account || NULL == rsession->account->user) {
-			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-					, "rtmp_handle_proc(), rtmp handle data fail, result:%d\n"
-					, result);
+			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING
+					, "rtmp_handle_proc(), rtmp handle data fail, result:%d, handle_count:%d\n"
+					, result, rsession->handle_count);
+		} else {
+			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_WARNING
+					, "rtmp_handle_proc(), rtmp handle data fail, user:%s, result:%d, handle_count:%d\n"
+					, rsession->account->user, result, rsession->handle_count);
 		}
-		else {
-			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-					, "rtmp_handle_proc(), rtmp handle data fail, user:%s, result:%d\n"
-					, rsession->account->user, result);
+
+		if (rsession->handle_disconnect == SWITCH_TRUE) {
+			destroy = (rsession->handle_count == 0);
+		} else {
+			rtmp_session_shutdown(&rsession);
 		}
 	}
 	switch_mutex_unlock(rsession->handle_mutex);
+
+	if (destroy) {
+		remove_from_timeout_list(io, rsession);
+		io->base.close(rsession);
+		rtmp_session_destroy(&rsession);
+	}
+
+	return result;
 }
 
 // add by Samson 2016-05-19
@@ -659,30 +605,21 @@ void *SWITCH_THREAD_FUNC rtmp_handle_thread(switch_thread_t *thread, void *obj)
 	rtmp_session_t* rsession = NULL;
 	void* pop = NULL;
 
+//	switch_status_t result;
+//	switch_bool_t is_destroy = SWITCH_FALSE;
+
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s: handle Thread starting\n", io->base.profile->name);
 
 	while(io->base.running) {
 		if (SWITCH_STATUS_SUCCESS == switch_queue_pop_timeout(io->handle_queue, &pop, timeout))
 		{
 			rsession = (rtmp_session_t*)pop;
-//			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "uuid:%s, Pop queue\n", rsession->uuid);
-
 			rtmp_handle_proc(rsession);
 
-			switch_mutex_lock(rsession->handle_count_mutex);
-			rsession->handle_count--;
-			// print log
-//			if (NULL == rsession->account || NULL == rsession->account->user) {
-//				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//						, "Pop queue and handle finish, uuid:%s, handle_count:%d\n"
-//						, rsession->uuid, rsession->handle_count);
-//			}
-//			else {
-//				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
-//						, "Pop queue and handle finish, uuid:%s, user:%s, handle_count:%d\n"
-//						, rsession->uuid, rsession->account->user, rsession->handle_count);
-//			}
-			switch_mutex_unlock(rsession->handle_count_mutex);
+//			switch_mutex_lock(rsession->handle_count_mutex);
+//			rsession->handle_count--;
+//			is_destroy = (rsession->handle_count <= 0) && (result != SWITCH_STATUS_SUCCESS) && (result != SWITCH_STATUS_BREAK);//(result == 70014);
+//			switch_mutex_unlock(rsession->handle_count_mutex);
 		}
 	}
 
@@ -753,7 +690,7 @@ switch_status_t rtmp_tcp_init(rtmp_profile_t *profile, const char *bindaddr, rtm
 
 	// modify by Samson 2016-05-28
 //	switch_socket_create_pollfd(&(io_tcp->listen_pollfd), io_tcp->listen_socket, SWITCH_POLLIN | SWITCH_POLLERR, NULL, pool);
-	switch_socket_create_pollfd(&(io_tcp->listen_pollfd), io_tcp->listen_socket, SWITCH_POLLIN | SWITCH_POLLERR, io_tcp->listen_socket, pool);
+	switch_socket_create_pollfd(&(io_tcp->listen_pollfd), io_tcp->listen_socket, SWITCH_POLLIN, io_tcp->listen_socket, pool);
 	// ------------------------
 	if (switch_pollset_add(io_tcp->pollset, io_tcp->listen_pollfd) != SWITCH_STATUS_SUCCESS) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "pollset_add failed\n");

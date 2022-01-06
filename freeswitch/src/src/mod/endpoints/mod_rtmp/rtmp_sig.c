@@ -108,7 +108,7 @@ void HandleRtmpCall(rtmp_session_t *rsession, const RtmpStreamParamItem* items, 
 					event = NULL;
 
 					if ( recvVideo ) {
-					switch_set_flag(rsession, SFLAG_VIDEO);
+						switch_set_flag(rsession, SFLAG_VIDEO);
 						if (rsession->tech_pvt) {
 							switch_set_flag(rsession->tech_pvt, TFLAG_VID_WAIT_KEYFRAME);
 						}

@@ -943,7 +943,7 @@ bool VideoFlvRecorder::RenewNaluBuffer()
 // 执行关闭shell
 void VideoFlvRecorder::RunCloseShell()
 {
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 					, "mod_file_recorder: VideoFlvRecorder::RunCloseShell() start, recorder:%p\n"
 					, this);
 
@@ -1003,7 +1003,7 @@ void VideoFlvRecorder::RunCloseShell()
 		}
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG
 					, "mod_file_recorder: RunCloseShell() end, recorder:%p\n"
 					, this);
 }
