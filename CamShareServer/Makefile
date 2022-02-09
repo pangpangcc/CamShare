@@ -10,9 +10,9 @@ export MAKE	:=	make
 
 release=0
 ifeq ($(release), 1)
-CXXFLAGS = -O3 
+CXXFLAGS = -O2 
 else
-CXXFLAGS = -O2 -g #-D_CHECK_MEMORY_LEAK
+CXXFLAGS = -O0 -g #-D_CHECK_MEMORY_LEAK
 endif
 
 CXXFLAGS +=	-Wall -fmessage-length=0 -Wno-unused-variable -Wno-unused-but-set-variable
@@ -35,7 +35,7 @@ LIBS =		-L. \
 			-Wl,-Bstatic -Lthird_party/esl/libs -lesl \
 			-Wl,-Bstatic -Lthird_party/curl/lib/.libs -lcurl \
 			-Wl,-Bstatic -Lthird_party/sqlite/.libs -lsqlite3 \
-			-Wl,-Bdynamic -ldl -lz -lpthread -lidn -lrt
+			-Wl,-Bdynamic -lssl -lcrypto -ldl -lz -lpthread -lidn -lrt
 
 OBJS 		=	main.o CamShareMiddleware.o  \
 				Session.o FreeswitchClient.o SessionManager.o \

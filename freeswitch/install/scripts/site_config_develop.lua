@@ -17,7 +17,7 @@ loginPaths = {
   ["4"] = "http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus",
   ["5"] = "http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus",
   ["6"] = "http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus",
-  ["7"] = "https://192.168.88.136/chat/setStatus?action=getuserloginstatus"
+  ["7"] = "https://192.168.88.136/s1db4v/chat/setStatus?action=getuserloginstatus"
 };
 
 function getLoginPath(siteId)
