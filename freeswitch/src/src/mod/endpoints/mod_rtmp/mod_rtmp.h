@@ -542,6 +542,7 @@ struct rtmp_session {
 	switch_mutex_t *handle_mutex;
 	switch_mutex_t *handle_count_mutex;
 	uint32_t handle_count;
+	switch_bool_t handle_disconnect;
 
 	uint8_t tryread_times;
 

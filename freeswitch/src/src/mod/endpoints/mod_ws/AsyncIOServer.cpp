@@ -155,9 +155,11 @@ void AsyncIOServer::Disconnect(Client* client) {
 			SWITCH_CHANNEL_LOG,
 			SWITCH_LOG_INFO,
 			"AsyncIOServer::Disconnect( "
-			"client : %p "
+			"client : %p, "
+			"socket : %p "
 			") \n",
-			client
+			client,
+			client->socket
 			);
 	if( client ) {
 		mTcpServer.Disconnect(client->socket);
@@ -212,29 +214,36 @@ void AsyncIOServer::OnRecvEvent(Socket* socket) {
 		// 有足够的缓存空间
 		if( client->CheckBufferEnough() ) {
 			while (true) {
+				len = sizeof(buf);
 				status = mTcpServer.Read(socket, (char *)buf, &len);
 //				status = switch_socket_recv(socket->socket, (char *)buf, &len);
 				if( status == SWITCH_STATUS_SUCCESS ) {
 					// 读取数据成功, 缓存到客户端
-//					switch_log_printf(
-//							SWITCH_CHANNEL_LOG,
-//							SWITCH_LOG_DEBUG,
-//							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, read ok ) \n",
-//							client,
-//							socket
-//							);
+					switch_log_printf(
+							SWITCH_CHANNEL_LOG,
+							SWITCH_LOG_DEBUG,
+							"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, len : %d, size : %d, read ok ) \n",
+							client,
+							socket,
+							len,
+							sizeof(buf)
+							);
 
 					if( client->Write(buf, len) ) {
 						// 放到处理队列
-//						switch_log_printf(
-//								SWITCH_CHANNEL_LOG,
-//								SWITCH_LOG_DEBUG,
-//								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, client write buffer ok ) \n",
-//								client,
-//								socket
-//								);
+						switch_log_printf(
+								SWITCH_CHANNEL_LOG,
+								SWITCH_LOG_DEBUG,
+								"AsyncIOServer::OnRecvEvent( client : %p, socket : %p, client write buffer ok ) \n",
+								client,
+								socket
+								);
 
 						RecvHandle(client);
+
+						if ( len < sizeof(buf) ) {
+							break;
+						}
 
 					} else {
 						// 没有足够的缓存空间
@@ -315,7 +324,7 @@ void AsyncIOServer::OnDisconnect(Socket* socket) {
 
 		switch_log_printf(
 				SWITCH_CHANNEL_LOG,
-				SWITCH_LOG_DEBUG,
+				SWITCH_LOG_INFO,
 				"AsyncIOServer::OnDisconnect( "
 				"client : %p, "
 				"socket : %p, "

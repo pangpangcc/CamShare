@@ -46,7 +46,11 @@ typedef struct Socket {
 	}
 
 	void Destroy() {
-
+		socket = NULL;
+		pollfd = NULL;
+		ip = NULL;
+		port = 0;
+		data = NULL;
 	}
 
 	void SetAddress(const char* ip, switch_port_t port) {
@@ -54,7 +58,7 @@ typedef struct Socket {
 		this->port = port;
 	}
 
-	void CreatePollfd(int16_t flags) {
+	void CreatePollfd(int32_t flags) {
 		switch_socket_create_pollfd(&this->pollfd, this->socket, flags, this, this->pool);
 	}
 

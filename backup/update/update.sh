@@ -24,7 +24,8 @@ cp -f ./file/switch.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch ./lib & ./mod files
 #cp -f ./file/bin/* /usr/local/freeswitch/bin/
-cp -f ./file/lib/* /usr/local/freeswitch/lib/
+#cp -f ./file/lib/* /usr/local/freeswitch/lib/
+#cp -f ./file/mod/* /usr/local/freeswitch/mod/
 
 # freeswitch scripts
 cp -f ./file/*.lua /usr/local/freeswitch/scripts/
@@ -34,19 +35,19 @@ cp -f ./file/close_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 #cp -f ./file/pic_shell.sh /usr/local/freeswitch/bin/mod_file_recorder_sh/
 
 # freeswitch mod_conference
-cp -f ./file/mod_conference* /usr/local/freeswitch/mod/
+#cp -f ./file/mod_conference* /usr/local/freeswitch/mod/
 #cp -f ./file/conference.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_file_recorder
-cp -f ./file/mod_file_recorder* /usr/local/freeswitch/mod/
+#cp -f ./file/mod_file_recorder* /usr/local/freeswitch/mod/
 #cp -f ./file/file_recorder.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_rtmp
-cp -f ./file/mod_rtmp* /usr/local/freeswitch/mod/
+#cp -f ./file/mod_rtmp* /usr/local/freeswitch/mod/
 #cp -f ./file/rtmp.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_ws
-cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
+#cp -f ./file/mod_ws* /usr/local/freeswitch/mod/
 #cp -f ./file/ws.conf.xml /usr/local/freeswitch/conf/autoload_configs/
 
 # freeswitch mod_logfile

@@ -43,11 +43,11 @@ chmod +x $updatedir/restore.sh
 #cp -f /usr/local/freeswitch/bin/freeswitch $updatefiledir/bin/
 
 # copy common lib
-mkdir -p $updatefiledir/lib
+#mkdir -p $updatefiledir/lib
 #cp -f /usr/local/freeswitch/lib/* $updatefiledir/lib/
-cp -f /usr/local/freeswitch/lib/libfreeswitch.a $updatefiledir/lib/
-cp -f /usr/local/freeswitch/lib/libfreeswitch.la $updatefiledir/lib/
-cp -f /usr/local/freeswitch/lib/libfreeswitch.so.1.0.0 $updatefiledir/lib/
+#cp -f /usr/local/freeswitch/lib/libfreeswitch.a $updatefiledir/lib/
+#cp -f /usr/local/freeswitch/lib/libfreeswitch.la $updatefiledir/lib/
+#cp -f /usr/local/freeswitch/lib/libfreeswitch.so.1.0.0 $updatefiledir/lib/
 
 #mkdir -p $updatefiledir/mod
 #cp -f /usr/local/freeswitch/mod/* $updatefiledir/mod/
@@ -65,23 +65,23 @@ cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/close_shell.sh $updatefiled
 #cp -f /usr/local/freeswitch/bin/mod_file_recorder_sh/pic_shell.sh $updatefiledir/
 
 # copy mod_conference files
-cp -f /usr/local/freeswitch/mod/mod_conference.so $updatefiledir/
-cp -f /usr/local/freeswitch/mod/mod_conference.la $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_conference.so $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_conference.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/conference.conf.xml $updatefiledir/
 
 # copy mod_file_recorder files
-cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
-cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_file_recorder.so $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_file_recorder.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/file_recorder.conf.xml $updatefiledir/
 
 # copy mod_rtmp files
-cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
-cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_rtmp.so $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_rtmp.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/rtmp.conf.xml $updatefiledir/
 
 # copy mod_ws files
-cp -f /usr/local/freeswitch/mod/mod_ws.so $updatefiledir/
-cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_ws.so $updatefiledir/
+#cp -f /usr/local/freeswitch/mod/mod_ws.la $updatefiledir/
 #cp -f /usr/local/freeswitch/conf/autoload_configs/ws.conf.xml $updatefiledir/
 
 # copy mod_logfile files

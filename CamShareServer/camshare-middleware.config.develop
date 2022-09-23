@@ -54,7 +54,7 @@ AUTHORIZATION_TIME=60
 # 站点配置
 [SITE]
 # 站点数量
-SITE_COUNT=5
+SITE_COUNT=6
 # 上传视频录制记录时间间隔(秒)
 UPLOADTIME=60
 
@@ -63,32 +63,63 @@ UPLOADTIME=60
 # 站点Id
 SITE_ID=0
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.8.136/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0
 
 # 站点配置(IDA)
 [SITE_1]
 # 站点Id
 SITE_ID=1
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.8.136/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0
 
 # 站点配置(CD)
 [SITE_2]
 # 站点Id
 SITE_ID=4
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.8.136/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0
 
 # 站点配置(LD)
 [SITE_3]
 # 站点Id
 SITE_ID=5
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.8.136/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0
 
 # 站点配置(AM)
 [SITE_4]
 # 站点Id
 SITE_ID=6
 # 上传录制文件完成记录接口路径
-SITE_HTTP_RECORD_URL=http://192.168.8.136/livechat/setstatus.php?action=savecamsharevideo
+SITE_HTTP_RECORD_URL=http://192.168.88.136/livechat/setstatus.php?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=http://192.168.88.136/livechat/setstatus.php?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0
+
+# 站点配置(CTL)
+[SITE_5]
+# 站点Id
+SITE_ID=7
+# 上传录制文件完成记录接口路径
+SITE_HTTP_RECORD_URL=https://192.168.88.136/chat/setStatus?action=savecamsharevideo
+# 登录鉴权接口路径
+SITE_HTTP_LOGIN_URL=https://192.168.88.136/chat/setStatus?action=getuserloginstatus
+# 是否需要外部登录鉴权
+SITE_EXTERNL_LOGIN=0

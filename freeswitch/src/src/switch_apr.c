@@ -787,6 +787,8 @@ SWITCH_DECLARE(switch_status_t) switch_socket_recv(switch_socket_t *sock, char *
 
 	if (r == 35 || r == 730035) {
 		r = SWITCH_STATUS_BREAK;
+	} else if ( APR_STATUS_IS_EAGAIN(r) ) {
+		r = SWITCH_STATUS_BREAK;
 	}
 
 	return (switch_status_t)r;
@@ -971,7 +973,7 @@ SWITCH_DECLARE(switch_status_t) switch_pollset_remove(switch_pollset_t *pollset,
 	return apr_pollset_remove((apr_pollset_t *) pollset, (const apr_pollfd_t *) descriptor);
 }
 
-SWITCH_DECLARE(switch_status_t) switch_socket_create_pollfd(switch_pollfd_t **pollfd, switch_socket_t *sock, int16_t flags, void *client_data, switch_memory_pool_t *pool)
+SWITCH_DECLARE(switch_status_t) switch_socket_create_pollfd(switch_pollfd_t **pollfd, switch_socket_t *sock, int32_t flags, void *client_data, switch_memory_pool_t *pool)
 {
 	if (!pollfd || !sock) {
 		return SWITCH_STATUS_FALSE;
@@ -1001,6 +1003,8 @@ SWITCH_DECLARE(switch_status_t) switch_pollset_poll(switch_pollset_t *pollset, s
 		
 		if (st == APR_TIMEUP) {
 			st = SWITCH_STATUS_TIMEOUT;
+		} else if ( APR_STATUS_IS_EINTR(st) ) {
+			st = SWITCH_STATUS_INTR;
 		}
 	}
 	
@@ -1024,7 +1028,7 @@ SWITCH_DECLARE(switch_status_t) switch_poll(switch_pollfd_t *aprset, int32_t num
 	return st;
 }
 
-SWITCH_DECLARE(switch_status_t) switch_socket_create_pollset(switch_pollfd_t ** poll, switch_socket_t *sock, int16_t flags, switch_memory_pool_t *pool)
+SWITCH_DECLARE(switch_status_t) switch_socket_create_pollset(switch_pollfd_t ** poll, switch_socket_t *sock, int32_t flags, switch_memory_pool_t *pool)
 {
 	switch_pollset_t *pollset;
 

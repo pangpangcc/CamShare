@@ -493,17 +493,23 @@ size_t HttpClient::HttpProgress(double downloadTotal, double downloadNow, double
 	mdUploadLast = uploadNow;
 
 	// waiting for upload finish, no upload timeout
-	if( uploadNow == uploadTotal ) {
-		if( downloadTotal != downloadNow && mdDownloadLast != -1 &&  mdDownloadLast == downloadNow ) {
+	if (uploadNow == uploadTotal) {
+		if (mdDownloadLast == -1) {
+			// update download progress at the beginning
+			mdDownloadLast = downloadNow;
+			mdDownloadLastTime = totalTime;
+		}
+
+		if (mdDownloadLast == downloadNow) {
 			if( totalTime - mdDownloadLastTime > DWONLOAD_TIMEOUT ) {
 				// DWONLOAD_TIMEOUT no receive data, download timeout
 				FileLog("httpclient", "HttpClient::HttpProgress( download timeout )");
 				mbStop = true;
 			}
 		} else {
-			// mark the download progress
-			mdDownloadLast = downloadNow;
+			// update download progress
 			mdDownloadLastTime = totalTime;
+			mdDownloadLast = downloadNow;
 		}
 	}
 

@@ -771,28 +771,17 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 	if (rsession->state == RS_HANDSHAKE) {
 		s = 1537 - rsession->hspos;
 
-		// modify by Samson 2016-06-01
 		result = rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s);
 		if (result != SWITCH_STATUS_SUCCESS) {
-			if (result == 70014) {
-				return SWITCH_STATUS_SUCCESS;
-			}
-			else {
-				return SWITCH_STATUS_FALSE;
-			}
+			return result;
 		}
-//		if (rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s) != SWITCH_STATUS_SUCCESS) {
-//			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Disconnected from flash client\n");
-//			return SWITCH_STATUS_FALSE;
-//		}
-		// ---------------------------
 
 		rsession->hspos += s;
 
 		/* Receive C0 and C1 */
 		if (rsession->hspos < 1537) {
 			/* Not quite there yet */
-			return SWITCH_STATUS_SUCCESS;
+			return SWITCH_STATUS_BREAK;
 		}
 
 		/* Send reply (S0 + S1) */
@@ -826,60 +815,34 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 		s = 1536 - rsession->hspos;
 
 		/* Receive C2 */
-		// modify by Samson 2016-06-01
 		result = rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s);
 		if (result != SWITCH_STATUS_SUCCESS) {
-			if (result == 70014) {
-				return SWITCH_STATUS_SUCCESS;
-			}
-			else {
-				return SWITCH_STATUS_FALSE;
-			}
+			return result;
 		}
-//		if (rsession->profile->io->read(rsession, rsession->hsbuf + rsession->hspos, &s) != SWITCH_STATUS_SUCCESS) {
-//			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Disconnected from flash client\n");
-//			return SWITCH_STATUS_FALSE;
-//		}
-		// ---------------------------
 
 		rsession->hspos += s;
 
 		if (rsession->hspos < 1536) {
 			/* Not quite there yet */
-			return SWITCH_STATUS_SUCCESS;
+			return SWITCH_STATUS_BREAK;
 		}
 
 		rsession->state++;
 
-		//s = 1536;
-		//rsession->profile->io->write(rsession, (char*)buf, &s);
-
 		switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "Done with handshake\n");
 
-
 		return SWITCH_STATUS_SUCCESS;
-	}  else if (rsession->state == RS_ESTABLISHED) {
+	} else if (rsession->state == RS_ESTABLISHED) {
 		/* Process RTMP packet */
 		switch(rsession->parse_state) {
 			case 0:
 				// Read the header's first byte
 				s = 1;
-				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, (unsigned char*)buf, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-					if (result == 70014) {
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [0] Read nothing: %d\n", result);
-						return SWITCH_STATUS_SUCCESS;
-					} else {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [0] Read error: %d\n", result);
-						return SWITCH_STATUS_FALSE;
-					}
+//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [0] Read error: %d\n", result);
+					return result;
 				}
-//				if (rsession->profile->io->read(rsession, (unsigned char*)buf, &s) != SWITCH_STATUS_SUCCESS) {
-//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Disconnected from flash client\n");
-//					return SWITCH_STATUS_FALSE;
-//				}
-				// ---------------------------
 
 				rsession->recv += s;
 
@@ -913,6 +876,8 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 					rsession->parse_state++;
 				}
 				rsession->parse_remain = 0;
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+						, "rtmp_handle_data(), parse_state:0->%d\n", rsession->parse_state);
 				break;
 
 			case 1:
@@ -934,33 +899,16 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 					return SWITCH_STATUS_FALSE;
 				}
 
-				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, readbuf, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-//					if (result == SWITCH_STATUS_INTR) {
-//						return SWITCH_STATUS_SUCCESS;
-//					}
-//					else {
-//						return SWITCH_STATUS_FALSE;
-//					}
-					if (result == 70014) {
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [1] Read nothing: %d\n", result);
-						return SWITCH_STATUS_SUCCESS;
-					} else {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [1] Read error: %d\n", result);
-						return SWITCH_STATUS_FALSE;
-					}
+//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [1] Read error: %d\n", result);
+					return result;
 				}
-//				if (rsession->profile->io->read(rsession, readbuf, &s) != SWITCH_STATUS_SUCCESS) {
-//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Disconnected from flash client\n");
-//					return SWITCH_STATUS_FALSE;
-//				}
-				// ---------------------------
 
 				rsession->parse_remain -= s;
 				if (rsession->parse_remain > 0) {
 					/* More data please */
-					return SWITCH_STATUS_SUCCESS;
+					return SWITCH_STATUS_BREAK;
 				}
 
 				rsession->recv += s;
@@ -990,7 +938,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				if (rsession->hdrsize >= 8 && state->origlen == 0) {
 					/* Happens we sometimes get a 0 length packet */
 					rsession->parse_state = 0;
-					return SWITCH_STATUS_SUCCESS;
+					return SWITCH_STATUS_BREAK;
 				}
 
 				/* FIXME: Handle extended timestamps */
@@ -999,6 +947,9 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				}
 
 				rsession->parse_state++;
+
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+						, "rtmp_handle_data(), parse_state:1->%d\n", rsession->parse_state);
 			}break;
 			case 2:
 			{
@@ -1018,9 +969,9 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 
 					rsession->parse_remain = s;
 					if (!s) {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error, forcing big read\n");
-						s = sizeof(state->buf);
-						rsession->profile->io->read(rsession, state->buf, &s);
+//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_ERROR, "rtmp_handle_data(), Protocol error, forcing big read\n");
+//						s = sizeof(state->buf);
+//						rsession->profile->io->read(rsession, state->buf, &s);
 						return SWITCH_STATUS_FALSE;
 					}
 				}
@@ -1039,28 +990,11 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 					return SWITCH_STATUS_FALSE;
 				}
 
-				// modify by Samson 2016-06-01
 				result = rsession->profile->io->read(rsession, state->buf + state->buf_pos, &s);
 				if (result != SWITCH_STATUS_SUCCESS) {
-//					if (result == SWITCH_STATUS_INTR) {
-//						return SWITCH_STATUS_SUCCESS;
-//					}
-//					else {
-//						return SWITCH_STATUS_FALSE;
-//					}
-					if (result == 70014) {
-//						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [2] Read nothing: %d\n", result);
-						return SWITCH_STATUS_SUCCESS;
-					} else {
-						switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [2] Read error: %d\n", result);
-						return SWITCH_STATUS_FALSE;
-					}
+//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_INFO, "rtmp_handle_data(), [2] Read error: %d\n", result);
+					return result;
 				}
-//				if (rsession->profile->io->read(rsession, state->buf + state->buf_pos, &s) != SWITCH_STATUS_SUCCESS) {
-//					switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_NOTICE, "Disconnected from flash client\n");
-//					return SWITCH_STATUS_FALSE;
-//				}
-				// ---------------------------
 				rsession->recv += s;
 
 				state->remainlen -= s;
@@ -1069,7 +1003,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 
 				if (rsession->parse_remain > 0) {
 					/* Need more data */
-					return SWITCH_STATUS_SUCCESS;
+					return SWITCH_STATUS_BREAK;
 				}
 
 				if (state->remainlen == 0) {
@@ -1133,7 +1067,7 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 							switch_thread_rwlock_unlock(rsession->rwlock);
 							break;
 						case RTMP_TYPE_VIDEO: /* Video data */
-							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "rtmp_handle_data(), ts: %u, data:0x%02x, len: %d \n", state->ts, *(state->buf), state->origlen);
+							switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG, "rtmp_handle_data(), recv video frame, ts: %u, data:0x%02x, len: %d \n", state->ts, *(state->buf), state->origlen);
 							if (rsession->media_debug & RTMP_MD_VIDEO_READ) {
 								switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "rtmp_handle_data(), R V ts:%u data:0x%02x len:%d \n", state->ts, *(state->buf), state->origlen);
 							}
@@ -1212,6 +1146,8 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				}
 
 				rsession->parse_state = 0;
+				switch_log_printf(SWITCH_CHANNEL_UUID_LOG(rsession->uuid), SWITCH_LOG_DEBUG
+						, "rtmp_handle_data(), parse_state:2->0\n");
 
 				/* Send an ACK if we need to */
 				if (rsession->recv - rsession->recv_ack_sent >= rsession->recv_ack_window) {
@@ -1222,6 +1158,8 @@ switch_status_t rtmp_handle_data(rtmp_session_t *rsession)
 				}
 
 			}
+		} if (rsession->state == RS_DESTROY) {
+			return SWITCH_STATUS_FALSE;
 		}
 	}
 

@@ -146,7 +146,6 @@ int WSClientParser::ParseData(char* buffer, int len) {
 	int ret = 0;
 //	DataParser::ParseData(NULL, len);
 
-	Lock();
 	switch( mState ) {
 	case WSClientState_UnKnow:{
 		int lineNumber = 0;
@@ -280,8 +279,6 @@ int WSClientParser::ParseData(char* buffer, int len) {
 		break;
 	}
 	}
-
-	Unlock();
 
 	return ret;
 }
@@ -450,7 +447,7 @@ WSChannel* WSClientParser::CreateCall(
 
 	switch_log_printf(
 			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-			SWITCH_LOG_INFO,
+			SWITCH_LOG_DEBUG,
 			"WSClientParser::CreateCall( "
 			"this : %p, "
 			"profileName : '%s', "
@@ -545,7 +542,7 @@ WSChannel* WSClientParser::CreateCall(
 	if( wsChannel ) {
 		switch_log_printf(
 				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-				SWITCH_LOG_INFO,
+				SWITCH_LOG_DEBUG,
 				"WSClientParser::CreateCall( "
 				"[Success], "
 				"this : %p, "
@@ -614,7 +611,7 @@ WSChannel* WSClientParser::CreateChannel(switch_core_session_t *session) {
 void WSClientParser::DestroyCall() {
 	switch_log_printf(
 			SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-			SWITCH_LOG_INFO,
+			SWITCH_LOG_DEBUG,
 			"WSClientParser::DestroyCall( "
 			"this : %p, "
 			"mpChannel : %p "
@@ -697,7 +694,6 @@ bool WSClientParser::HangupCall() {
 				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
 				SWITCH_LOG_INFO,
 				"WSClientParser::HangupCall( "
-				"[Start], "
 				"this : %p, "
 				"wsChannel : %p, "
 				"session : '%s' "
@@ -715,7 +711,7 @@ bool WSClientParser::HangupCall() {
 				if( channel ) {
 					switch_log_printf(
 							SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-							SWITCH_LOG_INFO,
+							SWITCH_LOG_DEBUG,
 							"WSClientParser::HangupCall( "
 							"[Channel hang up], "
 							"this : %p, "
@@ -730,7 +726,7 @@ bool WSClientParser::HangupCall() {
 				} else {
 					switch_log_printf(
 							SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-							SWITCH_LOG_INFO,
+							SWITCH_LOG_DEBUG,
 							"WSClientParser::HangupCall( "
 							"[No channel to hang up], "
 							"this : %p, "
@@ -748,7 +744,7 @@ bool WSClientParser::HangupCall() {
 
 		switch_log_printf(
 				SWITCH_CHANNEL_UUID_LOG(this->GetUUID()),
-				SWITCH_LOG_INFO,
+				SWITCH_LOG_DEBUG,
 				"WSClientParser::HangupCall( "
 				"[Success], "
 				"this : %p, "

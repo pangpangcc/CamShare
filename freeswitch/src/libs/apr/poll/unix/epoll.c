@@ -18,9 +18,9 @@
 
 #ifdef POLLSET_USES_EPOLL
 
-static apr_int16_t get_epoll_event(apr_int16_t event)
+static apr_int32_t get_epoll_event(apr_int32_t event)
 {
-    apr_int16_t rv = 0;
+	apr_int32_t rv = 0;
 
     if (event & APR_POLLIN)
         rv |= EPOLLIN;
@@ -32,14 +32,16 @@ static apr_int16_t get_epoll_event(apr_int16_t event)
         rv |= EPOLLERR;
     if (event & APR_POLLHUP)
         rv |= EPOLLHUP;
+    if (event & APR_POLLLET)
+    	rv |= EPOLLET;
     /* APR_POLLNVAL is not handled by epoll. */
 
     return rv;
 }
 
-static apr_int16_t get_epoll_revent(apr_int16_t event)
+static apr_int32_t get_epoll_revent(apr_int32_t event)
 {
-    apr_int16_t rv = 0;
+	apr_int32_t rv = 0;
 
     if (event & EPOLLIN)
         rv |= APR_POLLIN;
@@ -51,6 +53,8 @@ static apr_int16_t get_epoll_revent(apr_int16_t event)
         rv |= APR_POLLERR;
     if (event & EPOLLHUP)
         rv |= APR_POLLHUP;
+    if (event & EPOLLET)
+        rv |= APR_POLLLET;
     /* APR_POLLNVAL is not handled by epoll. */
 
     return rv;
@@ -155,7 +159,7 @@ APR_DECLARE(apr_status_t) apr_pollset_add(apr_pollset_t *pollset,
     }
     elem->pfd = *descriptor;
 
-    ev.events = get_epoll_event(descriptor->reqevents) | EPOLLET;
+    ev.events = get_epoll_event(descriptor->reqevents);
     ev.data.ptr = elem;
     if (descriptor->desc_type == APR_POLL_SOCKET) {
         ret = epoll_ctl(pollset->epoll_fd, EPOLL_CTL_ADD,
